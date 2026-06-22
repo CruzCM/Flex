@@ -1,0 +1,57 @@
+up
+
+spark = gerenciador_spark.criar_sessao_spark(
+    db2=True,
+    driver_memory="24g",
+    executor_memory="24g",
+    driver_cores=8,
+    executor_cores=5,
+    num_executors=12,
+    jars=[
+        "/dados/shared/bin/ojdbc8.jar",
+        "/dados/shared/bin/mysql-connector-java-8.0.22.jar",
+    ],
+    spark_conf={
+        # shuffle / infra
+        "spark.shuffle.service.enabled": "true",
+        "spark.shuffle.service.port": "7447",
+        "spark.shuffle.service.name": "spark3_shuffle",
+        "spark.shuffle.useOldFetchProtocol": "true",
+
+        # hive / leitura
+        "spark.sql.hive.convertMetastoreOrc": "false",
+        "spark.sql.hive.caseSensitiveInferenceMode": "NEVER_INFER",
+
+        # serializer
+        "spark.serializer": "org.apache.spark.serializer.KryoSerializer",
+        "spark.kryoserializer.buffer.max.mb": "512",
+
+        # parquet / compatibilidade
+        "spark.sql.parquet.writeLegacyFormat": "true",
+        "spark.sql.legacy.timeParserPolicy": "LEGACY",
+        "spark.sql.legacy.parquet.int96RebaseModeInRead": "CORRECTED",
+        "spark.sql.legacy.parquet.int96RebaseModeInWrite": "CORRECTED",
+        "spark.sql.legacy.parquet.datetimeRebaseModeInRead": "CORRECTED",
+        "spark.sql.legacy.parquet.datetimeRebaseModeInWrite": "CORRECTED",
+
+        # escrita dinâmica
+        "spark.sql.sources.partitionOverwriteMode": "dynamic",
+
+        # leitura recursiva
+        "spark.hadoop.mapreduce.input.fileinputformat.input.dir.recursive": "true",
+
+        # broadcast / performance
+        "spark.sql.autoBroadcastJoinThreshold": "-1",
+        "spark.sql.broadcastTimeout": "8000",
+
+        # dynamic allocation tuning
+        "spark.dynamicAllocation.schedulerBacklogTimeout": "1m",
+        "spark.dynamicAllocation.executorIdleTimeout": "2min",
+
+        # heartbeat
+        "spark.executor.heartbeatInterval": "1000",
+
+        # overhead
+        "spark.driver.memoryOverhead": "8g",
+    },
+)
