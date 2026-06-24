@@ -1,0 +1,80 @@
+## Tabela final de pontuação dos temas
+
+```text
+Pontuação total do tema
+=
+Pontuação por concentração      (0 a 2)
++
+Pontuação por resultado do mês  (0 a 2)
++
+Pontuação por perfil final      (0 a 2)
+
+Máximo por tema: 6 pontos
+```
+
+| Tema                          | Pontuação por concentração                                                                                                                                                                                              | Pontuação por resultado do mês                                                                                                                     | Pontuação por perfil financeiro final                                                                                                                             |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Gestão do Orçamento**       | • Indicador: **gastos essenciais ÷ saída total**.<br>• De `0%` até a referência: `+0`.<br>• Acima da referência até `referência + metade da referência`: `+1`.<br>• Acima desse limite: `+2`.                           | • Deficitário forte: `+2`.<br>• Deficitário fraco: `+1`.<br>• Neutro negativo ou neutro positivo: `+1`.<br>• Superavitário fraco ou forte: `+0`.   | • Endividado Acrobata: `+2`.<br>• Endividado Inadimplente: `+1`.<br>• Equilibrista: `+1`.<br>• Investidor Precavido, Protegido, Despreocupado ou Acelerado: `+1`. |
+| **Uso Consciente do Crédito** | • Indicador: **crédito e dívidas ÷ saída total**.<br>• De `0%` até a referência: `+0`.<br>• Acima da referência até `referência + metade da referência`: `+1`.<br>• Acima desse limite: `+2`.                           | • Deficitário forte: `+2`.<br>• Deficitário fraco: `+1`.<br>• Neutro negativo ou neutro positivo: `+1`.<br>• Superavitário fraco ou forte: `+0`.   | • Endividado Acrobata: `+1`.<br>• Endividado Iminente: `+2`.<br>• Endividado Inadimplente: `+2`.                                                                  |
+| **Consumo Planejado**         | • Indicador: **gastos flexíveis ÷ saída total**.<br>• De `0%` até a referência: `+0`.<br>• Acima da referência até `referência + metade da referência`: `+1`.<br>• Acima desse limite: `+2`.                            | • Deficitário forte: `+2`.<br>• Deficitário fraco: `+1`.<br>• Neutro negativo ou neutro positivo: `+1`.<br>• Superavitário fraco ou forte: `+0`.   | • Endividado Consciente: `+2`.<br>• Endividado Iminente: `+1`.                                                                                                    |
+| **Formação de Reserva**       | • Indicador: **aplicações e valores destinados à reserva ÷ entrada total**.<br>• De `0%` até a referência: `+0`.<br>• Acima da referência até `referência + metade da referência`: `+1`.<br>• Acima desse limite: `+2`. | • Deficitário forte ou fraco: `+0`.<br>• Neutro negativo ou neutro positivo: `+1`.<br>• Superavitário fraco: `+1`.<br>• Superavitário forte: `+2`. | • Endividado Consciente: `+1`.<br>• Equilibrista: `+2`.<br>• Investidor Precavido, Protegido, Despreocupado ou Acelerado: `+2`.                                   |
+
+## Regra comum da concentração
+
+| Faixa observada                                         | Pontos |
+| ------------------------------------------------------- | -----: |
+| De `0%` até a referência                                |   `+0` |
+| Acima da referência até `referência + (referência ÷ 2)` |   `+1` |
+| Acima de `referência + (referência ÷ 2)`                |   `+2` |
+
+## Faixas do resultado do mês
+
+```text
+Índice de saída (%)
+=
+(Saída Total ÷ Entrada Total) × 100
+```
+
+| Resultado do mês    |              Índice de saída |
+| ------------------- | ---------------------------: |
+| Deficitário forte   |              Acima de `110%` |
+| Deficitário fraco   |   Acima de `105%` até `110%` |
+| Neutro negativo     |   Acima de `100%` até `105%` |
+| Neutro positivo     |          De `95%` até `100%` |
+| Superavitário fraco | De `90%` até abaixo de `95%` |
+| Superavitário forte |              Abaixo de `90%` |
+
+## Regras de aplicação
+
+* Cada cliente possui um único perfil financeiro final.
+* Perfis não listados em um tema recebem `+0` naquele tema.
+* Cada perfil distribui `+3` no total: `+2` em seu tema principal e `+1` em um tema complementar.
+* Classificar seus Gastos e Marcação de Contexto não participam da pontuação numérica.
+
+----
+
+Ela é mais simples de interpretar que o resultado em valor:
+
+100% → saiu exatamente o que entrou.
+acima de 100% → saiu mais do que entrou.
+abaixo de 100% → parte do que entrou permaneceu no período.
+
+Para criar as seis faixas, recomendo uma tolerância de 5 pontos percentuais e intensidade forte a partir de 10 pontos percentuais em relação ao equilíbrio.
+
+| Faixa                   |              Índice de saída | Leitura                                                      |
+| ----------------------- | ---------------------------: | ------------------------------------------------------------ |
+| **Deficitário forte**   |             Maior que `110%` | Saiu mais de 10% acima do que entrou.                        |
+| **Deficitário fraco**   |   Acima de `105%` até `110%` | Saiu entre 5% e 10% acima do que entrou.                     |
+| **Neutro negativo**     |   Acima de `100%` até `105%` | Saiu um pouco mais do que entrou, mas dentro da tolerância.  |
+| **Neutro positivo**     |          De `95%` até `100%` | Saiu um pouco menos do que entrou, mas dentro da tolerância. |
+| **Superavitário fraco** | De `90%` até abaixo de `95%` | Sobrou entre 5% e 10% do que entrou.                         |
+| **Superavitário forte** |              Abaixo de `90%` | Sobrou mais de 10% do que entrou.                            |
+
+| Entrada Total | Saída Total | Índice de saída | Faixa               |
+| ------------: | ----------: | --------------: | ------------------- |
+|      R$ 1.000 |    R$ 1.140 |            114% | Deficitário forte   |
+|      R$ 1.000 |    R$ 1.070 |            107% | Deficitário fraco   |
+|      R$ 1.000 |    R$ 1.030 |            103% | Neutro negativo     |
+|      R$ 1.000 |      R$ 980 |             98% | Neutro positivo     |
+|      R$ 1.000 |      R$ 930 |             93% | Superavitário fraco |
+|      R$ 1.000 |      R$ 850 |             85% | Superavitário forte |
