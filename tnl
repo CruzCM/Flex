@@ -1,0 +1,17 @@
+
+tabelas_db2 = [
+    ("DB2GFP", "TRAN_RLZD_INST_PCT"),
+    ("DB2SMI", "CLI_SGM"),
+    ("DB2GFP", "CTGR_TRAN_OPB"),
+    ("DB2MCI", "OCP_CFMD_BCRO"),
+    ("DB2MCI", "CLIENTE"),
+    ("DB2MCI", "PESSOA_FISICA"),
+]
+
+for schema, nome_tabela in tabelas_db2:
+    cliente_db2.diagnosticar_tabela(
+        schema=schema,
+        nome_tabela=nome_tabela,
+        show=True,
+        truncate=False,
+    )
