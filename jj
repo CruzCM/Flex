@@ -1,5 +1,1538 @@
-**Detalhe da realização**
-A solução analisa transações e sinais financeiros já disponíveis para transformar movimentações do período em uma visão clara sobre o momento de cada cliente. Com base nessa leitura, identifica de forma simples, consistente e escalável qual tema de educação financeira pode ser mais relevante naquele momento.
 
-**Resultado da realização**
-O Banco passa a contar com uma visão estruturada da sua base, capaz de apontar temas prioritários de educação financeira para diferentes clientes. Isso permite planejar ações mais relevantes, oportunas e alinhadas ao momento de cada pessoa, fortalecendo o relacionamento e ampliando o valor percebido pelo cliente.
+%%spark
+
+sandbox = "t2i2016"
+database = f"sbx_{sandbox}"
+table_name = "ana_edu_fin_cli"
+tabela_spark = f"{database}.{table_name}"
+
+update_metadado = True
+
+if update_metadado:
+spark.sql(f"DROP TABLE IF EXISTS {tabela_spark}")
+else:
+spark.sql(f"TRUNCATE TABLE {tabela_spark}")
+```sql
+spark.sql(f"""
+CREATE TABLE IF NOT EXISTS {tabela_spark} (
+    
+-- Identificação e recortes exploratórios
+DT_EXEA                    DATE            COMMENT 'Data de execução do ETL',
+DT_MES_REF                 DATE            COMMENT 'Data do mês de referência',
+CD_CLI                     STRING          COMMENT 'Código do cliente',
+CD_PRFL                    STRING          COMMENT 'Código do perfil exploratório',
+NM_PRFL                    STRING          COMMENT 'Texto do perfil exploratório',
+QT_TRANS_TOTAL             BIGINT          COMMENT 'Quantidade total de transações',
+QT_TRANS_ENT               BIGINT          COMMENT 'Quantidade de transações de entrada',
+QT_TRANS_SAI               BIGINT          COMMENT 'Quantidade de transações de saída',
+CD_MAC_PRFL_CLI            STRING          COMMENT 'Código macro do perfil do cliente',
+NM_MAC_PRFL_CLI            STRING          COMMENT 'Texto macro do perfil do cliente',
+CD_MIC_PRFL_CLI            STRING          COMMENT 'Código micro do perfil do cliente',
+NM_MIC_PRFL_CLI            STRING          COMMENT 'Texto micro do perfil do cliente',
+CD_PRFL_FIN                STRING          COMMENT 'Código do perfil financeiro derivado',
+NM_PRFL_FIN                STRING          COMMENT 'Texto do perfil financeiro',
+
+-- Blocos de Entrada
+VL_ENT_REC                 DECIMAL(18,2)   COMMENT 'Valor de entrada por receita, rendimento ou benefício',
+VL_ENT_REEMB               DECIMAL(18,2)   COMMENT 'Valor de entrada por restituição, estorno ou ajuste',
+VL_ENT_RESG                DECIMAL(18,2)   COMMENT 'Valor de entrada por resgate de investimento',
+VL_ENT_IND                 DECIMAL(18,2)   COMMENT 'Valor de entrada por transferência ou entrada indefinida',
+VL_ENT_EMPR                DECIMAL(18,2)   COMMENT 'Valor de entrada por empréstimo ou crédito liberado',
+VL_ENT_TOTAL               DECIMAL(18,2)   COMMENT 'Valor total de entrada',
+
+-- Blocos de Saída
+VL_SAI_GEN                 DECIMAL(18,2)   COMMENT 'Valor de saída genérica ou não classificada',
+VL_SAI_ESS                 DECIMAL(18,2)   COMMENT 'Valor de saída essencial',
+VL_SAI_FLEX                DECIMAL(18,2)   COMMENT 'Valor de saída flexível',
+VL_SAI_RES                 DECIMAL(18,2)   COMMENT 'Valor de saída para reserva ou futuro',
+VL_SAI_DIV                 DECIMAL(18,2)   COMMENT 'Valor de saída para dívidas, crédito ou custo financeiro',
+VL_SAI_TOTAL               DECIMAL(18,2)   COMMENT 'Valor total de saída',
+
+-- Resultado do Orçamento
+VL_RES_ORC                 DECIMAL(18,2)   COMMENT 'Valor do resultado do orçamento',
+CD_RES_ORC                 INT             COMMENT 'Código do resultado do orçamento',
+TX_RES_ORC                 STRING          COMMENT 'Texto do resultado do orçamento',
+PC_SAI_ENT                 DECIMAL(9,6)    COMMENT 'Percentual de saída sobre entrada',
+TX_STS_RES                 STRING          COMMENT 'Texto do status do resultado',
+TX_STS_FINAL               STRING          COMMENT 'Texto do status final',
+
+-- Percentuais das Entradas
+PC_ENT_REC                 DECIMAL(9,6)    COMMENT 'Percentual de entrada por receita',
+PC_ENT_REEMB               DECIMAL(9,6)    COMMENT 'Percentual de entrada por reembolso',
+PC_ENT_RESG                DECIMAL(9,6)    COMMENT 'Percentual de entrada por resgate',
+PC_ENT_IND                 DECIMAL(9,6)    COMMENT 'Percentual de entrada indefinida',
+PC_ENT_EMPR                DECIMAL(9,6)    COMMENT 'Percentual de entrada por empréstimo',
+
+-- Percentuais das Saídas
+PC_SAI_GEN                 DECIMAL(9,6)    COMMENT 'Percentual de saída genérica',
+PC_SAI_ESS                 DECIMAL(9,6)    COMMENT 'Percentual de saída essencial',
+PC_SAI_FLEX                DECIMAL(9,6)    COMMENT 'Percentual de saída flexível',
+PC_SAI_RES                 DECIMAL(9,6)    COMMENT 'Percentual de saída para reserva',
+PC_SAI_DIV                 DECIMAL(9,6)    COMMENT 'Percentual de saída para dívidas',
+
+-- Percentuais de Referência
+PC_REF_GEN                 DECIMAL(9,6)    COMMENT 'Percentual de referência para saída genérica',
+PC_REF_ESS                 DECIMAL(9,6)    COMMENT 'Percentual de referência para saída essencial',
+PC_REF_FLEX                DECIMAL(9,6)    COMMENT 'Percentual de referência para saída flexível',
+PC_REF_RES                 DECIMAL(9,6)    COMMENT 'Percentual de referência para reserva',
+PC_REF_CRED                DECIMAL(9,6)    COMMENT 'Percentual de referência para crédito',
+
+-- Pontuação por Concentração
+NR_PONT_CONC_GEN           INT             COMMENT 'Pontuação de concentração genérica',
+NR_PONT_CONC_ESS           INT             COMMENT 'Pontuação de concentração essencial',
+NR_PONT_CONC_FLEX          INT             COMMENT 'Pontuação de concentração flexível',
+NR_PONT_CONC_RES           INT             COMMENT 'Pontuação de concentração reserva',
+NR_PONT_CONC_CRED          INT             COMMENT 'Pontuação de concentração crédito',
+
+-- Pontuação do Orçamento
+NR_PONT_ORC_GEN            INT             COMMENT 'Pontuação de orçamento genérica',
+NR_PONT_ORC_ESS            INT             COMMENT 'Pontuação de orçamento essencial',
+NR_PONT_ORC_FLEX           INT             COMMENT 'Pontuação de orçamento flexível',
+NR_PONT_ORC_RES            INT             COMMENT 'Pontuação de orçamento reserva',
+NR_PONT_ORC_CRED           INT             COMMENT 'Pontuação de orçamento crédito',
+
+-- Pontuação do Perfil
+NR_PONT_PRFL_GEN           INT             COMMENT 'Pontuação de perfil genérica',
+NR_PONT_PRFL_ESS           INT             COMMENT 'Pontuação de perfil essencial',
+NR_PONT_PRFL_FLEX          INT             COMMENT 'Pontuação de perfil flexível',
+NR_PONT_PRFL_RES           INT             COMMENT 'Pontuação de perfil reserva',
+NR_PONT_PRFL_CRED          INT             COMMENT 'Pontuação de perfil crédito',
+
+-- Pontuação Final por Tema
+NR_PONT_CATEG              INT             COMMENT 'Pontuação final de categorização de gastos',
+NR_PONT_ORC                INT             COMMENT 'Pontuação final de gestão de orçamento',
+NR_PONT_CONS               INT             COMMENT 'Pontuação final de consumo planejado',
+NR_PONT_RES                INT             COMMENT 'Pontuação final de formação de reserva',
+NR_PONT_CRED               INT             COMMENT 'Pontuação final de uso consciente do crédito'
+
+)
+COMMENT 'Análise de Educação Financeira do Cliente'
+STORED AS PARQUET
+TBLPROPERTIES (
+'parquet.compress' = 'SNAPPY'
+)
+""")
+```
+
+# Modelagem Final Revisada — ANA_EDU_FIN_CLI
+
+## Identificação da tabela
+
+| Item | Definição |
+|---|---|
+| Nome lógico | Análise de Educação Financeira do Cliente |
+| Nome físico | `ANA_EDU_FIN_CLI` |
+| Nome no Hive | `ana_edu_fin_cli` |
+| Granularidade | Uma linha por `CD_CLI` e `DT_MES_REF`. |
+| Finalidade | Organizar indicadores do período para apoiar a educação financeira do cliente. |
+
+## Mudanças consolidadas nesta revisão
+
+- `DT_EXEA` permanece como **data de execução**, sem timestamp.
+- O recorte de perfil utiliza `CD_PRFL` e `NM_PRFL`.
+- As quantidades foram alinhadas à linguagem de **Entrada** e **Saída**.
+- Os campos de perfil macro, micro e financeiro final foram separados para eliminar duplicidade de nomes físicos.
+- Os percentuais foram reorganizados para que a ordem do nome lógico corresponda à ordem das siglas físicas.
+- As regras de negócio e os limiares de pontuação foram preservados.
+
+## Padrão mínimo de siglas
+
+| Sigla | Uso |
+|---|---|
+| `CD` | Código |
+| `DT` | Data |
+| `NM` | Nome |
+| `NR` | Número / pontuação |
+| `PC` | Percentual |
+| `QT` | Quantidade |
+| `TX` | Texto ou status |
+| `VL` | Valor monetário |
+| `ENT` | Entrada |
+| `SAI` | Saída |
+| `PRFL` | Perfil |
+
+> Sequência temática fixa: **1. Genérica / Categorização; 2. Essencial / Orçamento; 3. Flexível / Consumo; 4. Reserva / Formação de Reserva; 5. Crédito / Uso Consciente do Crédito.**
+
+## Identificação e recortes exploratórios
+
+| Nome antigo | Nome lógico novo | Nome físico novo | CLASSIFICAÇÃO (NÃO CATEGORIA) | Valor Referência | Observação |
+|---|---|---|---|---|---|
+|  | Data Execução | DT_EXEA |  |  | Data em que o ETL foi executado. Usar data, não timestamp. |
+|  | Data Mês Referência | DT_MES_REF |  |  | Mês financeiro observado. |
+| CD_CLI | Código Cliente | CD_CLI |  |  | Uma linha por cliente e mês de referência. |
+|  | Código Perfil | CD_PRFL | Exploratório / agrupamento |  | Não participa da pontuação inicial. |
+|  | Nome Perfil | NM_PRFL | Exploratório / agrupamento |  | Não participa da pontuação inicial. |
+| QTD_TOTAL_TRANSACAO | Quantidade Transação Total | QT_TRANS_TOTAL |  | Contagem |  |
+| QTD_TOTAL_CREDITO | Quantidade Transação Entrada | QT_TRANS_ENT |  | Contagem | Mantida a origem; nome novo segue o bloco Entrada. |
+| QTD_TOTAL_DEBITO | Quantidade Transação Saída | QT_TRANS_SAI |  | Contagem | Mantida a origem; nome novo segue o bloco Saída. |
+| CD_PERFIL | Código Macro Perfil Cliente | CD_MAC_PRFL_CLI |  | Tabela DB2D1D.DVS_GRDR_FNCO_PF |  |
+| NM_PERFIL | Nome Macro Perfil Cliente | NM_MAC_PRFL_CLI |  | Endividado / Equilibrista / Investidor |  |
+| CD_SUB_PERFIL | Código Micro Perfil Cliente | CD_MIC_PRFL_CLI |  | Tabela DB2D1D.DVS_GRDR_FNCO_PF |  |
+| NM_SUB_PERFIL | Nome Micro Perfil Cliente | NM_MIC_PRFL_CLI |  | Acrobata / Iminente / Inadimplente / demais |  |
+|  | Código Perfil Financeiro | CD_PRFL_FIN |  | CD_MAC_PRFL_CLI + CD_MIC_PRFL_CLI | Campo derivado. |
+| TX_PERFIL_FINAL | Nome Perfil Financeiro | NM_PRFL_FIN |  | NM_MAC_PRFL_CLI + NM_MIC_PRFL_CLI |  |
+
+## Blocos de Entrada
+
+| Nome antigo | Nome lógico novo | Nome físico novo | CLASSIFICAÇÃO (NÃO CATEGORIA) | Valor Referência | Observação |
+|---|---|---|---|---|---|
+| C1 | Valor Entrada Receita | VL_ENT_REC | Receita / rendimento / benefício |  |  |
+| C2 | Valor Entrada Reembolso | VL_ENT_REEMB | Restituição / estorno / ajuste |  |  |
+| C3 | Valor Entrada Resgate | VL_ENT_RESG | Resgate de investimento |  |  |
+| C4 | Valor Entrada Indefinida | VL_ENT_IND | Transferência / entrada indefinida |  |  |
+| C5 | Valor Entrada Empréstimo | VL_ENT_EMPR | Crédito tomado / liberação de crédito |  | Dinheiro recebido que cria obrigação futura. |
+| Entrada_Total | Valor Entrada Total | VL_ENT_TOTAL |  | VL_ENT_TOTAL = VL_ENT_REC + VL_ENT_REEMB + VL_ENT_RESG + VL_ENT_IND + VL_ENT_EMPR |  |
+
+## Blocos de Saída
+
+| Nome antigo | Nome lógico novo | Nome físico novo | CLASSIFICAÇÃO (NÃO CATEGORIA) | Valor Referência | Observação |
+|---|---|---|---|---|---|
+| D1 | Valor Saída Genérica | VL_SAI_GEN | Genérico / não classificado |  |  |
+| D2 | Valor Saída Essencial | VL_SAI_ESS | Essenciais |  |  |
+| D3 | Valor Saída Flexível | VL_SAI_FLEX | Flexíveis |  |  |
+| D4 | Valor Saída Reserva | VL_SAI_RES | Reserva / futuro |  |  |
+| D5 | Valor Saída Dívidas | VL_SAI_DIV | Dívidas / crédito / custo financeiro |  |  |
+| Saida_Total | Valor Saída Total | VL_SAI_TOTAL |  | VL_SAI_TOTAL = VL_SAI_GEN + VL_SAI_ESS + VL_SAI_FLEX + VL_SAI_RES + VL_SAI_DIV |  |
+
+## Resultado do Orçamento
+
+| Nome antigo | Nome lógico novo | Nome físico novo | CLASSIFICAÇÃO (NÃO CATEGORIA) | Valor Referência | Observação |
+|---|---|---|---|---|---|
+| Valor_Resultado_Orçamento | Valor Resultado Orçamento | VL_RES_ORC |  | VL_RES_ORC = VL_ENT_TOTAL - VL_SAI_TOTAL |  |
+| Codigo_Resultado_Orçamento | Código Resultado Orçamento | CD_RES_ORC |  | 0 / 1 / 2 |  |
+| Texto_Resultado_Orçamento | Texto Resultado Orçamento | TX_RES_ORC |  | Neutro / Superavitário / Deficitário |  |
+| %_Resultado | Percentual Saída Entrada | PC_SAI_ENT |  | VL_SAI_TOTAL / VL_ENT_TOTAL |  |
+| tx_status_resultado | Texto Status Resultado | TX_STS_RES |  | Faixa 2 (forte) / Faixa 1 (fraco) |  |
+| tx_status_final | Texto Status Final | TX_STS_FINAL |  | TX_RES_ORC + TX_STS_RES | Exemplo: neutro + forte. |
+
+## Percentuais das Entradas
+
+| Nome antigo | Nome lógico novo | Nome físico novo | CLASSIFICAÇÃO (NÃO CATEGORIA) | Valor Referência | Observação |
+|---|---|---|---|---|---|
+| PERCENTUAL_C1 | Percentual Entrada Receita | PC_ENT_REC | (%) Receita / rendimento / benefício | VL_ENT_REC / VL_ENT_TOTAL |  |
+| PERCENTUAL_C2 | Percentual Entrada Reembolso | PC_ENT_REEMB | (%) Restituição / estorno / ajuste | VL_ENT_REEMB / VL_ENT_TOTAL |  |
+| PERCENTUAL_C3 | Percentual Entrada Resgate | PC_ENT_RESG | (%) Resgate de investimento | VL_ENT_RESG / VL_ENT_TOTAL |  |
+| PERCENTUAL_C4 | Percentual Entrada Indefinida | PC_ENT_IND | (%) Transferência / entrada indefinida | VL_ENT_IND / VL_ENT_TOTAL |  |
+| PERCENTUAL_C5 | Percentual Entrada Empréstimo | PC_ENT_EMPR | (%) Crédito tomado / liberação de crédito | VL_ENT_EMPR / VL_ENT_TOTAL |  |
+
+## Percentuais das Saídas
+
+| Nome antigo | Nome lógico novo | Nome físico novo | CLASSIFICAÇÃO (NÃO CATEGORIA) | Valor Referência | Observação |
+|---|---|---|---|---|---|
+| PERCENTUAL_D1 | Percentual Saída Genérica | PC_SAI_GEN | (%) Genérico / não classificado | VL_SAI_GEN / VL_SAI_TOTAL |  |
+| PERCENTUAL_D2 | Percentual Saída Essencial | PC_SAI_ESS | (%) Essenciais | VL_SAI_ESS / VL_SAI_TOTAL |  |
+| PERCENTUAL_D3 | Percentual Saída Flexível | PC_SAI_FLEX | (%) Flexíveis | VL_SAI_FLEX / VL_SAI_TOTAL |  |
+| PERCENTUAL_D4 | Percentual Saída Reserva | PC_SAI_RES | (%) Reserva / futuro | VL_SAI_RES / VL_SAI_TOTAL |  |
+| PERCENTUAL_D5 | Percentual Saída Dívidas | PC_SAI_DIV | (%) Dívidas / crédito / custo financeiro | VL_SAI_DIV / VL_SAI_TOTAL |  |
+
+## Percentuais de Referência
+
+| Nome antigo | Nome lógico novo | Nome físico novo | CLASSIFICAÇÃO (NÃO CATEGORIA) | Valor Referência | Observação |
+|---|---|---|---|---|---|
+| PRP_D1 | Percentual Referência Genérica | PC_REF_GEN | Genérico / não classificado | 75% fixo (`0.750000`) | Referência do Tema 1. |
+| PRP_D2 | Percentual Referência Essencial | PC_REF_ESS | Essenciais | 50% fixo (`0.500000`) | Referência inicial do Tema 2. |
+| PRP_D3 | Percentual Referência Flexível | PC_REF_FLEX | Flexíveis | 30% fixo (`0.300000`) | Referência inicial do Tema 3. |
+| PRP_D4 | Percentual Referência Reserva | PC_REF_RES | Reserva / futuro | 20% fixo (`0.200000`) | Referência inicial do Tema 4. |
+| PRP_D5 | Percentual Referência Crédito | PC_REF_CRED | Dívidas / crédito / custo financeiro | 30% fixo (`0.300000`) | Referência inicial do Tema 5. |
+
+## Pontuação por Concentração
+
+| Nome antigo | Nome lógico novo | Nome físico novo | CLASSIFICAÇÃO (NÃO CATEGORIA) | Valor Referência | Observação |
+|---|---|---|---|---|---|
+| PONTACAO_TOTAL_TEMA 1 | Pontuação Concentração Genérica | NR_PONT_CONC_GEN | Genérica / Categorização | +0 — `PC_SAI_GEN <= PC_REF_GEN`<br>+99 — `PC_SAI_GEN > PC_REF_GEN` | Tema 1. |
+| PONTACAO_TOTAL_TEMA 2 | Pontuação Concentração Essencial | NR_PONT_CONC_ESS | Essencial / Orçamento | +0 — `PC_SAI_ESS < PC_REF_ESS`<br>+1 — `PC_SAI_ESS >= PC_REF_ESS` e `PC_SAI_ESS < (PC_REF_ESS + (PC_REF_ESS / 2))`<br>+2 — `PC_SAI_ESS >= (PC_REF_ESS + (PC_REF_ESS / 2))` | Faixas atuais: menor que 50%, de 50% até menor que 75%, e maior ou igual a 75%. |
+| PONTACAO_TOTAL_TEMA 3 | Pontuação Concentração Flexível | NR_PONT_CONC_FLEX | Flexível / Consumo | +0 — `PC_SAI_FLEX < PC_REF_FLEX`<br>+1 — `PC_SAI_FLEX >= PC_REF_FLEX` e `PC_SAI_FLEX < (PC_REF_FLEX + (PC_REF_FLEX / 2))`<br>+2 — `PC_SAI_FLEX >= (PC_REF_FLEX + (PC_REF_FLEX / 2))` | Faixas atuais: menor que 30%, de 30% até menor que 45%, e maior ou igual a 45%. |
+| PONTACAO_TOTAL_TEMA 4 | Pontuação Concentração Reserva | NR_PONT_CONC_RES | Reserva / Formação de Reserva | +0 — `PC_SAI_RES >= (PC_REF_RES + (PC_REF_RES / 2))`<br>+1 — `PC_SAI_RES >= PC_REF_RES` e `PC_SAI_RES < (PC_REF_RES + (PC_REF_RES / 2))`<br>+2 — `PC_SAI_RES < PC_REF_RES` | Faixas atuais: maior ou igual a 30%, de 20% até menor que 30%, e menor que 20%. |
+| PONTACAO_TOTAL_TEMA 5 | Pontuação Concentração Crédito | NR_PONT_CONC_CRED | Crédito / Uso Consciente do Crédito | +0 — `PC_SAI_DIV < PC_REF_CRED`<br>+1 — `PC_SAI_DIV >= PC_REF_CRED` e `PC_SAI_DIV < (PC_REF_CRED + (PC_REF_CRED / 2))`<br>+2 — `PC_SAI_DIV >= (PC_REF_CRED + (PC_REF_CRED / 2))` | Faixas atuais: menor que 30%, de 30% até menor que 45%, e maior ou igual a 45%. |
+
+## Pontuação do Orçamento
+
+| Nome antigo | Nome lógico novo | Nome físico novo | CLASSIFICAÇÃO (NÃO CATEGORIA) | Valor Referência | Observação |
+|---|---|---|---|---|---|
+| PONTUAÇÃO_TOTAL_ORÇAMENTO_TEMA 1 | Pontuação Orçamento Genérica | NR_PONT_ORC_GEN | Genérica / Categorização | Não se aplica: +0 | Tema 1 não utiliza resultado orçamentário. |
+| PONTUAÇÃO_TOTAL_ORÇAMENTO_TEMA 2 | Pontuação Orçamento Essencial | NR_PONT_ORC_ESS | Essencial / Orçamento | Deficitário forte: +2<br>Deficitário fraco: +1<br>Neutro forte ou fraco: +1<br>Superavitário fraco ou forte: +0 | Avaliar por `TX_RES_ORC` e `TX_STS_RES`. |
+| PONTUAÇÃO_TOTAL_ORÇAMENTO_TEMA 3 | Pontuação Orçamento Flexível | NR_PONT_ORC_FLEX | Flexível / Consumo | Deficitário forte: +2<br>Deficitário fraco: +1<br>Neutro negativo ou positivo: +1<br>Superavitário fraco ou forte: +0 | Avaliar por `TX_RES_ORC` e `TX_STS_RES`. |
+| PONTUAÇÃO_TOTAL_ORÇAMENTO_TEMA 4 | Pontuação Orçamento Reserva | NR_PONT_ORC_RES | Reserva / Formação de Reserva | Deficitário forte ou fraco: +0<br>Neutro negativo ou positivo: +1<br>Superavitário fraco: +1<br>Superavitário forte: +2 | Avaliar por `TX_RES_ORC` e `TX_STS_RES`. |
+| PONTUAÇÃO_TOTAL_ORÇAMENTO_TEMA 5 | Pontuação Orçamento Crédito | NR_PONT_ORC_CRED | Crédito / Uso Consciente do Crédito | Deficitário forte: +2<br>Deficitário fraco: +1<br>Neutro negativo ou positivo: +1<br>Superavitário fraco ou forte: +0 | Avaliar por `TX_RES_ORC` e `TX_STS_RES`. |
+
+## Pontuação do Perfil
+
+| Nome antigo | Nome lógico novo | Nome físico novo | CLASSIFICAÇÃO (NÃO CATEGORIA) | Valor Referência | Observação |
+|---|---|---|---|---|---|
+| PONTUAÇÃO_TOTAL_PERFIL_TEMA 1 | Pontuação Perfil Genérica | NR_PONT_PRFL_GEN | Genérica / Categorização | Não se aplica: +0 | Tema 1 não utiliza perfil financeiro. |
+| PONTUAÇÃO_TOTAL_PERFIL_TEMA 2 | Pontuação Perfil Essencial | NR_PONT_PRFL_ESS | Essencial / Orçamento | Endividado Acrobata: +2<br>Endividado Inadimplente: +1<br>Equilibrista: +1<br>Investidor Precavido, Protegido, Despreocupado ou Acelerado: +1<br>Demais perfis: +0 | Avaliar por `NM_PRFL_FIN`. |
+| PONTUAÇÃO_TOTAL_PERFIL_TEMA 3 | Pontuação Perfil Flexível | NR_PONT_PRFL_FLEX | Flexível / Consumo | Endividado Consciente: +2<br>Endividado Iminente: +1<br>Demais perfis: +0 | Avaliar por `NM_PRFL_FIN`. |
+| PONTUAÇÃO_TOTAL_PERFIL_TEMA 4 | Pontuação Perfil Reserva | NR_PONT_PRFL_RES | Reserva / Formação de Reserva | Endividado Consciente: +1<br>Equilibrista: +2<br>Investidor Precavido, Protegido, Despreocupado ou Acelerado: +2<br>Demais perfis: +0 | Avaliar por `NM_PRFL_FIN`. |
+| PONTUAÇÃO_TOTAL_PERFIL_TEMA 5 | Pontuação Perfil Crédito | NR_PONT_PRFL_CRED | Crédito / Uso Consciente do Crédito | Endividado Acrobata: +1<br>Endividado Iminente: +2<br>Endividado Inadimplente: +2<br>Demais perfis: +0 | Avaliar por `NM_PRFL_FIN`. |
+
+## Pontuação Final por Tema
+
+| Nome antigo | Nome lógico novo | Nome físico novo | CLASSIFICAÇÃO (NÃO CATEGORIA) | Valor Referência | Observação |
+|---|---|---|---|---|---|
+| PONTUAÇÃO_TEMA_1 | Pontuação Categorização | NR_PONT_CATEG | Categorização de Gastos | `NR_PONT_CATEG = NR_PONT_CONC_GEN` | Tema 1 — Genérica. |
+| PONTUAÇÃO_TEMA_2 | Pontuação Orçamento | NR_PONT_ORC | Gestão de Orçamento | `NR_PONT_ORC = NR_PONT_CONC_ESS + NR_PONT_ORC_ESS + NR_PONT_PRFL_ESS` | Tema 2 — Essencial. |
+| PONTUAÇÃO_TEMA_3 | Pontuação Consumo | NR_PONT_CONS | Consumo Planejado | `NR_PONT_CONS = NR_PONT_CONC_FLEX + NR_PONT_ORC_FLEX + NR_PONT_PRFL_FLEX` | Tema 3 — Flexível. |
+| PONTUAÇÃO_TEMA_4 | Pontuação Reserva | NR_PONT_RES | Formação de Reserva | `NR_PONT_RES = NR_PONT_CONC_RES + NR_PONT_ORC_RES + NR_PONT_PRFL_RES` | Tema 4 — Reserva. |
+| PONTUAÇÃO_TEMA_5 | Pontuação Crédito | NR_PONT_CRED | Uso Consciente do Crédito | `NR_PONT_CRED = NR_PONT_CONC_CRED + NR_PONT_ORC_CRED + NR_PONT_PRFL_CRED` | Tema 5 — Crédito. |
+```
+
+
+
+--------------------------------
+
+
+
+from traceback import format_exc
+
+try:
+    from src.utils.gerenciador_sessao_spark_local import (
+        GerenciadorSessaoSpark,
+        ler_variavel_ambiente_local,
+    )
+
+    ambiente = ler_variavel_ambiente_local("AMBIENTE").upper()
+
+    if ambiente != "MODELAGEM":
+        ambiente = "PRODUCAO"
+
+    gerenciador_spark = GerenciadorSessaoSpark(
+        nome_sessao="etl-vinculacao-mf-insights",
+        adicionar_variaveis={
+            "DOMINIO": "t2i",
+            "SANDBOX": "t2i2016",
+            "AMBIENTE": ambiente,
+        },
+        nome_arquivo_env_modelagem="desenv.env",
+        exibir_configuracao=False,
+        ativar_logs=True,
+    )
+
+    spark = gerenciador_spark.criar_sessao_spark(
+        db2=True,
+        driver_memory="16g",
+        jars=[
+            "/dados/shared/bin/ojdbc8.jar",
+        ],
+        spark_conf={
+            "spark.driver.memoryOverhead": "8g",
+            "spark.executor.memoryOverhead": "4g",
+            "spark.serializer":
+                "org.apache.spark.serializer.KryoSerializer",
+            "spark.kryoserializer.buffer.max": "512m",
+            "spark.sql.adaptive.enabled": "true",
+            "spark.sql.adaptive.coalescePartitions.enabled": "true",
+            "spark.sql.adaptive.skewJoin.enabled": "true",
+            "spark.sql.adaptive.localShuffleReader.enabled": "true",
+            "spark.sql.shuffle.partitions": "240",
+            "spark.sql.sources.partitionOverwriteMode": "dynamic",
+            "spark.hadoop.mapreduce.input.fileinputformat.input.dir.recursive":"true",
+            "spark.sql.autoBroadcastJoinThreshold": "-1",
+            "spark.sql.broadcastTimeout": "8000",
+            "spark.executor.heartbeatInterval": "30s",
+            "spark.network.timeout": "300s",
+            "spark.sql.session.timeZone": "America/Sao_Paulo",
+        },
+    )
+
+    try:
+        widget_cls = __import__("ipywidgets").Widget
+        ipython = get_ipython()
+        if ipython is not None:
+            ipython.display_formatter.formatters["text/plain"].for_type(
+                widget_cls,
+                lambda *a, **k: None,
+            )
+    except (ImportError, NameError, AttributeError):
+        pass
+
+except Exception as exc:
+    print(type(exc).__name__)
+    print(str(exc))
+    print(format_exc())
+    raise
+
+try:
+    %run ./src/utils/gerenciador_sessao_spark_remoto.ipynb
+except Exception as exc:
+    print(type(exc).__name__)
+    print(str(exc))
+    print(format_exc())
+    raise
+
+%%spark
+
+ambiente = ler_variavel_ambiente_spark("AMBIENTE").upper()
+dominio = ler_variavel_ambiente_spark("DOMINIO").lower()
+hoje = ler_variavel_ambiente_spark("HOJE")
+
+if ambiente == "MODELAGEM":
+    sandbox = ler_variavel_ambiente_spark("SANDBOX").lower()
+    database = f"sbx_{sandbox}"
+else:
+    database = f"hive_{dominio}"
+
+env_spark = dict(os.environ)
+
+cliente_db2 = criar_cliente_db2_spark(env=env_spark)
+%%spark
+
+from datetime import datetime
+from pyspark import StorageLevel
+from pyspark.sql import functions as F
+from pyspark.sql.window import Window
+
+nome_tabela_saida = "ana_edu_fin_cli"
+nome_tabela = f"{database}.{nome_tabela_saida}"
+
+fetchsize_db2 = 10_000
+num_partitions_db2 = 16
+num_partitions_transacoes = 20
+partitions_hive = 10
+partitions_stage_default = 20
+
+materializar_etapas = True
+limpar_cache_intermediario = True
+limpar_cache_publicacao = True
+storage_level_materializacao = StorageLevel.MEMORY_AND_DISK
+
+diagnostico_opt_in = False
+
+# Faixa padrao para colunas de identificacao de cliente
+# Usada em CD_CLI, CD_CLI_OCP, COD e F_CLIENTE_COD.
+cd_cli_min = 1
+cd_cli_max = 999_999_999
+
+faixa_resultado_forte = 0.25
+
+pc_ref_gen = 0.750000
+pc_ref_ess = 0.500000
+pc_ref_flex = 0.300000
+pc_ref_res = 0.200000
+pc_ref_cred = 0.300000
+
+%%spark
+
+data_atual = hoje
+data_ini = data_atual[:8] + "01"
+
+df_datas = (
+    spark.createDataFrame([(1,)], ["id"])
+    .withColumn("data_atual", F.lit(data_atual).cast("date"))
+    .withColumn("data_ini", F.lit(data_ini).cast("date"))
+    .withColumn("data_fim", F.last_day("data_atual"))
+    .select("data_atual", "data_ini", "data_fim")
+)
+
+linha_datas = df_datas.collect()[0]
+
+data_ini = datetime.strftime(linha_datas[1], "%Y-%m-%d")
+data_fim = datetime.strftime(linha_datas[2], "%Y-%m-%d")
+ano_etl = int(datetime.strftime(linha_datas[1], "%Y"))
+
+print(f"Data de Inicio da query: {data_ini}")
+print(f"Data final da query: {data_fim}")
+print(f"Ano do ETL : {ano_etl}")
+
+query = f'''
+WITH base AS (
+    SELECT
+        CURRENT_DATE() AS DT_EXEA,
+        TRUNC(CAST(a.DT_TRAN AS DATE), 'MM') AS DT_MES_REF,
+
+        CAST(a.CD_CLI AS STRING) AS CD_CLI,
+        CAST(cs.CD_SGM_CLI AS STRING) AS CD_PRFL,
+
+        CASE
+            WHEN cs.CD_SGM_CLI = 2502 THEN 'SEM PERFIL'
+            WHEN cs.CD_SGM_CLI = 2012 THEN 'PF A'
+            WHEN cs.CD_SGM_CLI = 2112 THEN 'PF B'
+            WHEN cs.CD_SGM_CLI = 2602 THEN 'PF C'
+            WHEN cs.CD_SGM_CLI = 2702 THEN 'PF D'
+            WHEN cs.CD_SGM_CLI = 2712 THEN 'PF E'
+            WHEN cs.CD_SGM_CLI = 1111 THEN 'A CLASSIFICAR'
+        END AS TX_PRFL,
+
+        a.CD_PRD,
+
+        CASE
+            WHEN a.CD_PRD = 6 THEN 'CONTA CORRENTE'
+            WHEN a.CD_PRD = 9 THEN 'CARTAO'
+        END AS PRD,
+
+        a.CD_CTGR_TRAN_OGNL,
+        LOWER(TRIM(a.TX_DCR_TRAN_OGNL)) AS LANCAMENTO_ORIGINAL,
+        LOWER(TRIM(a.TX_CMPR_DCR_TRAN)) AS COMPLEMENTO_ORIGINAL,
+
+        CASE
+            WHEN a.CD_NTZ_CTB_TRAN = 'C' THEN 'CREDITO'
+            WHEN a.CD_NTZ_CTB_TRAN = 'D' THEN 'DEBITO'
+        END AS TP_LANCAMENTO,
+
+        a.VL_TRAN,
+
+        MONTH(a.DT_TRAN) || '/' || YEAR(a.DT_TRAN) AS DT_REF
+
+    FROM DB2GFP.TRAN_RLZD_INST_PCT a
+
+    INNER JOIN DB2SMI.CLI_SGM cs
+        ON a.CD_CLI = cs.CD_CLI
+
+    WHERE cs.CD_SGM_CLI IN (2502, 2012, 2112, 2602, 2702, 2712, 1111)
+        AND cs.CD_CRIT_SGM_CLI = 2
+        AND a.NR_PTC BETWEEN 80 AND 85
+        AND DATE(a.TS_INCL_TRAN) >= '2025-01-01'
+        AND a.DT_TRAN BETWEEN '{data_ini}' AND '{data_fim}'
+        AND a.CD_FST_TRAN_INST = 0
+),
+
+tratada AS (
+    SELECT
+        b.DT_EXEA,
+        b.DT_MES_REF,
+        b.CD_CLI,
+        b.CD_PRFL,
+        b.TX_PRFL,
+        b.CD_PRD,
+        b.PRD,
+        b.CD_CTGR_TRAN_OGNL,
+
+        TRIM(
+            TRANSLATE(
+                c.TX_DCR_CTGR_TRAN,
+                'aaaeeiooouc',
+                'áãâéêíóôõúç'
+            )
+        ) AS TX_DCR_CTGR_TRAN,
+
+        TRIM(
+            TRANSLATE(
+                COALESCE(b.LANCAMENTO_ORIGINAL, ''),
+                'oiauocaeaaaaaeeeeiiioooouuuc V()$&*%@;:_#',
+                'ÓÍÁÚÔÇÁÉãããããééééíõõõõúúúç1234567890/*-+.,| V()$&*%@;:_#'
+            )
+        ) AS LANCAMENTO_TRATADO,
+
+        TRIM(
+            TRANSLATE(
+                COALESCE(b.COMPLEMENTO_ORIGINAL, ''),
+                'oiauocaeaaaaaeeeeiiioooouuuc V()$&*%@;:_#',
+                'ÓÍÁÚÔÇÁÉãããããééééíõõõõúúúç1234567890/*-+.,| V()$&*%@;:_#'
+            )
+        ) AS COMPLEMENTO_TRATADO,
+
+        b.TP_LANCAMENTO,
+        b.VL_TRAN,
+        b.DT_REF
+
+    FROM base b
+
+    INNER JOIN DB2GFP.CTGR_TRAN_OPB c
+        ON b.CD_CTGR_TRAN_OGNL = c.CD_CTGR_TRAN
+),
+
+normalizada AS (
+    SELECT
+        DT_EXEA,
+        DT_MES_REF,
+        CD_CLI,
+        CD_PRFL,
+        TX_PRFL,
+        CD_PRD,
+        PRD,
+        CD_CTGR_TRAN_OGNL,
+        TX_DCR_CTGR_TRAN,
+
+        CASE
+            WHEN LOCATE(LANCAMENTO_TRATADO, COMPLEMENTO_TRATADO) > 0
+                THEN LANCAMENTO_TRATADO
+            ELSE REPLACE(
+                REPLACE(
+                    REPLACE(
+                        TRIM(LANCAMENTO_TRATADO) || ' ' || TRIM(COMPLEMENTO_TRATADO),
+                        '  ',
+                        ' '
+                    ),
+                    '  ',
+                    ' '
+                ),
+                '  ',
+                ' '
+            )
+        END AS LANCAMENTO,
+
+        TP_LANCAMENTO,
+        VL_TRAN,
+        DT_REF
+
+    FROM tratada
+)
+
+SELECT
+    DT_EXEA,
+    DT_MES_REF,
+    CD_CLI,
+    CD_PRFL,
+    TX_PRFL,
+    CD_PRD,
+    PRD,
+    CD_CTGR_TRAN_OGNL,
+    TX_DCR_CTGR_TRAN,
+    LANCAMENTO,
+    TP_LANCAMENTO,
+
+    AVG(VL_TRAN) AS MEDIA,
+    SUM(VL_TRAN) AS SOMA,
+    COUNT(VL_TRAN) AS QTD,
+
+    DT_REF
+
+FROM normalizada
+
+GROUP BY
+    DT_EXEA,
+    DT_MES_REF,
+    CD_CLI,
+    CD_PRFL,
+    TX_PRFL,
+    CD_PRD,
+    PRD,
+    CD_CTGR_TRAN_OGNL,
+    TX_DCR_CTGR_TRAN,
+    LANCAMENTO,
+    TP_LANCAMENTO,
+    DT_REF
+'''
+%%spark
+
+df_transacoes = cliente_db2.run_select(
+    query,
+    fetchsize=fetchsize_db2,
+    partition_column="CD_CLI",
+    lower_bound=cd_cli_min,
+    upper_bound=cd_cli_max,
+    num_partitions=num_partitions_transacoes
+)
+
+df_transacoes = materializar_etapa(
+    df_transacoes,
+    "01_transacoes_agregadas",
+    partitions=partitions_stage_default,
+)
+
+%%spark
+
+# Observacao: df_transacoes permanece como a base transacional agregada.
+# A gradeira financeira e consultada separadamente usando somente CD_CLI.
+# O join na base inicial so acontece apos garantir unicidade por CD_CLI.
+
+df_transacoes.select("CD_CLI").distinct().createOrReplaceTempView(
+    "vw_cd_cli_df_perfil"
+)
+
+query_perfil_gradeira = '''
+SELECT DISTINCT
+    CAST(g.CD_CLI AS STRING) AS CD_CLI,
+    CAST(g.CD_MAC_PRFL_CLI AS STRING) AS CD_MAC_PRFL_CLI,
+    g.NM_MAC_PRFL_CLI,
+    CAST(g.CD_MIC_PRFL_CLI AS STRING) AS CD_MIC_PRFL_CLI,
+    g.NM_MIC_PRFL_CLI
+FROM sbx_t2i2016.DVS_GRDR_FNCO_PF g
+INNER JOIN vw_cd_cli_df_perfil c
+    ON CAST(g.CD_CLI AS STRING) = c.CD_CLI
+'''
+
+df_perfil_gradeira = spark.sql(query_perfil_gradeira)
+
+df_perfil_gradeira_duplicados = (
+    df_perfil_gradeira
+    .groupBy("CD_CLI")
+    .count()
+    .filter(F.col("count") > 1)
+)
+
+qt_cli_perfil_gradeira_duplicados = df_perfil_gradeira_duplicados.count()
+
+if qt_cli_perfil_gradeira_duplicados > 0:
+    df_perfil_gradeira_duplicados.show(20, truncate=False)
+    raise ValueError(
+        "DVS_GRDR_FNCO_PF retornou mais de um perfil macro/micro "
+        "para o mesmo CD_CLI. Join bloqueado para evitar duplicidade."
+    )
+
+df_perfil_gradeira = materializar_etapa(
+    df_perfil_gradeira,
+    "02_gradeira_financeira_pf",
+    partitions=partitions_stage_default,
+)
+
+df_perfil = (
+    df_transacoes.alias("t")
+    .join(df_perfil_gradeira.alias("g"), on="CD_CLI", how="left")
+    .select(
+        F.col("t.DT_EXEA").alias("DT_EXEA"),
+        F.col("t.DT_MES_REF").alias("DT_MES_REF"),
+        F.col("t.CD_CLI").alias("CD_CLI"),
+        F.col("t.CD_PRFL").alias("CD_PRFL"),
+        F.col("t.TX_PRFL").alias("TX_PRFL"),
+        F.col("g.CD_MAC_PRFL_CLI").alias("CD_MAC_PRFL_CLI"),
+        F.col("g.NM_MAC_PRFL_CLI").alias("NM_MAC_PRFL_CLI"),
+        F.col("g.CD_MIC_PRFL_CLI").alias("CD_MIC_PRFL_CLI"),
+        F.col("g.NM_MIC_PRFL_CLI").alias("NM_MIC_PRFL_CLI"),
+        F.col("t.CD_PRD").alias("CD_PRD"),
+        F.col("t.PRD").alias("PRD"),
+        F.col("t.CD_CTGR_TRAN_OGNL").alias("CD_CTGR_TRAN_OGNL"),
+        F.col("t.TX_DCR_CTGR_TRAN").alias("TX_DCR_CTGR_TRAN"),
+        F.col("t.LANCAMENTO").alias("LANCAMENTO"),
+        F.col("t.TP_LANCAMENTO").alias("TP_LANCAMENTO"),
+        F.col("t.MEDIA").alias("MEDIA"),
+        F.col("t.SOMA").alias("SOMA"),
+        F.col("t.QTD").alias("QTD"),
+        F.col("t.DT_REF").alias("DT_REF"),
+    )
+)
+
+qt_df_transacoes = df_transacoes.count()
+qt_df_perfil = df_perfil.count()
+
+if qt_df_transacoes != qt_df_perfil:
+    raise ValueError(
+        "Base inicial alterou a quantidade de linhas: "
+        f"df_transacoes={qt_df_transacoes}, df_perfil={qt_df_perfil}."
+    )
+
+df_perfil = materializar_etapa(
+    df_perfil,
+    "03_base_inicial",
+    partitions=partitions_stage_default,
+)
+
+%%spark
+
+# Classificacao inicial por categoria original e tipo de lancamento.
+# O mapa usa c/d; df_perfil pode chegar como CREDITO/DEBITO ou c/d.
+
+codigos_classificacao_credito = {
+    "Transferência / entrada indefinida": 0,
+    "Receita / rendimento / benefício": 1,
+    "Restituição / estorno / reembolso / ajuste": 2,
+    "Resgate de investimento": 3,
+    "Crédito tomado / liberação de crédito": 4,
+}
+
+codigos_classificacao_debito = {
+    "Neutro / não classificado": 0,
+    "Essenciais": 1,
+    "Flexíveis": 2,
+    "Futuro": 3,
+    "Dívidas / crédito / custo financeiro": 4,
+}
+
+base_variaveis_classificacao = [
+    (0, 0, "Sem categoria", "Transferência / entrada indefinida", "Neutro / não classificado"),
+    (0, 83, "Sem categoria", "Transferência / entrada indefinida", "Neutro / não classificado"),
+    (1, 1, "Salário", "Receita / rendimento / benefício", "Neutro / não classificado"),
+    (1, 2, "Vale Alimentação", "Receita / rendimento / benefício", "Neutro / não classificado"),
+    (1, 3, "Restituição de IR", "Restituição / estorno / reembolso / ajuste", "Neutro / não classificado"),
+    (1, 4, "Bonificação", "Receita / rendimento / benefício", "Neutro / não classificado"),
+    (1, 5, "Outros Rendimentos", "Receita / rendimento / benefício", "Neutro / não classificado"),
+    (2, 6, "Água", "Restituição / estorno / reembolso / ajuste", "Essenciais"),
+    (2, 7, "Eletricidade e Gás", "Restituição / estorno / reembolso / ajuste", "Essenciais"),
+    (2, 9, "Compra de Imóvel", "Crédito tomado / liberação de crédito", "Dívidas / crédito / custo financeiro"),
+    (2, 10, "Aluguel e Condomínio", "Restituição / estorno / reembolso / ajuste", "Essenciais"),
+    (2, 11, "Móveis e Utensílios", "Restituição / estorno / reembolso / ajuste", "Flexíveis"),
+    (2, 12, "Serviços e Manutenção", "Restituição / estorno / reembolso / ajuste", "Essenciais"),
+    (2, 13, "Empregados", "Restituição / estorno / reembolso / ajuste", "Flexíveis"),
+    (2, 14, "Animais e Pets", "Restituição / estorno / reembolso / ajuste", "Flexíveis"),
+    (2, 3790, "Seguro Residencial", "Restituição / estorno / reembolso / ajuste", "Flexíveis"),
+    (3, 15, "Educação Superior", "Restituição / estorno / reembolso / ajuste", "Flexíveis"),
+    (3, 16, "Colégio", "Restituição / estorno / reembolso / ajuste", "Essenciais"),
+    (3, 17, "Idiomas", "Restituição / estorno / reembolso / ajuste", "Flexíveis"),
+    (3, 18, "Publicações e Papelaria", "Restituição / estorno / reembolso / ajuste", "Flexíveis"),
+    (3, 20, "Outros Gastos", "Restituição / estorno / reembolso / ajuste", "Flexíveis"),
+    (4, 21, "Viagens e Lazer", "Restituição / estorno / reembolso / ajuste", "Flexíveis"),
+    (4, 22, "Esportes e Academia", "Restituição / estorno / reembolso / ajuste", "Flexíveis"),
+    (4, 25, "Cultura e Entretenimento", "Restituição / estorno / reembolso / ajuste", "Flexíveis"),
+    (4, 26, "Publicações Digitais", "Restituição / estorno / reembolso / ajuste", "Flexíveis"),
+    (4, 61, "Jogos e Loterias", "Restituição / estorno / reembolso / ajuste", "Flexíveis"),
+    (5, 27, "Plano de Saúde", "Restituição / estorno / reembolso / ajuste", "Essenciais"),
+    (5, 28, "Serviços de Saúde", "Restituição / estorno / reembolso / ajuste", "Essenciais"),
+    (5, 29, "Dentista", "Restituição / estorno / reembolso / ajuste", "Essenciais"),
+    (5, 30, "Farmácias e Drogarias", "Restituição / estorno / reembolso / ajuste", "Essenciais"),
+    (6, 32, "Feira e Supermercado", "Restituição / estorno / reembolso / ajuste", "Essenciais"),
+    (6, 35, "Bar", "Restituição / estorno / reembolso / ajuste", "Flexíveis"),
+    (7, 36, "Compra de Veículo", "Crédito tomado / liberação de crédito", "Dívidas / crédito / custo financeiro"),
+    (7, 37, "Combustível", "Restituição / estorno / reembolso / ajuste", "Essenciais"),
+    (7, 38, "Estacionamento e Pedágio", "Restituição / estorno / reembolso / ajuste", "Flexíveis"),
+    (7, 39, "Seguro de Veículo", "Restituição / estorno / reembolso / ajuste", "Flexíveis"),
+    (7, 40, "Serviços e Manutenção", "Restituição / estorno / reembolso / ajuste", "Flexíveis"),
+    (7, 41, "Transporte Urbano e Apps", "Restituição / estorno / reembolso / ajuste", "Essenciais"),
+    (8, 42, "Vestuário e Acessórios", "Restituição / estorno / reembolso / ajuste", "Flexíveis"),
+    (8, 43, "Cuidado Pessoal e Beleza", "Restituição / estorno / reembolso / ajuste", "Flexíveis"),
+    (8, 44, "Compras Diversas", "Restituição / estorno / reembolso / ajuste", "Neutro / não classificado"),
+    (8, 45, "Pensão Alimentícia", "Restituição / estorno / reembolso / ajuste", "Essenciais"),
+    (8, 46, "Seguros e Previdência", "Restituição / estorno / reembolso / ajuste", "Neutro / não classificado"),
+    (8, 47, "Doação", "Restituição / estorno / reembolso / ajuste", "Flexíveis"),
+    (8, 48, "Gasto com Familiares", "Restituição / estorno / reembolso / ajuste", "Flexíveis"),
+    (8, 49, "Presentes", "Restituição / estorno / reembolso / ajuste", "Flexíveis"),
+    (8, 60, "Serviços diversos", "Restituição / estorno / reembolso / ajuste", "Flexíveis"),
+    (8, 4417, "Empréstimos e Prestações", "Crédito tomado / liberação de crédito", "Dívidas / crédito / custo financeiro"),
+    (9, 51, "Telefonia e Internet", "Restituição / estorno / reembolso / ajuste", "Essenciais"),
+    (9, 53, "Assinatura TV e Streaming", "Restituição / estorno / reembolso / ajuste", "Flexíveis"),
+    (10, 54, "IPTU", "Restituição / estorno / reembolso / ajuste", "Essenciais"),
+    (10, 55, "IPVA e Gastos Detran", "Restituição / estorno / reembolso / ajuste", "Essenciais"),
+    (10, 56, "Imposto de Renda", "Restituição / estorno / reembolso / ajuste", "Essenciais"),
+    (10, 57, "ISS(Imposto sobre Serviços)", "Restituição / estorno / reembolso / ajuste", "Essenciais"),
+    (10, 58, "GPS(Guia de Previdência Social)", "Restituição / estorno / reembolso / ajuste", "Futuro"),
+    (10, 59, "Serviços Financeiros", "Restituição / estorno / reembolso / ajuste", "Dívidas / crédito / custo financeiro"),
+    (10, 3787, "IOF", "Restituição / estorno / reembolso / ajuste", "Dívidas / crédito / custo financeiro"),
+    (10, 3788, "Encargos e Tarifas", "Restituição / estorno / reembolso / ajuste", "Dívidas / crédito / custo financeiro"),
+    (11, 279, "Gastos Diversos", "Transferência / entrada indefinida", "Neutro / não classificado"),
+    (11, 39434, "Cheque", "Transferência / entrada indefinida", "Neutro / não classificado"),
+    (11, 39435, "Saque", "Transferência / entrada indefinida", "Neutro / não classificado"),
+    (11, 39436, "Transferência", "Transferência / entrada indefinida", "Neutro / não classificado"),
+    (11, 39437, "Boletos Diversos", "Restituição / estorno / reembolso / ajuste", "Neutro / não classificado"),
+    (12, 111, "Cartão de Crédito", "Restituição / estorno / reembolso / ajuste", "Dívidas / crédito / custo financeiro"),
+    (13, 448977, "Aplicação", "Restituição / estorno / reembolso / ajuste", "Futuro"),
+    (13, 448978, "Resgate de Investimentos", "Resgate de investimento", "Neutro / não classificado"),
+    (14, 300, "Receitas Agro", "Receita / rendimento / benefício", "Neutro / não classificado"),
+    (14, 310, "Criações", "Receita / rendimento / benefício", "Neutro / não classificado"),
+    (14, 330, "Cultivos", "Receita / rendimento / benefício", "Neutro / não classificado"),
+    (14, 350, "Insumos", "Restituição / estorno / reembolso / ajuste", "Neutro / não classificado"),
+    (14, 370, "Apoio Produtivo", "Restituição / estorno / reembolso / ajuste", "Neutro / não classificado"),
+]
+
+linhas_mapeamento_classificacao = []
+
+for _, codigo_categoria, _, texto_credito, texto_debito in base_variaveis_classificacao:
+    linhas_mapeamento_classificacao.append(
+        (
+            codigo_categoria,
+            "c",
+            codigos_classificacao_credito[texto_credito],
+            texto_credito,
+        )
+    )
+    linhas_mapeamento_classificacao.append(
+        (
+            codigo_categoria,
+            "d",
+            codigos_classificacao_debito[texto_debito],
+            texto_debito,
+        )
+    )
+
+df_mapeamento_classificacao = spark.createDataFrame(
+    linhas_mapeamento_classificacao,
+    [
+        "CD_CTGR_TRAN_OGNL_MAP",
+        "TP_LANCAMENTO_MAP",
+        "CD_CLASSIFICACAO_INICIAL",
+        "CLASSIFICACAO_INICIAL",
+    ],
+)
+
+df_mapeamento_classificacao_duplicado = (
+    df_mapeamento_classificacao
+    .groupBy("CD_CTGR_TRAN_OGNL_MAP", "TP_LANCAMENTO_MAP")
+    .count()
+    .filter(F.col("count") > 1)
+)
+
+qt_mapeamento_classificacao_duplicado = df_mapeamento_classificacao_duplicado.count()
+
+if qt_mapeamento_classificacao_duplicado > 0:
+    df_mapeamento_classificacao_duplicado.show(20, truncate=False)
+    raise ValueError(
+        "Mapa de classificacao inicial possui chaves duplicadas por "
+        "CD_CTGR_TRAN_OGNL e TP_LANCAMENTO."
+    )
+
+tp_lancamento_normalizado = F.lower(F.trim(F.col("TP_LANCAMENTO")))
+
+df_perfil_chave_classificacao = df_perfil.withColumn(
+    "TP_LANCAMENTO_MAP",
+    F.when(tp_lancamento_normalizado.isin("c", "credito", "crédito"), F.lit("c"))
+    .when(tp_lancamento_normalizado.isin("d", "debito", "débito"), F.lit("d"))
+)
+
+df_tp_lancamento_nao_mapeado = (
+    df_perfil_chave_classificacao
+    .filter(F.col("TP_LANCAMENTO_MAP").isNull())
+    .select("TP_LANCAMENTO")
+    .distinct()
+)
+
+qt_tp_lancamento_nao_mapeado = df_tp_lancamento_nao_mapeado.count()
+
+if qt_tp_lancamento_nao_mapeado > 0:
+    df_tp_lancamento_nao_mapeado.show(20, truncate=False)
+    raise ValueError("TP_LANCAMENTO nao reconhecido para classificacao inicial.")
+
+df_perfil_classificacao_inicial = (
+    df_perfil_chave_classificacao.alias("p")
+    .join(
+        F.broadcast(df_mapeamento_classificacao).alias("m"),
+        (
+            F.col("p.CD_CTGR_TRAN_OGNL").cast("int")
+            == F.col("m.CD_CTGR_TRAN_OGNL_MAP")
+        )
+        & (F.col("p.TP_LANCAMENTO_MAP") == F.col("m.TP_LANCAMENTO_MAP")),
+        how="left",
+    )
+    .select(
+        F.col("p.DT_EXEA").alias("DT_EXEA"),
+        F.col("p.DT_MES_REF").alias("DT_MES_REF"),
+        F.col("p.CD_CLI").alias("CD_CLI"),
+        F.col("p.CD_PRFL").alias("CD_PRFL"),
+        F.col("p.TX_PRFL").alias("TX_PRFL"),
+        F.col("p.CD_MAC_PRFL_CLI").alias("CD_MAC_PRFL_CLI"),
+        F.col("p.NM_MAC_PRFL_CLI").alias("NM_MAC_PRFL_CLI"),
+        F.col("p.CD_MIC_PRFL_CLI").alias("CD_MIC_PRFL_CLI"),
+        F.col("p.NM_MIC_PRFL_CLI").alias("NM_MIC_PRFL_CLI"),
+        F.col("p.CD_PRD").alias("CD_PRD"),
+        F.col("p.PRD").alias("PRD"),
+        F.col("p.CD_CTGR_TRAN_OGNL").alias("CD_CTGR_TRAN_OGNL"),
+        F.col("p.TX_DCR_CTGR_TRAN").alias("TX_DCR_CTGR_TRAN"),
+        F.col("p.LANCAMENTO").alias("LANCAMENTO"),
+        F.col("p.TP_LANCAMENTO_MAP").alias("TP_LANCAMENTO"),
+        F.col("p.MEDIA").alias("MEDIA"),
+        F.col("p.SOMA").alias("SOMA"),
+        F.col("p.QTD").alias("QTD"),
+        F.col("p.DT_REF").alias("DT_REF"),
+        F.col("m.CLASSIFICACAO_INICIAL").alias("CLASSIFICACAO_INICIAL"),
+    )
+)
+
+df_classificacao_sem_mapeamento = (
+    df_perfil_classificacao_inicial
+    .filter(F.col("CLASSIFICACAO_INICIAL").isNull())
+    .select("CD_CTGR_TRAN_OGNL", "TP_LANCAMENTO")
+    .distinct()
+)
+
+qt_classificacao_sem_mapeamento = df_classificacao_sem_mapeamento.count()
+
+if qt_classificacao_sem_mapeamento > 0:
+    df_classificacao_sem_mapeamento.show(50, truncate=False)
+    raise ValueError(
+        "Existem categorias/tipos de lancamento sem classificacao inicial."
+    )
+
+qt_df_perfil = df_perfil.count()
+qt_df_perfil_classificacao_inicial = df_perfil_classificacao_inicial.count()
+
+if qt_df_perfil != qt_df_perfil_classificacao_inicial:
+    raise ValueError(
+        "Classificacao inicial alterou a quantidade de linhas: "
+        f"df_perfil={qt_df_perfil}, "
+        f"df_perfil_classificacao_inicial={qt_df_perfil_classificacao_inicial}."
+    )
+
+df_perfil_classificacao_inicial = materializar_etapa(
+    df_perfil_classificacao_inicial,
+    "04_classificacao_inicial",
+    partitions=partitions_stage_default,
+)
+
+%%spark
+
+# Resumo final: uma linha por cliente e mes de referencia.
+
+def soma_valor(condicao):
+    return F.coalesce(
+        F.sum(F.when(condicao, F.col("SOMA")).otherwise(F.lit(0))),
+        F.lit(0),
+    ).cast("decimal(18,2)")
+
+
+def soma_qtd(condicao):
+    return F.coalesce(
+        F.sum(F.when(condicao, F.col("QTD")).otherwise(F.lit(0))),
+        F.lit(0),
+    ).cast("bigint")
+
+
+is_entrada = F.col("TP_LANCAMENTO") == "c"
+is_saida = F.col("TP_LANCAMENTO") == "d"
+
+cls_receita = F.col("CLASSIFICACAO_INICIAL") == "Receita / rendimento / benefício"
+cls_reembolso = F.col("CLASSIFICACAO_INICIAL") == "Restituição / estorno / reembolso / ajuste"
+cls_resgate = F.col("CLASSIFICACAO_INICIAL") == "Resgate de investimento"
+cls_indefinida = F.col("CLASSIFICACAO_INICIAL") == "Transferência / entrada indefinida"
+cls_emprestimo = F.col("CLASSIFICACAO_INICIAL") == "Crédito tomado / liberação de crédito"
+
+cls_generica = F.col("CLASSIFICACAO_INICIAL") == "Neutro / não classificado"
+cls_essencial = F.col("CLASSIFICACAO_INICIAL") == "Essenciais"
+cls_flexivel = F.col("CLASSIFICACAO_INICIAL") == "Flexíveis"
+cls_reserva = F.col("CLASSIFICACAO_INICIAL") == "Futuro"
+cls_divida = F.col("CLASSIFICACAO_INICIAL") == "Dívidas / crédito / custo financeiro"
+
+colunas_identificacao_cliente = [
+    "DT_EXEA",
+    "DT_MES_REF",
+    "CD_CLI",
+    "CD_PRFL",
+    "TX_PRFL",
+    "CD_MAC_PRFL_CLI",
+    "NM_MAC_PRFL_CLI",
+    "CD_MIC_PRFL_CLI",
+    "NM_MIC_PRFL_CLI",
+]
+
+df_resumo_cliente = (
+    df_perfil_classificacao_inicial
+    .groupBy(*colunas_identificacao_cliente)
+    .agg(
+        F.sum("QTD").cast("bigint").alias("QT_TRANS_TOTAL"),
+        soma_qtd(is_entrada).alias("QT_TRANS_ENT"),
+        soma_qtd(is_saida).alias("QT_TRANS_SAI"),
+        soma_valor(is_entrada & cls_receita).alias("VL_ENT_REC"),
+        soma_valor(is_entrada & cls_reembolso).alias("VL_ENT_REEMB"),
+        soma_valor(is_entrada & cls_resgate).alias("VL_ENT_RESG"),
+        soma_valor(is_entrada & cls_indefinida).alias("VL_ENT_IND"),
+        soma_valor(is_entrada & cls_emprestimo).alias("VL_ENT_EMPR"),
+        soma_valor(is_entrada).alias("VL_ENT_TOTAL"),
+        soma_valor(is_saida & cls_generica).alias("VL_SAI_GEN"),
+        soma_valor(is_saida & cls_essencial).alias("VL_SAI_ESS"),
+        soma_valor(is_saida & cls_flexivel).alias("VL_SAI_FLEX"),
+        soma_valor(is_saida & cls_reserva).alias("VL_SAI_RES"),
+        soma_valor(is_saida & cls_divida).alias("VL_SAI_DIV"),
+        soma_valor(is_saida).alias("VL_SAI_TOTAL"),
+    )
+)
+
+df_resumo_cliente_duplicado = (
+    df_resumo_cliente
+    .groupBy("CD_CLI", "DT_MES_REF")
+    .count()
+    .filter(F.col("count") > 1)
+)
+
+qt_resumo_cliente_duplicado = df_resumo_cliente_duplicado.count()
+
+if qt_resumo_cliente_duplicado > 0:
+    df_resumo_cliente_duplicado.show(20, truncate=False)
+    raise ValueError(
+        "Resumo final gerou mais de uma linha por CD_CLI e DT_MES_REF."
+    )
+
+df_resumo_cliente = materializar_etapa(
+    df_resumo_cliente,
+    "05_resumo_cliente",
+    partitions=partitions_stage_default,
+)
+
+%%spark
+
+# Resultado do orcamento: uma linha por cliente e mes de referencia.
+
+df_resultado_orcamento = (
+    df_resumo_cliente
+    .withColumn(
+        "VL_RES_ORC",
+        (F.col("VL_ENT_TOTAL") - F.col("VL_SAI_TOTAL")).cast("decimal(18,2)"),
+    )
+    .withColumn(
+        "CD_RES_ORC",
+        F.when(F.col("VL_RES_ORC") > 0, F.lit(1))
+        .when(F.col("VL_RES_ORC") < 0, F.lit(2))
+        .otherwise(F.lit(0))
+        .cast("int"),
+    )
+    .withColumn(
+        "TX_RES_ORC",
+        F.when(F.col("CD_RES_ORC") == 1, F.lit("Superavitário"))
+        .when(F.col("CD_RES_ORC") == 2, F.lit("Deficitário"))
+        .otherwise(F.lit("Neutro")),
+    )
+    .withColumn(
+        "PC_SAI_ENT",
+        F.when(
+            F.col("VL_ENT_TOTAL") != 0,
+            F.col("VL_SAI_TOTAL") / F.col("VL_ENT_TOTAL"),
+        )
+        .otherwise(F.lit(None))
+        .cast("decimal(9,6)"),
+    )
+    .withColumn(
+        "TX_STS_RES",
+        F.when(
+            (F.col("VL_ENT_TOTAL") != 0)
+            & (
+                (F.abs(F.col("VL_RES_ORC")) / F.col("VL_ENT_TOTAL"))
+                >= F.lit(faixa_resultado_forte)
+            ),
+            F.lit("forte"),
+        ).otherwise(F.lit("fraco")),
+    )
+    .withColumn(
+        "TX_STS_FINAL",
+        F.concat_ws(" ", F.col("TX_RES_ORC"), F.col("TX_STS_RES")),
+    )
+)
+
+qt_df_resumo_cliente = df_resumo_cliente.count()
+qt_df_resultado_orcamento = df_resultado_orcamento.count()
+
+if qt_df_resumo_cliente != qt_df_resultado_orcamento:
+    raise ValueError(
+        "Resultado do orcamento alterou a quantidade de linhas: "
+        f"df_resumo_cliente={qt_df_resumo_cliente}, "
+        f"df_resultado_orcamento={qt_df_resultado_orcamento}."
+    )
+
+df_resultado_orcamento = materializar_etapa(
+    df_resultado_orcamento,
+    "06_resultado_orcamento",
+    partitions=partitions_stage_default,
+)
+
+%%spark
+
+# Percentuais de referencia fixos por tema.
+
+df_percentuais_referencia = (
+    df_resultado_orcamento
+    .withColumn("PC_REF_GEN", F.lit(pc_ref_gen).cast("decimal(9,6)"))
+    .withColumn("PC_REF_ESS", F.lit(pc_ref_ess).cast("decimal(9,6)"))
+    .withColumn("PC_REF_FLEX", F.lit(pc_ref_flex).cast("decimal(9,6)"))
+    .withColumn("PC_REF_RES", F.lit(pc_ref_res).cast("decimal(9,6)"))
+    .withColumn("PC_REF_CRED", F.lit(pc_ref_cred).cast("decimal(9,6)"))
+)
+
+qt_df_resultado_orcamento = df_resultado_orcamento.count()
+qt_df_percentuais_referencia = df_percentuais_referencia.count()
+
+if qt_df_resultado_orcamento != qt_df_percentuais_referencia:
+    raise ValueError(
+        "Percentuais de referencia alteraram a quantidade de linhas: "
+        f"df_resultado_orcamento={qt_df_resultado_orcamento}, "
+        f"df_percentuais_referencia={qt_df_percentuais_referencia}."
+    )
+
+df_percentuais_referencia = materializar_etapa(
+    df_percentuais_referencia,
+    "07_percentuais_referencia",
+    partitions=partitions_stage_default,
+)
+
+%%spark
+
+# Pontuacao por concentracao dos blocos de saida.
+
+def percentual_sobre_saida(coluna_valor):
+    return (
+        F.when(
+            F.col("VL_SAI_TOTAL") != 0,
+            F.col(coluna_valor) / F.col("VL_SAI_TOTAL"),
+        )
+        .otherwise(F.lit(None))
+        .cast("decimal(9,6)")
+    )
+
+
+def limite_superior(coluna_referencia):
+    return F.col(coluna_referencia) + (F.col(coluna_referencia) / F.lit(2))
+
+
+df_pontuacao_concentracao = (
+    df_percentuais_referencia
+    .withColumn("PC_SAI_GEN", percentual_sobre_saida("VL_SAI_GEN"))
+    .withColumn("PC_SAI_ESS", percentual_sobre_saida("VL_SAI_ESS"))
+    .withColumn("PC_SAI_FLEX", percentual_sobre_saida("VL_SAI_FLEX"))
+    .withColumn("PC_SAI_RES", percentual_sobre_saida("VL_SAI_RES"))
+    .withColumn("PC_SAI_DIV", percentual_sobre_saida("VL_SAI_DIV"))
+    .withColumn(
+        "NR_PONT_CONC_GEN",
+        F.when(F.col("PC_SAI_GEN") > F.col("PC_REF_GEN"), F.lit(99))
+        .otherwise(F.lit(0))
+        .cast("int"),
+    )
+    .withColumn(
+        "NR_PONT_CONC_ESS",
+        F.when(F.col("PC_SAI_ESS").isNull(), F.lit(0))
+        .when(F.col("PC_SAI_ESS") < F.col("PC_REF_ESS"), F.lit(0))
+        .when(F.col("PC_SAI_ESS") < limite_superior("PC_REF_ESS"), F.lit(1))
+        .otherwise(F.lit(2))
+        .cast("int"),
+    )
+    .withColumn(
+        "NR_PONT_CONC_FLEX",
+        F.when(F.col("PC_SAI_FLEX").isNull(), F.lit(0))
+        .when(F.col("PC_SAI_FLEX") < F.col("PC_REF_FLEX"), F.lit(0))
+        .when(F.col("PC_SAI_FLEX") < limite_superior("PC_REF_FLEX"), F.lit(1))
+        .otherwise(F.lit(2))
+        .cast("int"),
+    )
+    .withColumn(
+        "NR_PONT_CONC_RES",
+        F.when(F.col("PC_SAI_RES").isNull(), F.lit(0))
+        .when(F.col("PC_SAI_RES") >= limite_superior("PC_REF_RES"), F.lit(0))
+        .when(F.col("PC_SAI_RES") >= F.col("PC_REF_RES"), F.lit(1))
+        .otherwise(F.lit(2))
+        .cast("int"),
+    )
+    .withColumn(
+        "NR_PONT_CONC_CRED",
+        F.when(F.col("PC_SAI_DIV").isNull(), F.lit(0))
+        .when(F.col("PC_SAI_DIV") < F.col("PC_REF_CRED"), F.lit(0))
+        .when(F.col("PC_SAI_DIV") < limite_superior("PC_REF_CRED"), F.lit(1))
+        .otherwise(F.lit(2))
+        .cast("int"),
+    )
+)
+
+qt_df_percentuais_referencia = df_percentuais_referencia.count()
+qt_df_pontuacao_concentracao = df_pontuacao_concentracao.count()
+
+if qt_df_percentuais_referencia != qt_df_pontuacao_concentracao:
+    raise ValueError(
+        "Pontuacao por concentracao alterou a quantidade de linhas: "
+        f"df_percentuais_referencia={qt_df_percentuais_referencia}, "
+        f"df_pontuacao_concentracao={qt_df_pontuacao_concentracao}."
+    )
+
+df_pontuacao_concentracao = materializar_etapa(
+    df_pontuacao_concentracao,
+    "08_pontuacao_concentracao",
+    partitions=partitions_stage_default,
+)
+
+%%spark
+
+# Pontuacao do orcamento por tema.
+
+is_deficitario = F.col("TX_RES_ORC") == "Deficitário"
+is_neutro = F.col("TX_RES_ORC") == "Neutro"
+is_superavitario = F.col("TX_RES_ORC") == "Superavitário"
+is_forte = F.col("TX_STS_RES") == "forte"
+is_fraco = F.col("TX_STS_RES") == "fraco"
+
+pontuacao_orcamento_deficitario = (
+    F.when(is_deficitario & is_forte, F.lit(2))
+    .when(is_deficitario & is_fraco, F.lit(1))
+    .when(is_neutro, F.lit(1))
+    .otherwise(F.lit(0))
+    .cast("int")
+)
+
+df_pontuacao_orcamento = (
+    df_pontuacao_concentracao
+    .withColumn("NR_PONT_ORC_GEN", F.lit(0).cast("int"))
+    .withColumn("NR_PONT_ORC_ESS", pontuacao_orcamento_deficitario)
+    .withColumn("NR_PONT_ORC_FLEX", pontuacao_orcamento_deficitario)
+    .withColumn(
+        "NR_PONT_ORC_RES",
+        F.when(is_deficitario, F.lit(0))
+        .when(is_neutro, F.lit(1))
+        .when(is_superavitario & is_fraco, F.lit(1))
+        .when(is_superavitario & is_forte, F.lit(2))
+        .otherwise(F.lit(0))
+        .cast("int"),
+    )
+    .withColumn("NR_PONT_ORC_CRED", pontuacao_orcamento_deficitario)
+)
+
+qt_df_pontuacao_concentracao = df_pontuacao_concentracao.count()
+qt_df_pontuacao_orcamento = df_pontuacao_orcamento.count()
+
+if qt_df_pontuacao_concentracao != qt_df_pontuacao_orcamento:
+    raise ValueError(
+        "Pontuacao do orcamento alterou a quantidade de linhas: "
+        f"df_pontuacao_concentracao={qt_df_pontuacao_concentracao}, "
+        f"df_pontuacao_orcamento={qt_df_pontuacao_orcamento}."
+    )
+
+df_pontuacao_orcamento = materializar_etapa(
+    df_pontuacao_orcamento,
+    "09_pontuacao_orcamento",
+    partitions=partitions_stage_default,
+)
+
+%%spark
+
+# Pontuacao do perfil financeiro por tema.
+
+perfil_macro = F.lower(F.trim(F.coalesce(F.col("NM_MAC_PRFL_CLI"), F.lit(""))))
+perfil_micro = F.lower(F.trim(F.coalesce(F.col("NM_MIC_PRFL_CLI"), F.lit(""))))
+
+is_endividado = perfil_macro == "endividado"
+is_equilibrista = perfil_macro == "equilibrista"
+is_investidor = perfil_macro == "investidor"
+
+is_acrobata = perfil_micro == "acrobata"
+is_consciente = perfil_micro == "consciente"
+is_iminente = perfil_micro == "iminente"
+is_inadimplente = perfil_micro == "inadimplente"
+is_investidor_referencia = perfil_micro.isin(
+    "precavido",
+    "protegido",
+    "despreocupado",
+    "acelerado",
+)
+
+df_pontuacao_perfil = (
+    df_pontuacao_orcamento
+    .withColumn(
+        "CD_PRFL_FIN",
+        F.when(
+            F.col("CD_MAC_PRFL_CLI").isNull() & F.col("CD_MIC_PRFL_CLI").isNull(),
+            F.lit(None),
+        ).otherwise(F.concat_ws("_", "CD_MAC_PRFL_CLI", "CD_MIC_PRFL_CLI")),
+    )
+    .withColumn(
+        "NM_PRFL_FIN",
+        F.when(
+            F.col("NM_MAC_PRFL_CLI").isNull() & F.col("NM_MIC_PRFL_CLI").isNull(),
+            F.lit(None),
+        ).otherwise(F.concat_ws(" ", "NM_MAC_PRFL_CLI", "NM_MIC_PRFL_CLI")),
+    )
+    .withColumn("NR_PONT_PRFL_GEN", F.lit(0).cast("int"))
+    .withColumn(
+        "NR_PONT_PRFL_ESS",
+        F.when(is_endividado & is_acrobata, F.lit(2))
+        .when(is_endividado & is_inadimplente, F.lit(1))
+        .when(is_equilibrista, F.lit(1))
+        .when(is_investidor & is_investidor_referencia, F.lit(1))
+        .otherwise(F.lit(0))
+        .cast("int"),
+    )
+    .withColumn(
+        "NR_PONT_PRFL_FLEX",
+        F.when(is_endividado & is_consciente, F.lit(2))
+        .when(is_endividado & is_iminente, F.lit(1))
+        .otherwise(F.lit(0))
+        .cast("int"),
+    )
+    .withColumn(
+        "NR_PONT_PRFL_RES",
+        F.when(is_endividado & is_consciente, F.lit(1))
+        .when(is_equilibrista, F.lit(2))
+        .when(is_investidor & is_investidor_referencia, F.lit(2))
+        .otherwise(F.lit(0))
+        .cast("int"),
+    )
+    .withColumn(
+        "NR_PONT_PRFL_CRED",
+        F.when(is_endividado & is_acrobata, F.lit(1))
+        .when(is_endividado & is_iminente, F.lit(2))
+        .when(is_endividado & is_inadimplente, F.lit(2))
+        .otherwise(F.lit(0))
+        .cast("int"),
+    )
+)
+
+qt_df_pontuacao_orcamento = df_pontuacao_orcamento.count()
+qt_df_pontuacao_perfil = df_pontuacao_perfil.count()
+
+if qt_df_pontuacao_orcamento != qt_df_pontuacao_perfil:
+    raise ValueError(
+        "Pontuacao do perfil alterou a quantidade de linhas: "
+        f"df_pontuacao_orcamento={qt_df_pontuacao_orcamento}, "
+        f"df_pontuacao_perfil={qt_df_pontuacao_perfil}."
+    )
+
+df_pontuacao_perfil = materializar_etapa(
+    df_pontuacao_perfil,
+    "10_pontuacao_perfil",
+    partitions=partitions_stage_default,
+)
+
+%%spark
+
+# Pontuacao final por tema.
+
+def soma_pontuacao(*colunas):
+    expressao = F.lit(0)
+    for coluna in colunas:
+        expressao = expressao + F.coalesce(F.col(coluna), F.lit(0))
+    return expressao.cast("int")
+
+
+df_pontuacao_final_tema = (
+    df_pontuacao_perfil
+    .withColumn(
+        "NR_PONT_CATEG",
+        F.coalesce(F.col("NR_PONT_CONC_GEN"), F.lit(0)).cast("int"),
+    )
+    .withColumn(
+        "NR_PONT_ORC",
+        soma_pontuacao(
+            "NR_PONT_CONC_ESS",
+            "NR_PONT_ORC_ESS",
+            "NR_PONT_PRFL_ESS",
+        ),
+    )
+    .withColumn(
+        "NR_PONT_CONS",
+        soma_pontuacao(
+            "NR_PONT_CONC_FLEX",
+            "NR_PONT_ORC_FLEX",
+            "NR_PONT_PRFL_FLEX",
+        ),
+    )
+    .withColumn(
+        "NR_PONT_RES",
+        soma_pontuacao(
+            "NR_PONT_CONC_RES",
+            "NR_PONT_ORC_RES",
+            "NR_PONT_PRFL_RES",
+        ),
+    )
+    .withColumn(
+        "NR_PONT_CRED",
+        soma_pontuacao(
+            "NR_PONT_CONC_CRED",
+            "NR_PONT_ORC_CRED",
+            "NR_PONT_PRFL_CRED",
+        ),
+    )
+)
+
+qt_df_pontuacao_perfil = df_pontuacao_perfil.count()
+qt_df_pontuacao_final_tema = df_pontuacao_final_tema.count()
+
+if qt_df_pontuacao_perfil != qt_df_pontuacao_final_tema:
+    raise ValueError(
+        "Pontuacao final por tema alterou a quantidade de linhas: "
+        f"df_pontuacao_perfil={qt_df_pontuacao_perfil}, "
+        f"df_pontuacao_final_tema={qt_df_pontuacao_final_tema}."
+    )
+
+df_pontuacao_final_tema = materializar_etapa(
+    df_pontuacao_final_tema,
+    "11_pontuacao_final_tema",
+    partitions=partitions_stage_default,
+)
+
+%%spark
+
+# Carga final da tabela ANA_EDU_FIN_CLI.
+# Escrita direta com overwrite.
+
+def percentual_sobre_entrada(coluna_valor):
+    return (
+        F.when(
+            F.col("VL_ENT_TOTAL") != 0,
+            F.col(coluna_valor) / F.col("VL_ENT_TOTAL"),
+        )
+        .otherwise(F.lit(None))
+        .cast("decimal(9,6)")
+    )
+
+
+df_saida_final = (
+    df_pontuacao_final_tema
+    .withColumn("NM_PRFL", F.col("TX_PRFL"))
+    .withColumn("PC_ENT_REC", percentual_sobre_entrada("VL_ENT_REC"))
+    .withColumn("PC_ENT_REEMB", percentual_sobre_entrada("VL_ENT_REEMB"))
+    .withColumn("PC_ENT_RESG", percentual_sobre_entrada("VL_ENT_RESG"))
+    .withColumn("PC_ENT_IND", percentual_sobre_entrada("VL_ENT_IND"))
+    .withColumn("PC_ENT_EMPR", percentual_sobre_entrada("VL_ENT_EMPR"))
+    .select(
+        F.col("DT_EXEA").cast("date").alias("DT_EXEA"),
+        F.col("DT_MES_REF").cast("date").alias("DT_MES_REF"),
+        F.col("CD_CLI").cast("string").alias("CD_CLI"),
+        F.col("CD_PRFL").cast("string").alias("CD_PRFL"),
+        F.col("NM_PRFL").cast("string").alias("NM_PRFL"),
+        F.col("QT_TRANS_TOTAL").cast("bigint").alias("QT_TRANS_TOTAL"),
+        F.col("QT_TRANS_ENT").cast("bigint").alias("QT_TRANS_ENT"),
+        F.col("QT_TRANS_SAI").cast("bigint").alias("QT_TRANS_SAI"),
+        F.col("CD_MAC_PRFL_CLI").cast("string").alias("CD_MAC_PRFL_CLI"),
+        F.col("NM_MAC_PRFL_CLI").cast("string").alias("NM_MAC_PRFL_CLI"),
+        F.col("CD_MIC_PRFL_CLI").cast("string").alias("CD_MIC_PRFL_CLI"),
+        F.col("NM_MIC_PRFL_CLI").cast("string").alias("NM_MIC_PRFL_CLI"),
+        F.col("CD_PRFL_FIN").cast("string").alias("CD_PRFL_FIN"),
+        F.col("NM_PRFL_FIN").cast("string").alias("NM_PRFL_FIN"),
+        F.col("VL_ENT_REC").cast("decimal(18,2)").alias("VL_ENT_REC"),
+        F.col("VL_ENT_REEMB").cast("decimal(18,2)").alias("VL_ENT_REEMB"),
+        F.col("VL_ENT_RESG").cast("decimal(18,2)").alias("VL_ENT_RESG"),
+        F.col("VL_ENT_IND").cast("decimal(18,2)").alias("VL_ENT_IND"),
+        F.col("VL_ENT_EMPR").cast("decimal(18,2)").alias("VL_ENT_EMPR"),
+        F.col("VL_ENT_TOTAL").cast("decimal(18,2)").alias("VL_ENT_TOTAL"),
+        F.col("VL_SAI_GEN").cast("decimal(18,2)").alias("VL_SAI_GEN"),
+        F.col("VL_SAI_ESS").cast("decimal(18,2)").alias("VL_SAI_ESS"),
+        F.col("VL_SAI_FLEX").cast("decimal(18,2)").alias("VL_SAI_FLEX"),
+        F.col("VL_SAI_RES").cast("decimal(18,2)").alias("VL_SAI_RES"),
+        F.col("VL_SAI_DIV").cast("decimal(18,2)").alias("VL_SAI_DIV"),
+        F.col("VL_SAI_TOTAL").cast("decimal(18,2)").alias("VL_SAI_TOTAL"),
+        F.col("VL_RES_ORC").cast("decimal(18,2)").alias("VL_RES_ORC"),
+        F.col("CD_RES_ORC").cast("int").alias("CD_RES_ORC"),
+        F.col("TX_RES_ORC").cast("string").alias("TX_RES_ORC"),
+        F.col("PC_SAI_ENT").cast("decimal(9,6)").alias("PC_SAI_ENT"),
+        F.col("TX_STS_RES").cast("string").alias("TX_STS_RES"),
+        F.col("TX_STS_FINAL").cast("string").alias("TX_STS_FINAL"),
+        F.col("PC_ENT_REC").cast("decimal(9,6)").alias("PC_ENT_REC"),
+        F.col("PC_ENT_REEMB").cast("decimal(9,6)").alias("PC_ENT_REEMB"),
+        F.col("PC_ENT_RESG").cast("decimal(9,6)").alias("PC_ENT_RESG"),
+        F.col("PC_ENT_IND").cast("decimal(9,6)").alias("PC_ENT_IND"),
+        F.col("PC_ENT_EMPR").cast("decimal(9,6)").alias("PC_ENT_EMPR"),
+        F.col("PC_SAI_GEN").cast("decimal(9,6)").alias("PC_SAI_GEN"),
+        F.col("PC_SAI_ESS").cast("decimal(9,6)").alias("PC_SAI_ESS"),
+        F.col("PC_SAI_FLEX").cast("decimal(9,6)").alias("PC_SAI_FLEX"),
+        F.col("PC_SAI_RES").cast("decimal(9,6)").alias("PC_SAI_RES"),
+        F.col("PC_SAI_DIV").cast("decimal(9,6)").alias("PC_SAI_DIV"),
+        F.col("PC_REF_GEN").cast("decimal(9,6)").alias("PC_REF_GEN"),
+        F.col("PC_REF_ESS").cast("decimal(9,6)").alias("PC_REF_ESS"),
+        F.col("PC_REF_FLEX").cast("decimal(9,6)").alias("PC_REF_FLEX"),
+        F.col("PC_REF_RES").cast("decimal(9,6)").alias("PC_REF_RES"),
+        F.col("PC_REF_CRED").cast("decimal(9,6)").alias("PC_REF_CRED"),
+        F.col("NR_PONT_CONC_GEN").cast("int").alias("NR_PONT_CONC_GEN"),
+        F.col("NR_PONT_CONC_ESS").cast("int").alias("NR_PONT_CONC_ESS"),
+        F.col("NR_PONT_CONC_FLEX").cast("int").alias("NR_PONT_CONC_FLEX"),
+        F.col("NR_PONT_CONC_RES").cast("int").alias("NR_PONT_CONC_RES"),
+        F.col("NR_PONT_CONC_CRED").cast("int").alias("NR_PONT_CONC_CRED"),
+        F.col("NR_PONT_ORC_GEN").cast("int").alias("NR_PONT_ORC_GEN"),
+        F.col("NR_PONT_ORC_ESS").cast("int").alias("NR_PONT_ORC_ESS"),
+        F.col("NR_PONT_ORC_FLEX").cast("int").alias("NR_PONT_ORC_FLEX"),
+        F.col("NR_PONT_ORC_RES").cast("int").alias("NR_PONT_ORC_RES"),
+        F.col("NR_PONT_ORC_CRED").cast("int").alias("NR_PONT_ORC_CRED"),
+        F.col("NR_PONT_PRFL_GEN").cast("int").alias("NR_PONT_PRFL_GEN"),
+        F.col("NR_PONT_PRFL_ESS").cast("int").alias("NR_PONT_PRFL_ESS"),
+        F.col("NR_PONT_PRFL_FLEX").cast("int").alias("NR_PONT_PRFL_FLEX"),
+        F.col("NR_PONT_PRFL_RES").cast("int").alias("NR_PONT_PRFL_RES"),
+        F.col("NR_PONT_PRFL_CRED").cast("int").alias("NR_PONT_PRFL_CRED"),
+        F.col("NR_PONT_CATEG").cast("int").alias("NR_PONT_CATEG"),
+        F.col("NR_PONT_ORC").cast("int").alias("NR_PONT_ORC"),
+        F.col("NR_PONT_CONS").cast("int").alias("NR_PONT_CONS"),
+        F.col("NR_PONT_RES").cast("int").alias("NR_PONT_RES"),
+        F.col("NR_PONT_CRED").cast("int").alias("NR_PONT_CRED"),
+    )
+)
+
+df_saida_final_duplicado = (
+    df_saida_final
+    .groupBy("CD_CLI", "DT_MES_REF")
+    .count()
+    .filter(F.col("count") > 1)
+)
+
+qt_saida_final_duplicado = df_saida_final_duplicado.count()
+
+if qt_saida_final_duplicado > 0:
+    df_saida_final_duplicado.show(20, truncate=False)
+    raise ValueError(
+        "Saida final possui mais de uma linha por CD_CLI e DT_MES_REF."
+    )
+
+qt_df_pontuacao_final_tema = df_pontuacao_final_tema.count()
+qt_df_saida_final = df_saida_final.count()
+
+if qt_df_pontuacao_final_tema != qt_df_saida_final:
+    raise ValueError(
+        "Saida final alterou a quantidade de linhas: "
+        f"df_pontuacao_final_tema={qt_df_pontuacao_final_tema}, "
+        f"df_saida_final={qt_df_saida_final}."
+    )
+
+(
+    df_saida_final
+    .repartition(partitions_hive)
+    .write
+    .mode("overwrite")
+    .format("parquet")
+    .option("compression", "snappy")
+    .saveAsTable(nome_tabela)
+)
+
+print(f"Tabela final alimentada com overwrite: {nome_tabela}")
