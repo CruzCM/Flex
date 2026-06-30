@@ -1,5 +1,156 @@
 %%spark
 
+query = f"""
+SELECT
+    CD_CLI,
+    CD_PRFL,
+    TX_PRFL,
+    CD_PRD,
+    PRD,
+    CD_CTGR_TRAN_OGNL,
+    TX_DCR_CTGR_TRAN,
+    LANCAMENTO,
+    TP_LANCAMENTO,
+    AVG(VL_TRAN) AS MEDIA,
+    SUM(VL_TRAN) AS SOMA,
+    COUNT(VL_TRAN) AS QTD,
+    DT_REF
+
+FROM (
+    SELECT
+        a.CD_CLI,
+        cs.CD_SGM_CLI AS CD_PRFL,
+
+        CASE
+            WHEN cs.CD_SGM_CLI = 2502 THEN 'SEM PERFIL'
+            WHEN cs.CD_SGM_CLI = 2012 THEN 'PF A'
+            WHEN cs.CD_SGM_CLI = 2112 THEN 'PF B'
+            WHEN cs.CD_SGM_CLI = 2602 THEN 'PF C'
+            WHEN cs.CD_SGM_CLI = 2702 THEN 'PF D'
+            WHEN cs.CD_SGM_CLI = 2712 THEN 'PF E'
+            WHEN cs.CD_SGM_CLI = 1111 THEN 'A CLASSIFICAR'
+        END AS TX_PRFL,
+
+        a.CD_PRD,
+
+        CASE
+            WHEN a.CD_PRD = 6 THEN 'CONTA CORRENTE'
+            WHEN a.CD_PRD = 9 THEN 'CARTAO'
+        END AS PRD,
+
+        a.CD_CTGR_TRAN_OGNL,
+
+        TRIM(
+            TRANSLATE(
+                c.TX_DCR_CTGR_TRAN,
+                'aaaeeiooouc',
+                'áãâéêíóôõúç'
+            )
+        ) AS TX_DCR_CTGR_TRAN,
+
+        CASE
+            WHEN LOCATE(
+                TRIM(
+                    TRANSLATE(
+                        COALESCE(LOWER(TRIM(a.TX_DCR_TRAN_OGNL)), ''),
+                        'oiauocaeaaaaaeeeeiiioooouuuc V()$&*%@;:_#',
+                        'ÓÍÁÚÔÇÁÉãããããééééíõõõõúúúç1234567890/*-+.,| V()$&*%@;:_#'
+                    )
+                ),
+                TRIM(
+                    TRANSLATE(
+                        COALESCE(LOWER(TRIM(a.TX_CMPR_DCR_TRAN)), ''),
+                        'oiauocaeaaaaaeeeeiiioooouuuc V()$&*%@;:_#',
+                        'ÓÍÁÚÔÇÁÉãããããééééíõõõõúúúç1234567890/*-+.,| V()$&*%@;:_#'
+                    )
+                )
+            ) > 0
+            THEN TRIM(
+                TRANSLATE(
+                    COALESCE(LOWER(TRIM(a.TX_DCR_TRAN_OGNL)), ''),
+                    'oiauocaeaaaaaeeeeiiioooouuuc V()$&*%@;:_#',
+                    'ÓÍÁÚÔÇÁÉãããããééééíõõõõúúúç1234567890/*-+.,| V()$&*%@;:_#'
+                )
+            )
+            ELSE REPLACE(
+                REPLACE(
+                    REPLACE(
+                        TRIM(
+                            TRANSLATE(
+                                COALESCE(LOWER(TRIM(a.TX_DCR_TRAN_OGNL)), ''),
+                                'oiauocaeaaaaaeeeeiiioooouuuc V()$&*%@;:_#',
+                                'ÓÍÁÚÔÇÁÉãããããééééíõõõõúúúç1234567890/*-+.,| V()$&*%@;:_#'
+                            )
+                        )
+                        || ' ' ||
+                        TRIM(
+                            TRANSLATE(
+                                COALESCE(LOWER(TRIM(a.TX_CMPR_DCR_TRAN)), ''),
+                                'oiauocaeaaaaaeeeeiiioooouuuc V()$&*%@;:_#',
+                                'ÓÍÁÚÔÇÁÉãããããééééíõõõõúúúç1234567890/*-+.,| V()$&*%@;:_#'
+                            )
+                        ),
+                        '  ',
+                        ' '
+                    ),
+                    '  ',
+                    ' '
+                ),
+                '  ',
+                ' '
+            )
+        END AS LANCAMENTO,
+
+        CASE
+            WHEN a.CD_NTZ_CTB_TRAN = 'C' THEN 'CREDITO'
+            WHEN a.CD_NTZ_CTB_TRAN = 'D' THEN 'DEBITO'
+        END AS TP_LANCAMENTO,
+
+        a.VL_TRAN,
+
+        MONTH(a.DT_TRAN) || '/' || YEAR(a.DT_TRAN) AS DT_REF
+
+    FROM DB2GFP.TRAN_RLZD_INST_PCT a
+
+    INNER JOIN DB2SMI.CLI_SGM cs
+        ON a.CD_CLI = cs.CD_CLI
+
+    INNER JOIN DB2GFP.CTGR_TRAN_OPB c
+        ON a.CD_CTGR_TRAN_OGNL = c.CD_CTGR_TRAN
+
+    WHERE (
+            cs.CD_SGM_CLI = 2502
+         OR cs.CD_SGM_CLI = 2012
+         OR cs.CD_SGM_CLI = 2112
+         OR cs.CD_SGM_CLI = 2602
+         OR cs.CD_SGM_CLI = 2702
+         OR cs.CD_SGM_CLI = 2712
+         OR cs.CD_SGM_CLI = 1111
+    )
+        AND cs.CD_CRIT_SGM_CLI = 2
+        AND a.NR_PTC BETWEEN 80 AND 85
+        AND DATE(a.TS_INCL_TRAN) >= '2025-01-01'
+        AND a.DT_TRAN BETWEEN '{data_ini}' AND '{data_fim}'
+        AND a.CD_EST_TRAN_INST = 0
+) base_normalizada
+
+GROUP BY
+    CD_CLI,
+    CD_PRFL,
+    TX_PRFL,
+    CD_PRD,
+    PRD,
+    CD_CTGR_TRAN_OGNL,
+    TX_DCR_CTGR_TRAN,
+    LANCAMENTO,
+    TP_LANCAMENTO,
+    DT_REF
+"""
+
+
+
+%%spark
+
 sandbox = "t2i2016"
 database = f"sbx_{sandbox}"
 table_name = "ana_edu_fin_cli"
