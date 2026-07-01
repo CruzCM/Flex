@@ -1,0 +1,633 @@
+# ============================================================
+# gerenciador_sessao_spark_local.py
+# Ambiente local: cria e configura a sessão Spark via BBMagic
+# ============================================================
+
+import os
+import tempfile
+import time
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from typing import Optional, Tuple
+
+try:
+    from zoneinfo import ZoneInfo
+except ImportError:
+    ZoneInfo = None
+
+
+from bbmagic import Spark
+
+try:
+    from dotenv import load_dotenv, dotenv_values
+except Exception:
+    load_dotenv = None
+    dotenv_values = None
+
+try:
+    from IPython import get_ipython
+except Exception:
+    get_ipython = None
+
+
+if ZoneInfo is None:
+    FUSO_SAO_PAULO = timezone(timedelta(hours=-3), "America/Sao_Paulo")
+else:
+    try:
+        FUSO_SAO_PAULO = ZoneInfo("America/Sao_Paulo")
+    except Exception:
+        FUSO_SAO_PAULO = timezone(timedelta(hours=-3), "America/Sao_Paulo")
+
+
+def ler_variavel_ambiente_local(nome_variavel: str) -> str:
+    valor = os.environ.get(nome_variavel)
+
+    if valor is None or not valor.strip():
+        raise ValueError(
+            f"ETL abortado: variável de ambiente '{nome_variavel}' não informada"
+        )
+
+    return valor.strip()
+
+
+class GerenciadorSessaoSpark:
+    def __init__(
+        self,
+        nome_sessao: str,
+        adicionar_variaveis: Optional[dict] = None,
+        nome_arquivo_env_modelagem: Optional[str] = None,
+        exibir_configuracao: bool = False,
+        ativar_logs: bool = True,
+    ):
+        self.nome_sessao = nome_sessao
+        self.adicionar_variaveis = adicionar_variaveis or {}
+        self.nome_arquivo_env_modelagem = nome_arquivo_env_modelagem
+        self.exibir_configuracao = exibir_configuracao
+        self.ativar_logs = ativar_logs
+        self.spark = None
+
+        self.ambiente: Optional[str] = None
+        self.keytab: Optional[str] = None
+        self.nome_sessao_final: Optional[str] = None
+        self.variaveis_env_modelagem = {}
+
+    def _print(self, mensagem: str) -> None:
+        if self.exibir_configuracao:
+            print(mensagem)
+
+    def _localizar_arquivo(self, nome_arquivo: str) -> Optional[str]:
+        caminho_atual = Path.cwd()
+
+        while True:
+            caminho_encontrado = next(caminho_atual.rglob(nome_arquivo), None)
+
+            if caminho_encontrado:
+                return str(caminho_encontrado)
+
+            if caminho_atual.parent == caminho_atual:
+                return None
+
+            caminho_atual = caminho_atual.parent
+
+    def _carregar_env_modelagem(self) -> None:
+        ambiente = os.environ.get("AMBIENTE", "").strip().upper()
+
+        if ambiente == "MODELAGEM":
+            nome_arquivo_env = self.nome_arquivo_env_modelagem
+            override = True
+        else:
+            nome_arquivo_env = ".env"
+            override = False
+
+        if not nome_arquivo_env:
+            return
+
+        caminho_env = self._localizar_arquivo(nome_arquivo_env)
+
+        if not caminho_env:
+            if ambiente == "MODELAGEM":
+                raise FileNotFoundError(
+                    f"Arquivo de ambiente de modelagem não encontrado: "
+                    f"{nome_arquivo_env}"
+                )
+            return
+
+        if load_dotenv is None or dotenv_values is None:
+            raise ImportError(
+                "python-dotenv não está disponível para carregar o arquivo .env."
+            )
+
+        valores_env = dotenv_values(caminho_env)
+
+        load_dotenv(dotenv_path=caminho_env, override=override)
+
+        self.variaveis_env_modelagem = {
+            str(chave): os.environ[str(chave)].strip()
+            for chave, valor in valores_env.items()
+            if valor is not None and os.environ.get(str(chave), "").strip()
+        }
+
+
+        self._print(f"[ENV] Arquivo carregado: {caminho_env}")
+
+    def _preparar_contexto_local(self) -> None:
+        self._carregar_env_modelagem()
+
+        self.ambiente = ler_variavel_ambiente_local("AMBIENTE").upper()
+        self.keytab = ler_variavel_ambiente_local("KEYTAB")
+        self.nome_sessao_final = self._montar_nome_sessao(self.keytab)
+
+    def _garantir_contexto_local(self) -> None:
+        if not self.ambiente or not self.keytab or not self.nome_sessao_final:
+            self._preparar_contexto_local()
+
+    def _limpar_sessao_spark_anterior(self) -> None:
+        if get_ipython is None:
+            return
+
+        ipython = get_ipython()
+
+        if ipython is None:
+            return
+
+        try:
+            ipython.run_line_magic("spark", "cleanup")
+        except Exception:
+            pass
+
+    def _montar_nome_sessao(self, keytab: str) -> str:
+        return f"spark_{keytab}_{self.nome_sessao}"
+
+    def _obter_hoje(self) -> str:
+        self._garantir_contexto_local()
+
+        if self.ambiente == "MODELAGEM":
+            return datetime.now(tz=FUSO_SAO_PAULO).strftime("%Y-%m-%d")
+
+        valor = os.environ.get("ctmodate") or os.environ.get("CTMODATE")
+
+        if valor is None or not valor.strip():
+            raise ValueError(
+                "ETL abortado: variável de ambiente 'ctmodate' não informada"
+            )
+
+        return valor.strip()
+
+    def _montar_variaveis_spark(self) -> dict:
+        self._garantir_contexto_local()
+
+        variaveis_spark = {}
+
+        for chave, valor in self.variaveis_env_modelagem.items():
+            if valor is not None:
+                variaveis_spark[str(chave)] = str(valor)
+
+        variaveis_spark.update({
+            "AMBIENTE": self.ambiente,
+            "KEYTAB": self.keytab,
+            "SESSION_NAME": self.nome_sessao_final,
+            "USE_LOGS": str(self.ativar_logs),
+            "HOJE": self._obter_hoje(),
+        })
+
+        for chave, valor in self.adicionar_variaveis.items():
+            if valor is not None:
+                variaveis_spark[str(chave)] = str(valor)
+
+        return variaveis_spark
+
+    def _montar_spark_conf(self, spark_conf: Optional[dict]) -> dict:
+        configuracao_spark = {
+            "spark.sql.session.timeZone": "America/Sao_Paulo",
+        }
+
+        if not spark_conf:
+            return configuracao_spark
+
+        for chave, valor in spark_conf.items():
+            if valor is None:
+                continue
+
+            if isinstance(valor, bool):
+                configuracao_spark[str(chave)] = str(valor).lower()
+            else:
+                configuracao_spark[str(chave)] = str(valor)
+
+        return configuracao_spark
+
+    def _valor_configuracao_seguro(self, chave: str, valor) -> str:
+        chave_normalizada = str(chave).upper()
+
+        palavras_sensiveis = [
+            "PASSWORD",
+            "SENHA",
+            "SECRET",
+            "TOKEN",
+        ]
+
+        if any(palavra in chave_normalizada for palavra in palavras_sensiveis):
+            return "***"
+
+        return str(valor)
+
+    def _exibir_argumentos_spark(self, argumentos_spark: dict) -> None:
+        if not self.exibir_configuracao:
+            return
+
+        print("[SPARK][CONFIGURACAO]")
+
+        for chave, valor in argumentos_spark.items():
+            if chave == "env" and isinstance(valor, dict):
+                print("env:")
+
+                for nome_variavel, valor_variavel in sorted(valor.items()):
+                    valor_seguro = self._valor_configuracao_seguro(
+                        nome_variavel,
+                        valor_variavel,
+                    )
+                    print(f"  {nome_variavel}: {valor_seguro}")
+
+                continue
+
+            print(f"{chave}: {valor}")
+
+    def _criar_com_retry(self, argumentos_spark: dict) -> Spark:
+        esperas_segundos = [0, 60, 120, 180]
+
+        for tentativa, espera in enumerate(esperas_segundos, start=1):
+            try:
+                if espera > 0:
+                    time.sleep(espera)
+
+                self._print(
+                    f"[SPARK] Criando sessão. Tentativa {tentativa}/{len(esperas_segundos)}"
+                )
+
+                return Spark(**argumentos_spark)
+
+            except KeyboardInterrupt:
+                raise
+
+            except (ValueError, TypeError, EnvironmentError, ImportError, FileNotFoundError):
+                raise
+
+            except Exception:
+                if tentativa == len(esperas_segundos):
+                    raise
+
+                self._print(
+                    f"[SPARK] Falha na tentativa {tentativa}. Nova tentativa será realizada."
+                )
+
+        raise RuntimeError("Falha inesperada ao criar sessão Spark.")
+
+    def _exibir_resultado_virtualenv(
+        self,
+        acao: str,
+        motivo: str,
+        virtualenv: Optional[str],
+        overwrite_virtualenv: bool,
+    ) -> None:
+        print("[VIRTUALENV][MODELAGEM]")
+        print(f"Ação: {acao}")
+        print(f"Motivo: {motivo}")
+        print("")
+        print("Use manualmente em criar_sessao_spark:")
+        print("")
+
+        if virtualenv:
+            print(f'virtualenv="{virtualenv}",')
+        else:
+            print("virtualenv=None,")
+
+        print(f"overwrite_virtualenv={overwrite_virtualenv},")
+        print("")
+
+    def preparar_virtualenv_modelagem(
+        self,
+        nome_arquivo_requirements: str = "requirements-spark.txt",
+        recriar_zip: bool = False,
+    ) -> Tuple[Optional[str], bool]:
+        self._preparar_contexto_local()
+
+        if self.ambiente != "MODELAGEM":
+            raise EnvironmentError(
+                "preparar_virtualenv_modelagem deve ser usada somente em MODELAGEM."
+            )
+
+        try:
+            from bbmagic import Hdfs
+            from bbmagic.common import create_virtualenv
+        except Exception as exc:
+            raise ImportError(
+                "BBMagic não está disponível para preparar o virtualenv Spark."
+            ) from exc
+
+        env_dir = f"/user/{self.keytab}/.bbmagic/envs"
+        zip_name = f"{self.nome_sessao_final}.zip"
+        hdfs_virtualenv_path = f"hdfs://{env_dir}/{zip_name}"
+
+        hdfs = Hdfs(self.keytab)
+
+        try:
+            hdfs.makedirs(env_dir)
+        except Exception as exc:
+            self._print(
+                f"[VIRTUALENV][MODELAGEM] Aviso ao criar/validar pasta HDFS: {exc}"
+            )
+
+        arquivos_hdfs = hdfs.list(env_dir)
+        zip_existe = zip_name in arquivos_hdfs
+
+        if zip_existe and not recriar_zip:
+            self._exibir_resultado_virtualenv(
+                acao="zip existente reaproveitado",
+                motivo="zip já existia e recriar_zip=False",
+                virtualenv=hdfs_virtualenv_path,
+                overwrite_virtualenv=False,
+            )
+            return hdfs_virtualenv_path, False
+
+        caminho_requirements = self._localizar_arquivo(nome_arquivo_requirements)
+
+        if not caminho_requirements:
+            raise FileNotFoundError(
+                f"Arquivo de requirements não encontrado: {nome_arquivo_requirements}"
+            )
+
+        with tempfile.TemporaryDirectory() as pasta_temporaria:
+            create_virtualenv(
+                requirements=caminho_requirements,
+                create_zip=True,
+                zip_path=pasta_temporaria,
+                zip_name=self.nome_sessao_final,
+            )
+
+            caminho_zip_local = Path(pasta_temporaria) / zip_name
+
+            if not caminho_zip_local.exists():
+                zips_encontrados = list(Path(pasta_temporaria).glob("*.zip"))
+
+                if not zips_encontrados:
+                    raise FileNotFoundError(
+                        "Zip do virtualenv não foi criado pela BBMagic."
+                    )
+
+                caminho_zip_local = zips_encontrados[0]
+
+            hdfs.upload(
+                hdfs_path=hdfs_virtualenv_path,
+                local_path=str(caminho_zip_local),
+                overwrite=True,
+            )
+
+        if zip_existe and recriar_zip:
+            acao = "zip recriado"
+            motivo = "zip já existia e recriar_zip=True"
+        else:
+            acao = "zip criado"
+            motivo = "zip não existia"
+
+        self._exibir_resultado_virtualenv(
+            acao=acao,
+            motivo=motivo,
+            virtualenv=hdfs_virtualenv_path,
+            overwrite_virtualenv=False,
+        )
+
+        return hdfs_virtualenv_path, False
+
+    def criar_sessao_spark(
+        self,
+        db2: bool = False,
+        driver_memory: Optional[str] = None,
+        driver_cores: Optional[int] = None,
+        num_executors: Optional[int] = None,
+        executor_memory: Optional[str] = None,
+        executor_cores: Optional[int] = None,
+        jars: Optional[list] = None,
+        pyfiles: Optional[list] = None,
+        files: Optional[list] = None,
+        archives: Optional[list] = None,
+        virtualenv: Optional[str] = None,
+        overwrite_virtualenv: bool = False,
+        spark_conf: Optional[dict] = None,
+    ) -> Spark:
+        self._preparar_contexto_local()
+
+        argumentos_spark = {
+            "session_name": self.nome_sessao_final,
+            "username": self.keytab,
+            "spark_version": 3,
+            "env": self._montar_variaveis_spark(),
+            "spark_conf": self._montar_spark_conf(spark_conf),
+        }
+
+        if db2:
+            argumentos_spark["db2"] = True
+
+        if driver_memory:
+            argumentos_spark["driver_memory"] = driver_memory
+
+        if driver_cores:
+            argumentos_spark["driver_cores"] = driver_cores
+
+        if num_executors:
+            argumentos_spark["num_executors"] = num_executors
+
+        if executor_memory:
+            argumentos_spark["executor_memory"] = executor_memory
+
+        if executor_cores:
+            argumentos_spark["executor_cores"] = executor_cores
+
+        if jars:
+            argumentos_spark["jars"] = jars
+
+        if pyfiles:
+            argumentos_spark["pyfiles"] = pyfiles
+
+        if files:
+            argumentos_spark["files"] = files
+
+        if archives:
+            argumentos_spark["archives"] = archives
+
+        if virtualenv:
+            argumentos_spark["virtualenv"] = virtualenv
+            argumentos_spark["overwrite_virtualenv"] = overwrite_virtualenv
+
+        self._limpar_sessao_spark_anterior()
+        self._exibir_argumentos_spark(argumentos_spark)
+
+        self.spark = self._criar_com_retry(argumentos_spark)
+
+        return self.spark
+
+    def help(self) -> None:
+        print("""
+============================================================
+GerenciadorSessaoSpark()
+============================================================
+
+Uso base no notebook local:
+
+from src.utils.gerenciador_sessao_spark_local import (
+    GerenciadorSessaoSpark,
+    ler_variavel_ambiente_local,
+)
+
+ambiente = ler_variavel_ambiente_local("AMBIENTE").upper()
+
+if ambiente != "MODELAGEM":
+    ambiente = "PRODUCAO"
+
+
+gerenciador_spark = GerenciadorSessaoSpark(
+    nome_sessao="etl-vinculacao-mf-insights",
+    adicionar_variaveis={
+        "DOMINIO": "t2i",
+        "SANDBOX": "t2i2016",
+        "AMBIENTE": ambiente,
+    },
+    nome_arquivo_env_modelagem="desenv.env",
+    exibir_configuracao=False,
+    ativar_logs=True,
+)
+
+Parâmetros principais:
+- nome_sessao: nome lógico da sessão Spark do projeto;
+- adicionar_variaveis: variáveis adicionais enviadas para a sessão Spark;
+- nome_arquivo_env_modelagem: arquivo .env usado somente em MODELAGEM;
+- exibir_configuracao: exibe prints técnicos locais da criação da sessão;
+- ativar_logs: envia USE_LOGS para controlar logs dentro da sessão Spark.
+
+Regra:
+- o gerenciador roda no ambiente local do notebook/container;
+- a sessão Spark criada roda no ambiente Spark remoto;
+- em MODELAGEM, o arquivo informado em nome_arquivo_env_modelagem (por exemplo,
+  desenv.env) é carregado com override=True;
+- nos demais ambientes, o arquivo .env padrão é carregado com override=False;
+- as variáveis efetivas do arquivo carregado são enviadas automaticamente para
+  o ambiente da sessão Spark remota;
+- fora de MODELAGEM, variáveis já existentes no ambiente local prevalecem sobre
+  valores de mesmo nome definidos no .env;
+- variáveis em adicionar_variaveis sobrescrevem variáveis de mesmo nome vindas
+  do arquivo de ambiente carregado;
+- HOJE é enviado automaticamente para a sessão Spark:
+  - em MODELAGEM, usa a data atual do Python em America/Sao_Paulo;
+  - em ambientes produtivos, usa ctmodate/CTMODATE do ambiente local;
+- virtualenv é preparado separadamente e copiado manualmente para criar_sessao_spark;
+- ao enviar credenciais pelo env da sessão Spark, recomenda-se manter
+  exibir_configuracao=False.
+
+============================================================
+preparar_virtualenv_modelagem()
+============================================================
+
+Uso em MODELAGEM:
+
+gerenciador_spark.preparar_virtualenv_modelagem(
+    nome_arquivo_requirements="requirements-spark.txt",
+    recriar_zip=False,
+)
+
+Regra:
+- se o zip não existe, cria;
+- se o zip existe e recriar_zip=False, reaproveita;
+- se o zip existe e recriar_zip=True, recria.
+
+A função imprime os valores que devem ser copiados manualmente para:
+
+spark = gerenciador_spark.criar_sessao_spark(
+    virtualenv="hdfs:///user/{keytab}/.bbmagic/envs/{nome_sessao_final}.zip",
+    overwrite_virtualenv=False,
+)
+
+Observação:
+- a função é exclusiva para MODELAGEM;
+- se o usuário quiser usar virtualenv em outro ambiente, deve informar manualmente
+  virtualenv e overwrite_virtualenv em criar_sessao_spark.
+
+============================================================
+criar_sessao_spark()
+============================================================
+
+Exemplo completo com todas as configurações disponíveis:
+
+spark = gerenciador_spark.criar_sessao_spark(
+    db2=True,
+
+    driver_memory="16g",
+    driver_cores=4,
+
+    num_executors=8,
+    executor_memory="8g",
+    executor_cores=4,
+
+    jars=[
+        "/dados/shared/bin/ojdbc8.jar",
+    ],
+
+    pyfiles=[
+        "hdfs:///user/t2i2016/libs/projeto.zip",
+    ],
+
+    files=[
+        "hdfs:///user/t2i2016/config/config.json",
+    ],
+
+    archives=[
+        "hdfs:///user/t2i2016/archives/recursos.zip#recursos",
+    ],
+
+    virtualenv="hdfs:///user/{keytab}/.bbmagic/envs/{nome_sessao_final}.zip",
+    overwrite_virtualenv=False,
+
+    spark_conf={
+        "spark.driver.memoryOverhead": "8g",
+        "spark.sql.shuffle.partitions": "400",
+        "spark.default.parallelism": "400",
+        "spark.sql.adaptive.enabled": "true",
+        "spark.sql.adaptive.coalescePartitions.enabled": "true",
+        "spark.sql.adaptive.skewJoin.enabled": "true",
+        "spark.sql.autoBroadcastJoinThreshold": "-1",
+        "spark.sql.sources.partitionOverwriteMode": "dynamic",
+        "spark.sql.session.timeZone": "America/Sao_Paulo",
+    },
+)
+
+============================================================
+Fluxo recomendado em MODELAGEM com virtualenv
+============================================================
+
+1. Criar o gerenciador:
+
+gerenciador_spark = GerenciadorSessaoSpark(...)
+
+2. Preparar ou reaproveitar o zip:
+
+gerenciador_spark.preparar_virtualenv_modelagem(
+    nome_arquivo_requirements="requirements-spark.txt",
+    recriar_zip=False,
+)
+
+3. Copiar o virtualenv impresso pela função.
+
+4. Criar a sessão Spark usando o path copiado:
+
+spark = gerenciador_spark.criar_sessao_spark(
+    db2=True,
+    driver_memory="16g",
+    virtualenv="hdfs:///user/{keytab}/.bbmagic/envs/{nome_sessao_final}.zip",
+    overwrite_virtualenv=False,
+    jars=[
+        "/dados/shared/bin/ojdbc8.jar",
+    ],
+    spark_conf={
+        "spark.driver.memoryOverhead": "8g",
+    },
+)
+
+============================================================
+""")
