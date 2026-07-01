@@ -1,0 +1,49 @@
+def _carregar_env_modelagem(self) -> None:
+    ambiente = os.environ.get("AMBIENTE", "").strip().upper()
+
+    # ========================================================
+    # MODELAGEM
+    # ========================================================
+    if ambiente == "MODELAGEM":
+        if not self.nome_arquivo_env_modelagem:
+            return
+
+        if load_dotenv is None or dotenv_values is None:
+            raise ImportError(
+                "python-dotenv não está disponível para carregar o arquivo .env de modelagem."
+            )
+
+        caminho_env = self._localizar_arquivo(
+            self.nome_arquivo_env_modelagem
+        )
+
+        if not caminho_env:
+            raise FileNotFoundError(
+                f"Arquivo de ambiente de modelagem não encontrado: "
+                f"{self.nome_arquivo_env_modelagem}"
+            )
+
+        load_dotenv(dotenv_path=caminho_env, override=True)
+
+        self.variaveis_env_modelagem = {
+            str(chave): str(valor)
+            for chave, valor in dotenv_values(caminho_env).items()
+            if valor is not None and str(valor).strip()
+        }
+
+        self._print(
+            f"[ENV] Arquivo de modelagem carregado: {caminho_env}"
+        )
+
+        return
+
+    # ========================================================
+    # PRODUÇÃO
+    # ========================================================
+    self.variaveis_env_modelagem = {
+        str(chave): str(valor)
+        for chave, valor in os.environ.items()
+        if valor is not None and str(valor).strip()
+    }
+
+    self._print("[ENV] Variáveis carregadas do ambiente local.")
