@@ -1,0 +1,42 @@
+# Metodologia usada para estruturar recomendações de Educação Financeira
+
+O trabalho consistiu em transformar cinco temas de educação financeira em conteúdos claros, consistentes e seguros para comunicação com clientes. Os temas tratados foram: Categorização dos Gastos, Gestão do Orçamento, Uso Consciente do Crédito, Consumo Planejado e Formação de Reserva.
+
+O principal cuidado foi não misturar essas recomendações com produtos bancários, funcionalidades do aplicativo, ofertas de crédito, investimentos ou benefícios comerciais. Cada item foi tratado exclusivamente como uma recomendação de comportamento financeiro que pode ser útil para um público com determinada necessidade.
+
+## Formato de saída
+
+Para cada recomendação, foi criado um conteúdo em três blocos:
+
+1. **Explicação técnica**
+   Um parágrafo com linguagem mais formal e precisa, explicando o conceito, o objetivo da prática e como ela se relaciona com a organização financeira da pessoa.
+
+2. **Explicação para leigos**
+   Um parágrafo simples, direto e próximo da realidade do cliente. A intenção foi traduzir o conceito técnico para uma situação cotidiana, sem usar termos financeiros desnecessários.
+
+3. **Benefícios diretos**
+   Uma lista objetiva com ganhos práticos que podem resultar da adoção daquela recomendação. Os benefícios foram escritos com cuidado para não prometer resultados garantidos, como economia automática, aprovação de crédito, aumento de limite, rentabilidade ou resolução imediata de dívidas.
+
+## Raciocínio utilizado
+
+A construção dos textos partiu de uma regra central: diferenciar o que é uma orientação financeira do que seria uma promessa de resultado.
+
+Por exemplo, na recomendação de categorização dos gastos, o benefício direto não é “economizar dinheiro automaticamente”. O benefício real é identificar para onde o dinheiro está indo, perceber despesas recorrentes e reconhecer padrões de consumo. A economia pode acontecer depois, mas depende das decisões da pessoa.
+
+O mesmo critério foi aplicado aos demais temas. Em Gestão do Orçamento, o benefício é organizar receitas, despesas e prioridades. Em Uso Consciente do Crédito, é avaliar parcelas, juros e capacidade de pagamento antes de assumir uma dívida. Em Consumo Planejado, é criar reflexão antes da compra e reduzir decisões impulsivas. Em Formação de Reserva, é desenvolver o hábito de separar recursos para objetivos e imprevistos.
+
+Esse cuidado deixa o conteúdo mais confiável, porque apresenta benefícios possíveis e concretos sem transformar educação financeira em promessa comercial.
+
+## Passo a passo aplicado
+
+Primeiro, foi definido que os cinco itens seriam tratados como recomendações de educação financeira, e não como produtos ou serviços bancários.
+
+Depois, cada tema foi analisado separadamente para identificar seu objetivo principal. A categorização dos gastos ajuda a entender a distribuição do dinheiro. A gestão do orçamento ajuda a organizar o mês. O uso consciente do crédito ajuda a avaliar compromissos financeiros. O consumo planejado ajuda a refletir antes de comprar. A formação de reserva ajuda a criar proteção para objetivos e imprevistos.
+
+Em seguida, foi criada uma explicação técnica para cada recomendação, usando uma linguagem precisa e adequada para materiais internos, jornadas de comunicação ou descrições estruturadas.
+
+Depois, cada conceito foi traduzido para uma explicação simples, com foco em situações do dia a dia. O objetivo foi permitir que qualquer pessoa entendesse rapidamente o valor da recomendação.
+
+Por fim, foram listados apenas benefícios diretos e verificáveis da prática. Também foram evitadas promessas excessivas. Em vez de dizer que uma recomendação “elimina dívidas” ou “garante economia”, o texto mostra que ela ajuda a identificar gastos, organizar prioridades, avaliar decisões e criar hábitos financeiros mais conscientes.
+
+O resultado é um modelo de conteúdo que combina clareza técnica, linguagem acessível e responsabilidade na comunicação. Ele pode ser usado como base para segmentação de público, réguas de relacionamento, mensagens educativas, cards, jornadas de CRM ou materiais de orientação financeira.

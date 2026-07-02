@@ -1,0 +1,368 @@
+Você está certo. Eu estava olhando demais para proteção e pouco para potência semântica.
+
+O cadastro não deve ser neutro. Ele deve ser uma matéria-prima persuasiva forte, capaz de alimentar Apresentação, Copywriter, TND, Voz BB e CTA sem deixar o texto genérico.
+
+A mudança de visão é esta:
+
+Apelo não vem de adjetivo.
+Apelo vem de tensão concreta + avanço concreto + estado desejado.
+
+“Simples”, “vantajoso”, “inteligente”, “prático” e “exclusivo” sozinhos enfraquecem o sistema. Eles não dão material suficiente para os agentes criarem mensagens diferentes.
+
+O encaixe correto na Apresentação
+
+A Apresentação já está bem construída. Ela usa os seis campos como blocos combináveis, em seis pontos de entrada distintos. Portanto, não precisamos mudar a Apresentação primeiro; precisamos escrever os dados para que funcionem dentro dela.
+
+Cada campo precisa obedecer a um contrato de sentido e gramática:
+
+Campo	Forma ideal para encaixar nos prompts	Papel persuasivo
+Público descrição	Pessoas que + situação concreta	Cria reconhecimento
+Público necessidade racional	Verbo no infinitivo + objeto + limitação	Define o trabalho prático
+Público necessidade emocional	Mais + estado desejado + contexto	Define a motivação emocional
+Produto descrição	Uma solução / serviço / ferramenta + mecanismo	Explica o que existe
+Produto benefício racional	Resultado funcional concreto	Explica o avanço prático
+Produto benefício emocional	Mais + sensação + contexto	Mostra o efeito emocional possível
+
+A compatibilidade precisa funcionar nestas estruturas:
+
+Para [PÚBLICO DESCRIÇÃO], quando precisam [NECESSIDADE RACIONAL]
+e buscam [NECESSIDADE EMOCIONAL], [PRODUTO DESCRIÇÃO] oferece
+[BENEFÍCIO RACIONAL], favorecendo [BENEFÍCIO EMOCIONAL].
+Com [PRODUTO DESCRIÇÃO], [PÚBLICO DESCRIÇÃO] acessam
+[BENEFÍCIO RACIONAL] para [NECESSIDADE RACIONAL].
+[BENEFÍCIO RACIONAL] ajuda [PÚBLICO DESCRIÇÃO] a
+[NECESSIDADE RACIONAL].
+No caminho para [NECESSIDADE EMOCIONAL], [PÚBLICO DESCRIÇÃO]
+podem [NECESSIDADE RACIONAL] com o apoio de [PRODUTO DESCRIÇÃO].
+
+Essa é a regra mais importante do cadastro:
+
+Cada campo precisa ser forte sozinho, mas precisa ser ainda melhor quando combinado com os outros cinco.
+
+Onde o apelo deve entrar
+Público descrição
+
+Não deve dizer o que a pessoa quer. Deve mostrar o que ela vive.
+
+Fraco:
+
+Pessoas que querem mais crédito com praticidade.
+
+Forte:
+
+Pessoas que concentram boa parte da vida financeira em outras instituições.
+
+O primeiro já antecipa necessidade e solução. O segundo cria uma situação reconhecível.
+
+Necessidade racional
+
+Não deve descrever o produto desejado. Deve nomear um único trabalho que a pessoa precisa realizar.
+
+Fraco:
+
+Ter parcelas fixas e juros menores.
+
+Forte:
+
+Organizar o pagamento de um saldo usado sem depender do Limite Especial.
+
+“Parcelas fixas” é atributo da solução. “Organizar o pagamento” é o trabalho da pessoa.
+
+Necessidade emocional
+
+Não é um problema emocional. É o estado que a pessoa quer alcançar enquanto resolve o problema.
+
+Fraco:
+
+Alívio e confiança para organizar as contas.
+
+Forte:
+
+Mais controle sobre o orçamento.
+
+O campo precisa ter um único eixo emocional. “Alívio e confiança” abre duas direções diferentes para os agentes.
+
+Produto descrição
+
+Não deve apenas nomear o produto. Deve mostrar seu mecanismo de valor.
+
+Fraco:
+
+CDC BB.
+
+Forte:
+
+Uma linha de crédito com parcelas fixas para substituir o uso recorrente do Limite Especial.
+Benefício racional
+
+Não deve repetir a necessidade da pessoa. Deve mostrar o que a solução torna possível.
+
+Fraco:
+
+Organizar pagamentos.
+
+Forte:
+
+Mais previsibilidade para planejar os pagamentos.
+Benefício emocional
+
+Não deve repetir exatamente a necessidade emocional do público.
+
+Necessidade emocional:
+Mais controle sobre o orçamento.
+
+Benefício emocional:
+Mais tranquilidade para tomar decisões financeiras.
+
+O público busca controle. A solução pode favorecer tranquilidade. São próximos, mas não são iguais.
+
+O que está acontecendo nos rascunhos atuais
+
+Os registros têm boas intenções, mas vários campos ainda carregam funções trocadas.
+
+Os principais padrões a corrigir são:
+
+Público descrito pelo desejo, não pela situação.
+Necessidade racional descrita como atributo desejado do produto.
+Benefício racional repetindo a própria necessidade.
+Dois estados emocionais no mesmo campo.
+Descrição de produto contendo benefício, promessa ou campanha.
+Produto e público com o mesmo nome, como “CDC”, “ITP” ou “Open Finance”, em vez de o público ser nomeado pela situação que vive.
+
+A recomendação é tratar o registro atual de público como:
+
+Público em contexto de oferta
+
+Não como um público genérico definitivo.
+
+Por exemplo:
+
+Nome atual:
+CDC
+
+Nome recomendado:
+Uso recorrente do Limite Especial
+Nome atual:
+ITP
+
+Nome recomendado:
+Recursos distribuídos entre instituições
+Nome atual:
+Cofrinho BB
+
+Nome recomendado:
+Dinheiro para objetivos misturado aos gastos do dia a dia
+
+Isso torna o catálogo reutilizável e melhora muito as Apresentações.
+
+Exemplo: CDC BB reescrito para os prompts
+Campo	Versão recomendada
+Produto descrição	Uma linha de crédito com parcelas fixas para substituir o uso recorrente do Limite Especial
+Produto benefício racional	Mais previsibilidade para planejar pagamentos
+Produto benefício emocional	Mais tranquilidade para tomar decisões financeiras
+Público descrição	Pessoas que recorrem ao Limite Especial para cobrir despesas do mês
+Público necessidade racional	Organizar o pagamento do saldo usado sem depender do limite
+Público necessidade emocional	Mais controle sobre o orçamento
+
+Teste na Apresentação Encaixe de Valor:
+
+Para pessoas que recorrem ao Limite Especial para cobrir despesas do mês,
+quando precisam organizar o pagamento do saldo usado sem depender do limite
+e buscam mais controle sobre o orçamento, uma linha de crédito com parcelas
+fixas para substituir o uso recorrente do Limite Especial oferece mais
+previsibilidade para planejar pagamentos, favorecendo mais tranquilidade
+para tomar decisões financeiras.
+
+O texto ainda não é a peça final. Mas já entrega tudo que o restante do pipeline precisa:
+
+uma situação;
+uma tensão prática;
+uma motivação emocional;
+um mecanismo de solução;
+um avanço funcional;
+um efeito emocional.
+
+O Copywriter poderá desenvolver isso. As TNDs poderão alterar a rota de leitura. A Voz BB poderá institucionalizar. E o agente de CTA terá base para inferir uma ação financeira mais específica.
+
+Como os seis campos alimentam os agentes
+Agente	O que ele aproveita do cadastro
+Apresentação	Monta a cadeia de valor sem inventar relações
+Copywriter	Desenvolve o conflito, solução e ganho
+TND	Escolhe diferentes pontos de entrada sem perder verdade
+Voz BB	Ajusta expressão sem perder substância
+Tagline	Destila o valor mais relevante
+Headline	Escolhe um gancho sustentado
+CTA	Identifica a ação bancária mais coerente com necessidade e solução
+
+A CTA fica melhor quando a necessidade racional é realmente uma ação ou um problema prático. “Organizar pagamentos” pode levar a uma CTA de simulação, consulta ou renegociação. “Ter mais tranquilidade” não dá uma direção operacional clara.
+
+Direção final
+
+Não vamos buscar descrições “mais apelativas” por meio de promessa ou linguagem publicitária.
+
+Vamos buscar apelo por meio de:
+
+Situação reconhecível
++
+Problema único e concreto
++
+Avanço funcional claro
++
+Estado emocional específico
+
+Minha recomendação é congelar esse contrato semântico e, em seguida, revisar os sete produtos e os sete públicos um por um, sempre testando cada ficha nas seis Apresentações antes de avançar para os agentes seguintes.
+
+
+
+Decisão principal
+
+A nova abordagem não deve entrar diretamente nos placeholders.
+
+Ela deve primeiro ser interpretada em uma ficha estratégica mais rica; depois, essa ficha é convertida para o contrato semântico congelado.
+
+Nova abordagem de produto e público
+↓
+Leitura estratégica e decomposição
+↓
+Ficha de valor do caso
+↓
+Seis campos da arquitetura
+↓
+Apresentações
+↓
+Demais agentes
+
+Assim, mantemos a riqueza da nova visão sem quebrar os prompts já consolidados.
+
+Plano de ação
+1. Entender a unidade real da nova abordagem
+
+Antes de escrever qualquer campo, vamos descobrir qual é a unidade de comunicação:
+
+Produto isolado?
+Produto + situação?
+Produto + público?
+Produto + momento de vida?
+Produto + necessidade específica?
+
+Hoje, a unidade prática é um par de produto e público. A nova abordagem pode mudar isso, mas precisa terminar em uma unidade que permita uma proposta de valor única.
+
+2. Separar verdade de interpretação
+
+Para cada caso, vamos separar:
+
+Camada	Pergunta
+Fato de produto	O que a solução é, faz ou permite?
+Contexto de público	O que a pessoa vive?
+Tensão prática	O que ela precisa resolver?
+Tensão emocional	Como ela quer se sentir?
+Valor funcional	O que muda na prática?
+Valor emocional	Que efeito isso pode favorecer?
+
+Nada entra nos seis campos antes de passar por essa separação.
+
+3. Criar uma ficha estratégica antes do cadastro
+
+A ficha não substitui o cadastro atual. Ela serve para pensar com profundidade antes da síntese.
+
+Contexto vivido:
+Tensão prática central:
+Tensão emocional predominante:
+Objetivo prático:
+Objetivo emocional:
+Solução disponível:
+Mecanismo de valor:
+Ganho funcional principal:
+Efeito emocional plausível:
+Limites e condições materiais:
+
+A partir dela, extraímos os seis campos congelados.
+
+4. Converter para o contrato semântico
+
+A conversão continua obrigatoriamente nesta estrutura:
+
+PÚBLICO_DESCRIÇÃO
+Pessoas que + situação concreta vivida
+
+PÚBLICO_NECESSIDADE_RACIONAL
+Verbo no infinitivo + objeto + contexto ou limitação
+
+PÚBLICO_NECESSIDADE_EMOCIONAL
+Mais + estado desejado + contexto
+
+PRODUTO_DESCRIÇÃO
+Uma solução, serviço, ferramenta ou modalidade + mecanismo principal
+
+PRODUTO_BENEFÍCIO_RACIONAL
+Mais + ganho funcional concreto
+
+PRODUTO_BENEFÍCIO_EMOCIONAL
+Mais + efeito emocional plausível
+
+Essa estrutura permanece porque é ela que sustenta as seis Apresentações sem sobreposição semântica.
+
+5. Testar antes de cadastrar
+
+Cada ficha nova deve ser testada nas seis Apresentações, não para gerar campanha final, mas para descobrir se os campos combinam bem.
+
+O teste precisa responder:
+
+O público descrição encaixa depois de “Para”?
+A necessidade racional encaixa depois de “quando precisam”?
+A necessidade emocional encaixa depois de “buscam” ou “no caminho para”?
+O produto descrição encaixa como solução concreta?
+O benefício racional explica um avanço funcional?
+O benefício emocional conclui sem repetir o desejo do público?
+
+Se uma Apresentação ficar gramaticalmente ruim ou semanticamente repetitiva, o problema está no cadastro, não no prompt.
+
+6. Definir elegibilidade de Apresentação
+
+Nem todo caso deve priorizar as mesmas seis Apresentações.
+
+Após o teste, cada ficha recebe:
+
+Apresentações prioritárias
+Apresentações possíveis
+Apresentações não recomendadas
+
+Isso preserva a flexibilidade da arquitetura sem forçar uma rota que enfraqueça a proposta.
+
+7. Testar a cadeia completa
+
+Somente depois de aprovada na Apresentação, a ficha avança para:
+
+Apresentação
+→ Revisor
+→ Cenário
+→ Copywriter
+→ TND
+→ Voz BB
+→ Tagline
+→ Headline
+→ CTA
+
+O teste completo deve verificar se:
+
+a copy não fica genérica;
+as TNDs conseguem se diferenciar;
+a Voz BB não reduz o valor a uma frase institucional vazia;
+a CTA consegue inferir uma ação bancária plausível.
+Resultado esperado
+
+A nova abordagem pode ser mais sofisticada, comportamental, estratégica ou baseada em jornada. Mas ela precisa terminar assim:
+
+Uma situação reconhecível
++
+Um problema prático único
++
+Um estado desejado claro
++
+Uma solução concreta
++
+Um ganho funcional específico
++
+Um efeito emocional plausível
+
+Esse será o filtro de entrada para qualquer nova forma de produto e público.
