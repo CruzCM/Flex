@@ -1,0 +1,1042 @@
+from textwrap import dedent
+
+# ============================================================
+# 1. CONTRASTE
+# ============================================================
+
+valor_where = 1  # Contraste
+
+TX_FUC_OPRL_TND = dedent("""
+Intenção: tornar o valor perceptível pela diferença entre duas condições.
+
+Função: colocar lado a lado uma situação atual e uma alternativa possível, sem exagerar problema, sem criar medo e sem prometer resultado garantido.
+
+A persona principal de Contraste é a diferença prática: a mensagem deve deixar claro o que muda na percepção, na organização, na decisão ou no caminho da pessoa quando a solução entra na conversa.
+""").strip()
+
+cliente_oracle.update_line(
+    tabela="TND_CGTV_TCN",
+    coluna_where="NR_IDFR_TND",
+    valor_where=valor_where,
+    coluna_update="TX_FUC_OPRL_TND",
+    novo_valor=TX_FUC_OPRL_TND
+)
+
+TX_DCR_DETD_TND = dedent("""
+ASSINATURA DA MENSAGEM
+
+Abra apresentando duas condições distintas sustentadas pelo texto-base.
+
+A comparação pode ocorrer entre situação atual e alternativa possível, necessidade prática e benefício funcional, dúvida atual e clareza possível, desorganização e organização, decisão impulsiva e decisão planejada, ou qualquer outra oposição moderada já presente no conteúdo.
+
+Mantenha as duas condições separadas e fáceis de perceber.
+
+Apresente a solução como ponte prática entre elas.
+
+Conecte o ganho funcional ao efeito emocional de forma clara, mostrando a diferença que a solução pode favorecer.
+
+Finalize destacando a diferença concreta que a solução pode ajudar a construir.
+
+A mensagem deve mostrar contraste sem criar medo, culpa, urgência, pressão ou oposição exagerada.
+
+
+ASSINATURA DA TAGLINE
+
+A tagline deve explicar a diferença prática entre as duas condições.
+
+Ela deve deixar claro o que a pessoa passa a enxergar, organizar, comparar, planejar ou decidir melhor.
+
+A tagline não deve exagerar a oposição. Ela deve explicar o contraste com clareza.
+
+Formas esperadas da tagline:
+- diferença prática entre duas condições;
+- alternativa mais clara para uma situação atual;
+- menos dúvida e mais clareza;
+- de uma condição para outra, sem prometer resultado automático.
+
+
+ASSINATURA DA HEADLINE
+
+A headline deve destacar a diferença de forma curta e perceptível.
+
+O título deve ter tensão de contraste.
+
+Pode usar estruturas comparativas, desde que não exagere.
+
+Formas esperadas de título:
+- Menos dúvida, mais clareza
+- Do impulso ao plano
+- Gasto visto, gasto entendido
+- Mais plano, menos susto
+
+
+LIMITES DA TENDÊNCIA
+
+Não agrave a situação atual.
+
+Não invente perdas, riscos, urgência ou consequências.
+
+Não use oposição dramática.
+
+Não transforme apoio em solução garantida.
+
+Não transforme Contraste em Transformação.
+
+Contraste coloca condições lado a lado.
+
+Transformação mostra percurso entre condições.
+""").strip()
+
+cliente_oracle.update_line(
+    tabela="TND_CGTV_TCN",
+    coluna_where="NR_IDFR_TND",
+    valor_where=valor_where,
+    coluna_update="TX_DCR_DETD_TND",
+    novo_valor=TX_DCR_DETD_TND
+)
+
+TX_RCPO_PDRO_TND = dedent("""
+contraste, comparação, diferença, alternativa, duas condições, oposição moderada, ponte prática, clareza prática, antes e depois possível
+""").strip()
+
+cliente_oracle.update_line(
+    tabela="TND_CGTV_TCN",
+    coluna_where="NR_IDFR_TND",
+    valor_where=valor_where,
+    coluna_update="TX_RCPO_PDRO_TND",
+    novo_valor=TX_RCPO_PDRO_TND
+)
+
+
+# ============================================================
+# 2. CURIOSIDADE
+# ============================================================
+
+valor_where = 2  # Curiosidade
+
+TX_FUC_OPRL_TND = dedent("""
+Intenção: abrir uma lacuna simples de compreensão.
+
+Função: chamar atenção por meio de uma dúvida prática que a própria mensagem consegue responder com clareza.
+
+A persona principal de Curiosidade é a pergunta respondível: a mensagem deve despertar interesse sem parecer mistério, suspense, provocação vazia ou clickbait.
+""").strip()
+
+cliente_oracle.update_line(
+    tabela="TND_CGTV_TCN",
+    coluna_where="NR_IDFR_TND",
+    valor_where=valor_where,
+    coluna_update="TX_FUC_OPRL_TND",
+    novo_valor=TX_FUC_OPRL_TND
+)
+
+TX_DCR_DETD_TND = dedent("""
+ASSINATURA DA MENSAGEM
+
+Abra criando uma lacuna de entendimento baseada em uma relação já presente no texto-base.
+
+A mensagem pode usar uma pergunta direta, desde que ela seja respondida pelo próprio conteúdo.
+
+A pergunta deve ser simples, prática, relevante e imediatamente compreensível.
+
+Responda logo em seguida, conectando necessidade, solução e benefício.
+
+Use frases curtas e progressão objetiva.
+
+Finalize consolidando a compreensão obtida.
+
+A mensagem deve gerar esclarecimento, não suspense.
+
+
+ASSINATURA DA TAGLINE
+
+A tagline deve seguir a mesma linha da curiosidade, mas sem usar forma de pergunta.
+
+Ela deve responder, esclarecer ou completar a lacuna central.
+
+A tagline deve funcionar como a resposta clara que sustenta o título.
+
+Formas esperadas da tagline:
+- resposta direta à dúvida;
+- explicação curta do valor;
+- esclarecimento da relação entre necessidade e benefício;
+- frase que completa a curiosidade aberta pela mensagem.
+
+Exemplo de lógica:
+Headline: Para onde vai seu dinheiro?
+Tagline: Separar os gastos por categoria ajuda a enxergar o que mais pesa no mês.
+
+
+ASSINATURA DA HEADLINE
+
+A headline deve assumir forma de pergunta curta, direta e respondível sempre que houver clareza e limite de caracteres.
+
+O título de Curiosidade deve abrir a lacuna.
+
+A pergunta precisa ser respondida pela tagline ou pelo resumo institucional.
+
+Formas esperadas de título:
+- Para onde vai seu dinheiro?
+- O que pesa no mês?
+- Comprar agora faz sentido?
+- Seu crédito cabe no mês?
+
+
+LIMITES DA TENDÊNCIA
+
+Não use clickbait.
+
+Não crie segredo.
+
+Não use suspense artificial.
+
+Não faça pergunta que a mensagem não consiga responder.
+
+Não deixe a tagline também em pergunta.
+
+Não transforme Curiosidade em provocação vaga.
+
+Curiosidade deve gerar esclarecimento, não manipulação.
+""").strip()
+
+cliente_oracle.update_line(
+    tabela="TND_CGTV_TCN",
+    coluna_where="NR_IDFR_TND",
+    valor_where=valor_where,
+    coluna_update="TX_DCR_DETD_TND",
+    novo_valor=TX_DCR_DETD_TND
+)
+
+TX_RCPO_PDRO_TND = dedent("""
+pergunta, lacuna respondida, dúvida prática, resposta clara, descoberta, esclarecimento, atenção, compreensão
+""").strip()
+
+cliente_oracle.update_line(
+    tabela="TND_CGTV_TCN",
+    coluna_where="NR_IDFR_TND",
+    valor_where=valor_where,
+    coluna_update="TX_RCPO_PDRO_TND",
+    novo_valor=TX_RCPO_PDRO_TND
+)
+
+
+# ============================================================
+# 3. ESPECIFICIDADE
+# ============================================================
+
+valor_where = 3  # Especificidade
+
+TX_FUC_OPRL_TND = dedent("""
+Intenção: aumentar clareza e credibilidade pela concretude.
+
+Função: destacar o elemento mais específico disponível no texto-base para tornar a proposta mais objetiva, menos genérica e mais fácil de entender.
+
+A persona principal de Especificidade é a precisão: a mensagem deve mostrar exatamente qual elemento, prática, benefício ou solução está em jogo.
+""").strip()
+
+cliente_oracle.update_line(
+    tabela="TND_CGTV_TCN",
+    coluna_where="NR_IDFR_TND",
+    valor_where=valor_where,
+    coluna_update="TX_FUC_OPRL_TND",
+    novo_valor=TX_FUC_OPRL_TND
+)
+
+TX_DCR_DETD_TND = dedent("""
+ASSINATURA DA MENSAGEM
+
+Abra pelo elemento mais concreto do texto-base.
+
+Esse elemento pode ser o benefício racional, a prática específica, a solução nomeada, a ação que a pessoa pode realizar, a condição concreta do público ou o objeto que organiza a mensagem.
+
+Priorize substantivos, verbos e relações objetivas.
+
+Explique como esse elemento concreto se conecta à necessidade e ao efeito emocional.
+
+Evite abstrações quando houver benefício real disponível.
+
+Finalize retomando o ganho prático de modo objetivo.
+
+A mensagem deve responder: o que exatamente está sendo oferecido ou favorecido?
+
+
+ASSINATURA DA TAGLINE
+
+A tagline deve destacar o elemento concreto e explicar seu valor.
+
+Ela deve preservar o benefício ou mecanismo específico, em vez de trocar por uma ideia genérica.
+
+Formas esperadas da tagline:
+- elemento concreto mais utilidade;
+- benefício específico mais efeito prático;
+- prática específica mais clareza de valor;
+- entrega real mais razão para importar.
+
+
+ASSINATURA DA HEADLINE
+
+A headline deve abrir pelo elemento mais concreto.
+
+O título deve ser direto, específico e fácil de reconhecer.
+
+Formas esperadas de título:
+- Gastos por categoria
+- Parcelas no radar
+- Meta com valor definido
+- Cashback no celular
+
+
+LIMITES DA TENDÊNCIA
+
+Não invente números, medidas, prazos, critérios, condições ou requisitos.
+
+Não substitua benefício concreto por abstração.
+
+Não use mais clareza, mais controle ou mais confiança como centro da mensagem quando houver uma entrega mais específica disponível.
+
+Não transforme Especificidade em Previsibilidade.
+
+Especificidade responde o que exatamente.
+
+Previsibilidade responde como isso se conecta.
+""").strip()
+
+cliente_oracle.update_line(
+    tabela="TND_CGTV_TCN",
+    coluna_where="NR_IDFR_TND",
+    valor_where=valor_where,
+    coluna_update="TX_DCR_DETD_TND",
+    novo_valor=TX_DCR_DETD_TND
+)
+
+TX_RCPO_PDRO_TND = dedent("""
+concretude, precisão, detalhe, elemento concreto, ganho objetivo, benefício específico, delimitação, clareza, entrega real
+""").strip()
+
+cliente_oracle.update_line(
+    tabela="TND_CGTV_TCN",
+    coluna_where="NR_IDFR_TND",
+    valor_where=valor_where,
+    coluna_update="TX_RCPO_PDRO_TND",
+    novo_valor=TX_RCPO_PDRO_TND
+)
+
+
+# ============================================================
+# 4. PERTENCIMENTO
+# ============================================================
+
+valor_where = 4  # Pertencimento
+
+TX_FUC_OPRL_TND = dedent("""
+Intenção: ativar identidade contextual compartilhada.
+
+Função: mostrar que a proposta é relevante para pessoas em uma condição comum, sem inventar comunidade, maioria, depoimento ou prova social.
+
+A persona principal de Pertencimento é o grupo contextual: a mensagem deve fazer a pessoa reconhecer que aquela solução se aplica a pessoas em situação semelhante à dela.
+""").strip()
+
+cliente_oracle.update_line(
+    tabela="TND_CGTV_TCN",
+    coluna_where="NR_IDFR_TND",
+    valor_where=valor_where,
+    coluna_update="TX_FUC_OPRL_TND",
+    novo_valor=TX_FUC_OPRL_TND
+)
+
+TX_DCR_DETD_TND = dedent("""
+ASSINATURA DA MENSAGEM
+
+Abra pelo perfil coletivo do público.
+
+Use a condição compartilhada já presente no texto-base.
+
+Apresente a necessidade como algo relevante para pessoas que vivem aquele contexto.
+
+Mostre a solução como adequada a essa condição coletiva.
+
+Conecte o ganho funcional ao benefício emocional.
+
+Finalize reforçando a pertinência da proposta para esse grupo contextual.
+
+A mensagem deve falar de pessoas em determinada situação, não de uma comunidade inventada.
+
+
+ASSINATURA DA TAGLINE
+
+A tagline deve mostrar por que a proposta faz sentido para pessoas naquela condição.
+
+Ela deve reforçar pertinência contextual, sem parecer prova social.
+
+Formas esperadas da tagline:
+- pessoas em determinada situação mais valor prático;
+- condição compartilhada mais solução adequada;
+- contexto coletivo mais benefício claro;
+- público contextual mais razão de relevância.
+
+
+ASSINATURA DA HEADLINE
+
+A headline deve destacar a condição compartilhada.
+
+O título deve parecer feito para um grupo contextual específico.
+
+Formas esperadas de título:
+- Para quem planeja
+- Quem usa crédito
+- Metas de todo mês
+- Compras com mais plano
+
+
+LIMITES DA TENDÊNCIA
+
+Não invente comunidade.
+
+Não diga que muita gente, todos, clientes como você ou quem sabe faz assim se isso não estiver na fonte.
+
+Não crie prova social, depoimento, maioria, pertencimento formal ou validação externa.
+
+Não transforme Pertencimento em Afinidade.
+
+Pertencimento fala de um grupo contextual.
+
+Afinidade fala da situação reconhecível da pessoa.
+""").strip()
+
+cliente_oracle.update_line(
+    tabela="TND_CGTV_TCN",
+    coluna_where="NR_IDFR_TND",
+    valor_where=valor_where,
+    coluna_update="TX_DCR_DETD_TND",
+    novo_valor=TX_DCR_DETD_TND
+)
+
+TX_RCPO_PDRO_TND = dedent("""
+grupo contextual, condição compartilhada, pessoas que, perfil coletivo, pertinência, vínculo, reconhecimento coletivo, situação comum
+""").strip()
+
+cliente_oracle.update_line(
+    tabela="TND_CGTV_TCN",
+    coluna_where="NR_IDFR_TND",
+    valor_where=valor_where,
+    coluna_update="TX_RCPO_PDRO_TND",
+    novo_valor=TX_RCPO_PDRO_TND
+)
+
+
+# ============================================================
+# 5. PREVISIBILIDADE
+# ============================================================
+
+valor_where = 5  # Previsibilidade
+
+TX_FUC_OPRL_TND = dedent("""
+Intenção: reduzir incerteza interpretativa por meio de uma lógica clara.
+
+Função: explicar como necessidade, solução, ganho funcional e efeito emocional se conectam em uma sequência compreensível.
+
+A persona principal de Previsibilidade é o encadeamento: a mensagem deve fazer a pessoa entender a relação entre ação, solução e efeito.
+""").strip()
+
+cliente_oracle.update_line(
+    tabela="TND_CGTV_TCN",
+    coluna_where="NR_IDFR_TND",
+    valor_where=valor_where,
+    coluna_update="TX_FUC_OPRL_TND",
+    novo_valor=TX_FUC_OPRL_TND
+)
+
+TX_DCR_DETD_TND = dedent("""
+ASSINATURA DA MENSAGEM
+
+Abra estabelecendo uma relação lógica clara presente no texto-base.
+
+Organize a mensagem em sequência: situação ou necessidade, solução, ganho funcional e efeito emocional possível.
+
+Use conectores naturais para explicitar a relação entre ideias, como quando, com isso, por isso, assim e equivalentes naturais.
+
+A mensagem deve deixar claro o caminho mental: quando algo acontece, a solução ajuda de determinada forma e isso favorece determinado efeito.
+
+Finalize reafirmando como a solução contribui para tornar a situação mais clara, organizada ou controlável.
+
+A mensagem deve reduzir incerteza, não criar etapas operacionais inventadas.
+
+
+ASSINATURA DA TAGLINE
+
+A tagline deve explicitar a relação entre ação, solução e efeito.
+
+Ela deve deixar claro por que uma coisa leva à outra.
+
+Formas esperadas da tagline:
+- quando uma necessidade aparece, a solução ajuda de forma prática;
+- ação prática mais ganho funcional;
+- relação causal simples;
+- solução mais efeito possível.
+
+
+ASSINATURA DA HEADLINE
+
+A headline deve sugerir relação clara entre ação e efeito.
+
+O título deve transmitir lógica, clareza ou consequência prática.
+
+Formas esperadas de título:
+- Entenda antes de decidir
+- Organize para planejar
+- Compare para escolher
+- Veja antes de usar
+
+
+LIMITES DA TENDÊNCIA
+
+Não invente etapas, prazos, fluxos, critérios ou garantias.
+
+Não transforme relação lógica em promessa automática.
+
+Não use linguagem técnica de processo se ela não estiver no texto-base.
+
+Não transforme Previsibilidade em Especificidade.
+
+Previsibilidade mostra conexão.
+
+Especificidade mostra detalhe concreto.
+""").strip()
+
+cliente_oracle.update_line(
+    tabela="TND_CGTV_TCN",
+    coluna_where="NR_IDFR_TND",
+    valor_where=valor_where,
+    coluna_update="TX_DCR_DETD_TND",
+    novo_valor=TX_DCR_DETD_TND
+)
+
+TX_RCPO_PDRO_TND = dedent("""
+causalidade, sequência lógica, conexão, clareza, previsibilidade, encadeamento, consequência prática, entendimento, relação entre ideias
+""").strip()
+
+cliente_oracle.update_line(
+    tabela="TND_CGTV_TCN",
+    coluna_where="NR_IDFR_TND",
+    valor_where=valor_where,
+    coluna_update="TX_RCPO_PDRO_TND",
+    novo_valor=TX_RCPO_PDRO_TND
+)
+
+
+# ============================================================
+# 6. SIMPLICIDADE
+# ============================================================
+
+valor_where = 6  # Simplicidade
+
+TX_FUC_OPRL_TND = dedent("""
+Intenção: reduzir esforço mental e tornar o valor imediatamente compreensível.
+
+Função: apresentar a ideia essencial com clareza, economia e baixa carga cognitiva.
+
+A persona principal de Simplicidade é o essencial: a mensagem deve dizer o que importa com o mínimo necessário, sem ficar rasa, vaga ou genérica.
+""").strip()
+
+cliente_oracle.update_line(
+    tabela="TND_CGTV_TCN",
+    coluna_where="NR_IDFR_TND",
+    valor_where=valor_where,
+    coluna_update="TX_FUC_OPRL_TND",
+    novo_valor=TX_FUC_OPRL_TND
+)
+
+TX_DCR_DETD_TND = dedent("""
+ASSINATURA DA MENSAGEM
+
+Abra pela tese central do texto-base em uma frase direta.
+
+Apresente apenas a razão prática principal e o efeito mais relevante.
+
+Use uma ideia por frase.
+
+Use períodos curtos.
+
+Evite explicações paralelas, perguntas, contrastes extensos, adjetivos vazios e digressões.
+
+Organize a mensagem em até três ideias principais: valor central, razão prática e efeito percebido.
+
+Finalize retomando o valor central de forma objetiva.
+
+A mensagem deve parecer simples, não rasa.
+
+
+ASSINATURA DA TAGLINE
+
+A tagline deve apresentar o valor essencial com máxima clareza.
+
+Ela deve ser direta, fácil e sem construção sofisticada.
+
+Formas esperadas da tagline:
+- solução mais benefício direto;
+- ação prática mais valor;
+- frase curta com uma única ideia;
+- explicação simples do ganho principal.
+
+
+ASSINATURA DA HEADLINE
+
+A headline deve ser uma afirmação direta e essencial.
+
+O título deve reduzir esforço, não criar enigma.
+
+Formas esperadas de título:
+- Organize seus gastos
+- Planeje seu mês
+- Revise seu crédito
+- Comece sua reserva
+
+
+LIMITES DA TENDÊNCIA
+
+Não empobreça o sentido.
+
+Não elimine uma relação material importante.
+
+Não transforme Simplicidade em slogan vazio.
+
+Não use pergunta, metáfora ou contraste quando isso aumentar o esforço de leitura.
+
+Não simplifique a ponto de perder benefício real, condição ou nível de promessa.
+""").strip()
+
+cliente_oracle.update_line(
+    tabela="TND_CGTV_TCN",
+    coluna_where="NR_IDFR_TND",
+    valor_where=valor_where,
+    coluna_update="TX_DCR_DETD_TND",
+    novo_valor=TX_DCR_DETD_TND
+)
+
+TX_RCPO_PDRO_TND = dedent("""
+simplicidade, essencial, clareza imediata, baixo esforço, direto, objetivo, fácil, síntese, uma ideia central
+""").strip()
+
+cliente_oracle.update_line(
+    tabela="TND_CGTV_TCN",
+    coluna_where="NR_IDFR_TND",
+    valor_where=valor_where,
+    coluna_update="TX_RCPO_PDRO_TND",
+    novo_valor=TX_RCPO_PDRO_TND
+)
+
+
+# ============================================================
+# 7. TRANSFORMAÇÃO
+# ============================================================
+
+valor_where = 7  # Transformação
+
+TX_FUC_OPRL_TND = dedent("""
+Intenção: tornar o avanço possível mais perceptível.
+
+Função: organizar a mensagem como uma passagem entre uma condição atual e uma direção desejada, sem prometer resultado automático.
+
+A persona principal de Transformação é o movimento: a mensagem deve mostrar progresso, passagem ou evolução possível.
+""").strip()
+
+cliente_oracle.update_line(
+    tabela="TND_CGTV_TCN",
+    coluna_where="NR_IDFR_TND",
+    valor_where=valor_where,
+    coluna_update="TX_FUC_OPRL_TND",
+    novo_valor=TX_FUC_OPRL_TND
+)
+
+TX_DCR_DETD_TND = dedent("""
+ASSINATURA DA MENSAGEM
+
+Abra pela condição atual ou pela direção desejada que dá sentido à mudança.
+
+Apresente a solução como meio de transição.
+
+Explique o ganho funcional como elemento que favorece movimento, organização, clareza, controle ou avanço.
+
+Conclua mostrando o efeito emocional como direção possível e coerente.
+
+A mensagem deve transmitir percurso e progresso.
+
+A transformação deve ser plausível, gradual e sustentada pelo texto-base.
+
+O texto deve mostrar uma passagem possível, não um antes e depois garantido.
+
+
+ASSINATURA DA TAGLINE
+
+A tagline deve mostrar a passagem ou avanço possível com clareza.
+
+Ela deve explicar o movimento sem prometer resultado garantido.
+
+Formas esperadas da tagline:
+- de uma condição para uma direção melhor;
+- prática concreta mais avanço possível;
+- solução mais progresso gradual;
+- organização mais próximo passo.
+
+
+ASSINATURA DA HEADLINE
+
+A headline deve sintetizar movimento, passagem ou avanço.
+
+O título deve ter sensação de progresso.
+
+Formas esperadas de título:
+- Do gasto à escolha
+- Comece sua reserva
+- Da dúvida ao plano
+- Seu próximo passo
+
+
+LIMITES DA TENDÊNCIA
+
+Não crie antes e depois garantido.
+
+Não invente jornada, personagem ou resultado automático.
+
+Não trate apoio como transformação certa.
+
+Não transforme Transformação em Contraste.
+
+Transformação mostra passagem.
+
+Contraste mostra diferença lado a lado.
+""").strip()
+
+cliente_oracle.update_line(
+    tabela="TND_CGTV_TCN",
+    coluna_where="NR_IDFR_TND",
+    valor_where=valor_where,
+    coluna_update="TX_DCR_DETD_TND",
+    novo_valor=TX_DCR_DETD_TND
+)
+
+TX_RCPO_PDRO_TND = dedent("""
+transformação, progresso, passagem, avanço possível, mudança gradual, trajetória, evolução, movimento, direção desejada
+""").strip()
+
+cliente_oracle.update_line(
+    tabela="TND_CGTV_TCN",
+    coluna_where="NR_IDFR_TND",
+    valor_where=valor_where,
+    coluna_update="TX_RCPO_PDRO_TND",
+    novo_valor=TX_RCPO_PDRO_TND
+)
+
+
+# ============================================================
+# 8. CONSISTÊNCIA
+# ============================================================
+
+valor_where = 8  # Consistência
+
+TX_FUC_OPRL_TND = dedent("""
+Intenção: mostrar que a solução combina com o objetivo que a pessoa busca.
+
+Função: alinhar necessidade, solução e benefício a uma direção já desejada pelo público.
+
+A persona principal de Consistência é o alinhamento: a mensagem deve mostrar que a proposta é uma escolha coerente com aquilo que a pessoa quer alcançar.
+""").strip()
+
+cliente_oracle.update_line(
+    tabela="TND_CGTV_TCN",
+    coluna_where="NR_IDFR_TND",
+    valor_where=valor_where,
+    coluna_update="TX_FUC_OPRL_TND",
+    novo_valor=TX_FUC_OPRL_TND
+)
+
+TX_DCR_DETD_TND = dedent("""
+ASSINATURA DA MENSAGEM
+
+Abra pelo objetivo, estado desejado ou direção explicitamente presente no texto-base.
+
+Mostre a necessidade prática como algo que precisa ser organizado, entendido, planejado ou resolvido para seguir nessa direção.
+
+Apresente a solução como uma escolha coerente com esse objetivo.
+
+Explique o ganho funcional como apoio concreto para manter essa direção.
+
+Finalize reforçando a continuidade entre o que a pessoa busca e o que a solução favorece.
+
+A mensagem deve transmitir coerência de decisão, não transformação dramática.
+
+
+ASSINATURA DA TAGLINE
+
+A tagline deve conectar o que a pessoa busca com a escolha apresentada.
+
+Ela deve deixar claro que a solução faz sentido porque ajuda a sustentar uma direção desejada.
+
+Formas esperadas da tagline:
+- objetivo desejado mais escolha coerente;
+- direção da pessoa mais benefício prático;
+- necessidade mais solução alinhada;
+- estado desejado mais apoio concreto.
+
+
+ASSINATURA DA HEADLINE
+
+A headline deve destacar alinhamento entre objetivo e escolha.
+
+O título deve parecer coerente, calmo e direcionado.
+
+Formas esperadas de título:
+- Escolha com direção
+- Planeje no seu ritmo
+- Crédito com mais critério
+- Consumo com intenção
+
+
+LIMITES DA TENDÊNCIA
+
+Não atribua valores pessoais, decisões anteriores, hábitos ou identidade que não estejam no texto-base.
+
+Não diga que a pessoa sempre buscou, já sabe ou valoriza algo se isso não estiver na fonte.
+
+Não transforme Consistência em Transformação.
+
+Consistência enfatiza alinhamento.
+
+Transformação enfatiza passagem.
+""").strip()
+
+cliente_oracle.update_line(
+    tabela="TND_CGTV_TCN",
+    coluna_where="NR_IDFR_TND",
+    valor_where=valor_where,
+    coluna_update="TX_DCR_DETD_TND",
+    novo_valor=TX_DCR_DETD_TND
+)
+
+TX_RCPO_PDRO_TND = dedent("""
+alinhamento, coerência, objetivo, direção, escolha consistente, continuidade, decisão, propósito, compatibilidade
+""").strip()
+
+cliente_oracle.update_line(
+    tabela="TND_CGTV_TCN",
+    coluna_where="NR_IDFR_TND",
+    valor_where=valor_where,
+    coluna_update="TX_RCPO_PDRO_TND",
+    novo_valor=TX_RCPO_PDRO_TND
+)
+
+
+# ============================================================
+# 9. AFINIDADE
+# ============================================================
+
+valor_where = 9  # Afinidade
+
+TX_FUC_OPRL_TND = dedent("""
+Intenção: criar reconhecimento situacional imediato.
+
+Função: fazer a pessoa perceber que a mensagem parte de uma situação próxima da realidade dela, sem parecer genérica, invasiva ou exageradamente íntima.
+
+A persona principal de Afinidade é o reconhecimento individual: a mensagem deve soar como algo pensado para uma situação que a pessoa vive ou reconhece.
+""").strip()
+
+cliente_oracle.update_line(
+    tabela="TND_CGTV_TCN",
+    coluna_where="NR_IDFR_TND",
+    valor_where=valor_where,
+    coluna_update="TX_FUC_OPRL_TND",
+    novo_valor=TX_FUC_OPRL_TND
+)
+
+TX_DCR_DETD_TND = dedent("""
+ASSINATURA DA MENSAGEM
+
+Abra pela situação concreta, necessidade ou dificuldade que o público vive no texto-base.
+
+A mensagem deve começar criando reconhecimento: a pessoa precisa perceber rapidamente que aquele conteúdo tem relação com o momento dela.
+
+Desenvolva mostrando por que a solução faz sentido para aquele contexto específico.
+
+Conecte a necessidade prática ao ganho funcional e ao efeito emocional de forma próxima, clara e humana.
+
+Finalize reforçando a pertinência da proposta para aquela situação vivida.
+
+A mensagem deve parecer pessoalmente relevante, mas sem presumir intimidade, sentimentos não declarados ou experiências que não estejam no texto-base.
+
+
+ASSINATURA DA TAGLINE
+
+A tagline deve explicar por que a solução faz sentido para aquela situação específica.
+
+Ela deve manter a sensação de reconhecimento, mas com clareza objetiva.
+
+A tagline não deve soar como slogan genérico. Ela deve conectar contexto vivido e valor prático.
+
+Formas esperadas da tagline:
+- situação reconhecível mais valor da solução;
+- necessidade concreta mais apoio prático;
+- contexto do público mais benefício direto;
+- momento vivido mais proposta adequada.
+
+
+ASSINATURA DA HEADLINE
+
+A headline deve abrir por uma situação reconhecível.
+
+O título precisa fazer a pessoa pensar que aquilo tem relação com ela.
+
+A headline não precisa ser uma pergunta, mas deve parecer próxima, específica e contextual.
+
+Formas esperadas de título:
+- Gastos que se repetem
+- Seu mês mais claro
+- Crédito com seu histórico
+- Metas no seu ritmo
+
+
+LIMITES DA TENDÊNCIA
+
+Não crie intimidade excessiva.
+
+Não use gírias, confissões, histórias inventadas ou frases como se soubesse exatamente o que a pessoa sente.
+
+Não transforme Afinidade em Pertencimento.
+
+Afinidade fala com a pessoa em sua situação.
+
+Pertencimento fala de pessoas em uma condição compartilhada.
+""").strip()
+
+cliente_oracle.update_line(
+    tabela="TND_CGTV_TCN",
+    coluna_where="NR_IDFR_TND",
+    valor_where=valor_where,
+    coluna_update="TX_DCR_DETD_TND",
+    novo_valor=TX_DCR_DETD_TND
+)
+
+TX_RCPO_PDRO_TND = dedent("""
+reconhecimento, situação vivida, contexto individual, proximidade, relevância pessoal, identificação, adequação, momento da pessoa
+""").strip()
+
+cliente_oracle.update_line(
+    tabela="TND_CGTV_TCN",
+    coluna_where="NR_IDFR_TND",
+    valor_where=valor_where,
+    coluna_update="TX_RCPO_PDRO_TND",
+    novo_valor=TX_RCPO_PDRO_TND
+)
+
+
+# ============================================================
+# 10. CONGRUÊNCIA FINAL
+# ============================================================
+
+valor_where = 10  # Congruência Final
+
+TX_FUC_OPRL_TND = dedent("""
+Intenção: criar sensação de coerência e fechamento lógico.
+
+Função: abrir com uma ideia central, desenvolver as razões que sustentam essa ideia e encerrar retomando o mesmo valor de forma consistente.
+
+A persona principal de Congruência Final é a completude: a mensagem deve parecer redonda, lógica e bem fechada.
+""").strip()
+
+cliente_oracle.update_line(
+    tabela="TND_CGTV_TCN",
+    coluna_where="NR_IDFR_TND",
+    valor_where=valor_where,
+    coluna_update="TX_FUC_OPRL_TND",
+    novo_valor=TX_FUC_OPRL_TND
+)
+
+TX_DCR_DETD_TND = dedent("""
+ASSINATURA DA MENSAGEM
+
+Abra pelo valor central mais importante do texto-base.
+
+Esse valor pode estar no benefício racional, no estado emocional desejado ou na relação principal entre necessidade e solução.
+
+Desenvolva apenas as relações necessárias para sustentar essa ideia inicial.
+
+Organize o raciocínio com começo, sustentação e fechamento.
+
+O encerramento deve retomar semanticamente a abertura, usando outra formulação.
+
+A última unidade da mensagem deve confirmar a tese inicial, sem introduzir assunto novo.
+
+A mensagem deve parecer completa: aquilo que abre também deve dar sentido ao fechamento.
+
+
+ASSINATURA DA TAGLINE
+
+A tagline deve apresentar uma ideia de valor completa, clara e autossuficiente.
+
+Ela deve sustentar a lógica central da mensagem, sem abrir uma pergunta nova e sem depender de explicação adicional.
+
+Formas esperadas da tagline:
+- valor central mais sustentação prática;
+- benefício mais razão clara;
+- solução mais efeito coerente;
+- ideia completa em uma frase clara.
+
+
+ASSINATURA DA HEADLINE
+
+A headline deve soar como uma ideia fechada.
+
+O título precisa transmitir completude, coerência e conclusão.
+
+A headline não deve parecer fragmentada, misteriosa ou aberta demais.
+
+Formas esperadas de título:
+- Escolhas com sentido
+- Crédito com contexto
+- Seu plano ganha forma
+- Organizar faz diferença
+
+
+LIMITES DA TENDÊNCIA
+
+Não crie circularidade vazia.
+
+Não repita literalmente a mesma frase no começo e no fim.
+
+Não introduza uma nova promessa no encerramento.
+
+Não transforme Congruência Final em Consistência.
+
+Congruência Final organiza a mensagem como composição circular.
+
+Consistência organiza a mensagem como alinhamento entre objetivo e escolha.
+""").strip()
+
+cliente_oracle.update_line(
+    tabela="TND_CGTV_TCN",
+    coluna_where="NR_IDFR_TND",
+    valor_where=valor_where,
+    coluna_update="TX_DCR_DETD_TND",
+    novo_valor=TX_DCR_DETD_TND
+)
+
+TX_RCPO_PDRO_TND = dedent("""
+coerência, fechamento, completude, retomada, lógica, valor central, confirmação, tese, conclusão
+""").strip()
+
+cliente_oracle.update_line(
+    tabela="TND_CGTV_TCN",
+    coluna_where="NR_IDFR_TND",
+    valor_where=valor_where,
+    coluna_update="TX_RCPO_PDRO_TND",
+    novo_valor=TX_RCPO_PDRO_TND
+)
+
+
+# ============================================================
+# CONFERÊNCIA FINAL
+# ============================================================
+
+cliente_oracle.selecionar_tabela(
+    "TND_CGTV_TCN",
+    show=True
+)
