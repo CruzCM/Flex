@@ -6,7 +6,6 @@ ref_table = "AVS_SELD"
 
 from pyspark.sql import types as T
 from pyspark.sql.functions import current_timestamp
-import json
 
 schema = T.StructType([
     T.StructField("NR_AVS_SELD", T.LongType(), False),
@@ -14,9 +13,9 @@ schema = T.StructType([
     T.StructField("NR_IDFR_SGT", T.LongType(), False),
     T.StructField("CD_EXNO_CRIC", T.StringType(), False),
     T.StructField("CD_EXNO_AVS", T.StringType(), False),
-    T.StructField("NR_IDFR_APSC", T.LongType(), False),
-    T.StructField("NR_IDFR_CNR", T.LongType(), False),
-    T.StructField("NR_IDFR_TND", T.LongType(), False),
+    T.StructField("NR_IDFR_APSC", T.LongType(), False),  # fixo = 3049
+    T.StructField("NR_IDFR_CNR", T.LongType(), False),   # fixo = 1017
+    T.StructField("NR_IDFR_TND", T.LongType(), False),   # fixo = 1
     T.StructField("TX_TIT_PDRO_AVS", T.StringType(), False),
     T.StructField("TX_STIT_PDRO_AVS", T.StringType(), False),
     T.StructField("TX_ACMT_PDRO_AVS", T.StringType(), False),
@@ -25,170 +24,176 @@ schema = T.StructType([
     T.StructField("TS_CAD_AVS", T.TimestampType(), True),
 ])
 
-pares_produto_publico = [
+dados = [
     (
-        3010,
-        4008,
+        5001, 3010, 4008, "CRIC-5001", "AVS-5001", 3049, 1017, 1,
         "Open Finance BB – Crédito e Limite",
-        "Histórico financeiro fora do BB"
+        "Histórico financeiro fora do BB",
+        "Aviso padrão para Open Finance BB – Crédito e Limite direcionado a histórico financeiro fora do BB.",
+        '{"nr_avs_seld":5001,"pbco":3010,"sgt":4008,"apsc":3049,"cnr":1017,"tnd":1}',
+        "USR00001", None
     ),
     (
-        3011,
-        4009,
+        5002, 3011, 4009, "CRIC-5002", "AVS-5002", 3049, 1017, 1,
         "Open Finance BB – Portabilidade de Crédito",
-        "Crédito em outro banco para comparar"
+        "Crédito em outro banco para comparar",
+        "Aviso padrão para Open Finance BB – Portabilidade de Crédito direcionado a crédito em outro banco para comparar.",
+        '{"nr_avs_seld":5002,"pbco":3011,"sgt":4009,"apsc":3049,"cnr":1017,"tnd":1}',
+        "USR00001", None
     ),
     (
-        3012,
-        4010,
+        5003, 3012, 4010, "CRIC-5003", "AVS-5003", 3049, 1017, 1,
         "Open Finance BB – Gestão Financeira",
-        "Contas em mais de um banco"
+        "Contas em mais de um banco",
+        "Aviso padrão para Open Finance BB – Gestão Financeira direcionado a contas em mais de um banco.",
+        '{"nr_avs_seld":5003,"pbco":3012,"sgt":4010,"apsc":3049,"cnr":1017,"tnd":1}',
+        "USR00001", None
     ),
     (
-        3013,
-        4011,
+        5004, 3013, 4011, "CRIC-5004", "AVS-5004", 3049, 1017, 1,
         "Consórcio Imobiliário BB – Compra de Imóvel",
-        "Compra de imóvel planejada"
+        "Compra de imóvel planejada",
+        "Aviso padrão para Consórcio Imobiliário BB – Compra de Imóvel direcionado a compra de imóvel planejada.",
+        '{"nr_avs_seld":5004,"pbco":3013,"sgt":4011,"apsc":3049,"cnr":1017,"tnd":1}',
+        "USR00001", None
     ),
     (
-        3014,
-        4012,
+        5005, 3014, 4012, "CRIC-5005", "AVS-5005", 3049, 1017, 1,
         "Consórcio Imobiliário BB – Reforma ou Construção",
-        "Reforma ou construção planejada"
+        "Reforma ou construção planejada",
+        "Aviso padrão para Consórcio Imobiliário BB – Reforma ou Construção direcionado a reforma ou construção planejada.",
+        '{"nr_avs_seld":5005,"pbco":3014,"sgt":4012,"apsc":3049,"cnr":1017,"tnd":1}',
+        "USR00001", None
     ),
     (
-        3015,
-        4013,
+        5006, 3015, 4013, "CRIC-5006", "AVS-5006", 3049, 1017, 1,
         "Consórcio Imobiliário BB – Planejamento sem Juros",
-        "Imóvel com planejamento financeiro"
+        "Imóvel com planejamento financeiro",
+        "Aviso padrão para Consórcio Imobiliário BB – Planejamento sem Juros direcionado a imóvel com planejamento financeiro.",
+        '{"nr_avs_seld":5006,"pbco":3015,"sgt":4013,"apsc":3049,"cnr":1017,"tnd":1}',
+        "USR00001", None
     ),
     (
-        3016,
-        4014,
+        5007, 3016, 4014, "CRIC-5007", "AVS-5007", 3049, 1017, 1,
         "Consórcio de Eletro e Eletrônicos BB – Celular",
-        "Troca de celular planejada"
+        "Troca de celular planejada",
+        "Aviso padrão para Consórcio de Eletro e Eletrônicos BB – Celular direcionado a troca de celular planejada.",
+        '{"nr_avs_seld":5007,"pbco":3016,"sgt":4014,"apsc":3049,"cnr":1017,"tnd":1}',
+        "USR00001", None
     ),
     (
-        3017,
-        4015,
+        5008, 3017, 4015, "CRIC-5008", "AVS-5008", 3049, 1017, 1,
         "Consórcio de Eletro e Eletrônicos BB – Casa",
-        "Casa para equipar com planejamento"
+        "Casa para equipar com planejamento",
+        "Aviso padrão para Consórcio de Eletro e Eletrônicos BB – Casa direcionado a casa para equipar com planejamento.",
+        '{"nr_avs_seld":5008,"pbco":3017,"sgt":4015,"apsc":3049,"cnr":1017,"tnd":1}',
+        "USR00001", None
     ),
     (
-        3018,
-        4016,
+        5009, 3018, 4016, "CRIC-5009", "AVS-5009", 3049, 1017, 1,
         "Consórcio de Eletro e Eletrônicos BB – Escritório",
-        "Eletrônicos para trabalho ou estudo"
+        "Eletrônicos para trabalho ou estudo",
+        "Aviso padrão para Consórcio de Eletro e Eletrônicos BB – Escritório direcionado a eletrônicos para trabalho ou estudo.",
+        '{"nr_avs_seld":5009,"pbco":3018,"sgt":4016,"apsc":3049,"cnr":1017,"tnd":1}',
+        "USR00001", None
     ),
     (
-        3019,
-        4017,
+        5010, 3019, 4017, "CRIC-5010", "AVS-5010", 3049, 1017, 1,
         "Empréstimo Pessoal BB – Simulação no App",
-        "Crédito para simular antes de decidir"
+        "Crédito para simular antes de decidir",
+        "Aviso padrão para Empréstimo Pessoal BB – Simulação no App direcionado a crédito para simular antes de decidir.",
+        '{"nr_avs_seld":5010,"pbco":3019,"sgt":4017,"apsc":3049,"cnr":1017,"tnd":1}',
+        "USR00001", None
     ),
     (
-        3020,
-        4018,
+        5011, 3020, 4018, "CRIC-5011", "AVS-5011", 3049, 1017, 1,
         "Empréstimo Pessoal BB – Crédito de Uso Livre",
-        "Necessidade de crédito de uso livre"
+        "Necessidade de crédito de uso livre",
+        "Aviso padrão para Empréstimo Pessoal BB – Crédito de Uso Livre direcionado a necessidade de crédito de uso livre.",
+        '{"nr_avs_seld":5011,"pbco":3020,"sgt":4018,"apsc":3049,"cnr":1017,"tnd":1}',
+        "USR00001", None
     ),
     (
-        3021,
-        4019,
+        5012, 3021, 4019, "CRIC-5012", "AVS-5012", 3049, 1017, 1,
         "Empréstimo Pessoal BB – Prazo para Começar a Pagar",
-        "Crédito com fôlego para começar a pagar"
+        "Crédito com fôlego para começar a pagar",
+        "Aviso padrão para Empréstimo Pessoal BB – Prazo para Começar a Pagar direcionado a crédito com fôlego para começar a pagar.",
+        '{"nr_avs_seld":5012,"pbco":3021,"sgt":4019,"apsc":3049,"cnr":1017,"tnd":1}',
+        "USR00001", None
     ),
     (
-        3022,
-        4020,
+        5013, 3022, 4020, "CRIC-5013", "AVS-5013", 3049, 1017, 1,
         "Cofrinho BB – Guardar Dinheiro do Seu Jeito",
-        "Objetivos misturados aos gastos do dia a dia"
+        "Objetivos misturados aos gastos do dia a dia",
+        "Aviso padrão para Cofrinho BB – Guardar Dinheiro do Seu Jeito direcionado a objetivos misturados aos gastos do dia a dia.",
+        '{"nr_avs_seld":5013,"pbco":3022,"sgt":4020,"apsc":3049,"cnr":1017,"tnd":1}',
+        "USR00001", None
     ),
     (
-        3023,
-        4021,
+        5014, 3023, 4021, "CRIC-5014", "AVS-5014", 3049, 1017, 1,
         "Shopping BB – Celulares com Cashback ou Desconto",
-        "Compra de celular com boa condição"
+        "Compra de celular com boa condição",
+        "Aviso padrão para Shopping BB – Celulares com Cashback ou Desconto direcionado a compra de celular com boa condição.",
+        '{"nr_avs_seld":5014,"pbco":3023,"sgt":4021,"apsc":3049,"cnr":1017,"tnd":1}',
+        "USR00001", None
     ),
     (
-        3024,
-        4022,
+        5015, 3024, 4022, "CRIC-5015", "AVS-5015", 3049, 1017, 1,
         "Parcelamento do Limite Especial BB – Organizar o Valor Usado",
-        "Limite Especial usado na conta"
+        "Limite Especial usado na conta",
+        "Aviso padrão para Parcelamento do Limite Especial BB – Organizar o Valor Usado direcionado a limite especial usado na conta.",
+        '{"nr_avs_seld":5015,"pbco":3024,"sgt":4022,"apsc":3049,"cnr":1017,"tnd":1}',
+        "USR00001", None
     ),
     (
-        3025,
-        4023,
+        5016, 3025, 4023, "CRIC-5016", "AVS-5016", 3049, 1017, 1,
         "ITP BB – Pagamento com Dinheiro de Outro Banco",
-        "Dinheiro em outro banco para pagar"
+        "Dinheiro em outro banco para pagar",
+        "Aviso padrão para ITP BB – Pagamento com Dinheiro de Outro Banco direcionado a dinheiro em outro banco para pagar.",
+        '{"nr_avs_seld":5016,"pbco":3025,"sgt":4023,"apsc":3049,"cnr":1017,"tnd":1}',
+        "USR00001", None
     ),
     (
-        3026,
-        4024,
+        5017, 3026, 4024, "CRIC-5017", "AVS-5017", 3049, 1017, 1,
         "Educação Financeira – Categorização dos Gastos",
-        "Gastos do mês pouco organizados"
+        "Gastos do mês pouco organizados",
+        "Aviso padrão para Educação Financeira – Categorização dos Gastos direcionado a gastos do mês pouco organizados.",
+        '{"nr_avs_seld":5017,"pbco":3026,"sgt":4024,"apsc":3049,"cnr":1017,"tnd":1}',
+        "USR00001", None
     ),
     (
-        3027,
-        4025,
+        5018, 3027, 4025, "CRIC-5018", "AVS-5018", 3049, 1017, 1,
         "Educação Financeira – Gestão do Orçamento",
-        "Contas do mês para organizar"
+        "Contas do mês para organizar",
+        "Aviso padrão para Educação Financeira – Gestão do Orçamento direcionado a contas do mês para organizar.",
+        '{"nr_avs_seld":5018,"pbco":3027,"sgt":4025,"apsc":3049,"cnr":1017,"tnd":1}',
+        "USR00001", None
     ),
     (
-        3028,
-        4026,
+        5019, 3028, 4026, "CRIC-5019", "AVS-5019", 3049, 1017, 1,
         "Educação Financeira – Uso Consciente do Crédito",
-        "Crédito para revisar antes de usar mais"
+        "Crédito para revisar antes de usar mais",
+        "Aviso padrão para Educação Financeira – Uso Consciente do Crédito direcionado a crédito para revisar antes de usar mais.",
+        '{"nr_avs_seld":5019,"pbco":3028,"sgt":4026,"apsc":3049,"cnr":1017,"tnd":1}',
+        "USR00001", None
     ),
     (
-        3029,
-        4027,
+        5020, 3029, 4027, "CRIC-5020", "AVS-5020", 3049, 1017, 1,
         "Educação Financeira – Consumo Planejado",
-        "Compra para avaliar antes de decidir"
+        "Compra para avaliar antes de decidir",
+        "Aviso padrão para Educação Financeira – Consumo Planejado direcionado a compra para avaliar antes de decidir.",
+        '{"nr_avs_seld":5020,"pbco":3029,"sgt":4027,"apsc":3049,"cnr":1017,"tnd":1}',
+        "USR00001", None
     ),
     (
-        3030,
-        4028,
+        5021, 3030, 4028, "CRIC-5021", "AVS-5021", 3049, 1017, 1,
         "Educação Financeira – Formação de Reserva",
-        "Reserva ainda sem começar"
-    ),
+        "Reserva ainda sem começar",
+        "Aviso padrão para Educação Financeira – Formação de Reserva direcionado a reserva ainda sem começar.",
+        '{"nr_avs_seld":5021,"pbco":3030,"sgt":4028,"apsc":3049,"cnr":1017,"tnd":1}',
+        "USR00001", None
+    )
 ]
-
-dados = []
-
-for idx, (nr_idfr_pbco, nr_idfr_sgt, nm_sgt_pdro, referencia_publico) in enumerate(
-    pares_produto_publico,
-    start=1
-):
-    nr_avs_seld = 5000 + idx
-
-    js_avs_pdro = {
-        "nr_avs_seld": nr_avs_seld,
-        "nr_idfr_pbco": nr_idfr_pbco,
-        "nr_idfr_sgt": nr_idfr_sgt,
-        "nr_idfr_apsc": 1025,
-        "nr_idfr_cnr": 1,
-        "nr_idfr_tnd": 1,
-        "nm_sgt_pdro": nm_sgt_pdro,
-        "referencia_publico": referencia_publico
-    }
-
-    dados.append((
-        nr_avs_seld,
-        nr_idfr_pbco,
-        nr_idfr_sgt,
-        f"CRIC-{nr_avs_seld}",
-        f"AVS-{nr_avs_seld}",
-        1025,
-        1,
-        1,
-        nm_sgt_pdro,
-        referencia_publico,
-        f"Aviso padrão para {nm_sgt_pdro} direcionado a {referencia_publico}.",
-        json.dumps(js_avs_pdro, ensure_ascii=False),
-        "ADMIN",
-        None
-    ))
 
 df = (
     spark.createDataFrame(dados, schema)
@@ -204,6 +209,13 @@ cliente_oracle.reload_dataframe(
 )
 
 df_oracle = cliente_oracle.selecionar_tabela(ref_table, show=True)
+
+
+
+
+
+
+
 
 
 
