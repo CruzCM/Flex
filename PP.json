@@ -1,3 +1,145 @@
+
+%%spark
+
+from pyspark.sql import functions as F
+
+# ============================================================
+# UPDATE PONTUAL — RCM_VLDD
+# ============================================================
+#
+# CD_EST_RCM:
+# 1 = EM_PREPARAÇÃO
+# 2 = AGUARDANDO_VIGÊNCIA
+# 3 = VIGENTE
+# 4 = EXPIRADA
+# 5 = FINALIZADA
+#
+# NR_VLDO_VRS:
+# 0 = ainda não existe versão válida
+# 1 = versão 1 já é válida
+#
+# NR_VRS_PRPT:
+# 1 = versão proposta atual
+
+updates_rcm_vldd = [
+    # RCM, CD_EST_RCM, NR_VLDO_VRS, NR_VRS_PRPT
+
+    (1001, 1, 0, 1),  # EM_PREPARAÇÃO | AGUARDANDO_APROVAÇÃO
+    (1002, 1, 0, 1),  # EM_PREPARAÇÃO | REPROVADA
+    (1003, 2, 1, 1),  # AGUARDANDO_VIGÊNCIA | APROVADA
+    (1004, 3, 1, 1),  # VIGENTE | APROVADA
+    (1005, 4, 1, 1),  # EXPIRADA | APROVADA
+    (1006, 5, 1, 1),  # FINALIZADA | APROVADA
+
+    (1007, 1, 0, 1),  # EM_PREPARAÇÃO | AGUARDANDO_APROVAÇÃO
+    (1008, 1, 0, 1),  # EM_PREPARAÇÃO | REPROVADA
+    (1009, 2, 1, 1),  # AGUARDANDO_VIGÊNCIA | APROVADA
+    (1010, 3, 1, 1),  # VIGENTE | APROVADA
+    (1011, 4, 1, 1),  # EXPIRADA | APROVADA
+    (1012, 5, 1, 1),  # FINALIZADA | APROVADA
+
+    (1013, 1, 0, 1),  # EM_PREPARAÇÃO | AGUARDANDO_APROVAÇÃO
+    (1014, 1, 0, 1),  # EM_PREPARAÇÃO | REPROVADA
+    (1015, 2, 1, 1),  # AGUARDANDO_VIGÊNCIA | APROVADA
+    (1016, 3, 1, 1),  # VIGENTE | APROVADA
+    (1017, 4, 1, 1),  # EXPIRADA | APROVADA
+    (1018, 5, 1, 1),  # FINALIZADA | APROVADA
+
+    (1019, 1, 0, 1),  # EM_PREPARAÇÃO | AGUARDANDO_APROVAÇÃO
+    (1020, 3, 1, 1),  # VIGENTE | APROVADA
+    (1021, 2, 1, 1),  # AGUARDANDO_VIGÊNCIA | APROVADA
+]
+
+for nr_idfr_rcm, cd_est_rcm, nr_vldo_vrs, nr_vrs_prpt in updates_rcm_vldd:
+    cliente_oracle.update_line(
+        tabela="RCM_VLDD",
+        coluna_where="NR_IDFR_RCM",
+        valor_where=nr_idfr_rcm,
+        coluna_update="CD_EST_RCM",
+        novo_valor=cd_est_rcm
+    )
+
+    cliente_oracle.update_line(
+        tabela="RCM_VLDD",
+        coluna_where="NR_IDFR_RCM",
+        valor_where=nr_idfr_rcm,
+        coluna_update="NR_VLDO_VRS",
+        novo_valor=nr_vldo_vrs
+    )
+
+    cliente_oracle.update_line(
+        tabela="RCM_VLDD",
+        coluna_where="NR_IDFR_RCM",
+        valor_where=nr_idfr_rcm,
+        coluna_update="NR_VRS_PRPT",
+        novo_valor=nr_vrs_prpt
+    )
+
+
+# ============================================================
+# UPDATE PONTUAL — RCM_VRS
+# ============================================================
+#
+# CD_EST_RCM_VRS:
+# 1 = AGUARDANDO_APROVAÇÃO
+# 2 = APROVADA
+# 3 = REPROVADA
+
+updates_rcm_vrs = [
+    # RCM, CD_EST_RCM_VRS
+
+    (1001, 1),  # AGUARDANDO_APROVAÇÃO
+    (1002, 3),  # REPROVADA
+    (1003, 2),  # APROVADA
+    (1004, 2),  # APROVADA
+    (1005, 2),  # APROVADA
+    (1006, 2),  # APROVADA
+
+    (1007, 1),  # AGUARDANDO_APROVAÇÃO
+    (1008, 3),  # REPROVADA
+    (1009, 2),  # APROVADA
+    (1010, 2),  # APROVADA
+    (1011, 2),  # APROVADA
+    (1012, 2),  # APROVADA
+
+    (1013, 1),  # AGUARDANDO_APROVAÇÃO
+    (1014, 3),  # REPROVADA
+    (1015, 2),  # APROVADA
+    (1016, 2),  # APROVADA
+    (1017, 2),  # APROVADA
+    (1018, 2),  # APROVADA
+
+    (1019, 1),  # AGUARDANDO_APROVAÇÃO
+    (1020, 2),  # APROVADA
+    (1021, 2),  # APROVADA
+]
+
+for nr_idfr_rcm, cd_est_rcm_vrs in updates_rcm_vrs:
+    cliente_oracle.update_line(
+        tabela="RCM_VRS",
+        coluna_where="NR_IDFR_RCM",
+        valor_where=nr_idfr_rcm,
+        coluna_update="CD_EST_RCM_VRS",
+        novo_valor=cd_est_rcm_vrs
+    )
+
+
+# ============================================================
+# CONFERÊNCIA
+# ============================================================
+
+df_vldd = cliente_oracle.selecionar_tabela("RCM_VLDD", show=True)
+df_vrs = cliente_oracle.selecionar_tabela("RCM_VRS", show=True)
+
+
+
+
+
+
+
+
+
+
 %%spark
 
 ref_table = "RCM_VLDD"
