@@ -1,5 +1,647 @@
 %%spark
 
+# ============================================================
+# MASSA FINAL — RCM_VLDD + RCM_VRS
+# ============================================================
+#
+# Pré-condição:
+# - AVS_SELD já existe com NR_AVS_SELD 5001 a 5021.
+# - RCM_VLDD e RCM_VRS foram apagadas antes deste bloco.
+#
+# Objetivo:
+# - Recriar RCM_VLDD com 21 recomendações.
+# - Recriar RCM_VRS com 21 versões iniciais.
+# - Criar versões 2 reutilizando AVS_SELD existente.
+# - Demonstrar estados de recomendação e estados de versão.
+#
+# Estados RCM_VLDD.CD_EST_RCM:
+# 1 = EM_PREPARAÇÃO
+# 2 = AGUARDANDO_VIGÊNCIA
+# 3 = VIGENTE
+# 4 = EXPIRADA
+# 5 = FINALIZADA
+#
+# Estados RCM_VRS.CD_EST_RCM_VRS:
+# 1 = AGUARDANDO_APROVAÇÃO
+# 2 = APROVADA
+# 3 = REPROVADA
+#
+# Regra para nova versão:
+# - V2 em avaliação: RCM_VLDD.NR_VLDO_VRS = 1 e RCM_VLDD.NR_VRS_PRPT = 2
+# - V2 aprovada/promovida: RCM_VLDD.NR_VLDO_VRS = 2 e RCM_VLDD.NR_VRS_PRPT = 2
+# - Não usar NR_VRS_PRPT = 3 neste mock.
+
+from pyspark.sql import types as T
+from pyspark.sql import functions as F
+from pyspark.sql.functions import current_timestamp
+
+
+# ============================================================
+# 1. RCM_VLDD — RECOMENDAÇÃO VALIDADA / CONSOLIDADA
+# ============================================================
+
+ref_table = "RCM_VLDD"
+
+schema_vldd = T.StructType([
+    T.StructField("NR_IDFR_RCM", T.LongType(), False),
+    T.StructField("NR_IDFR_PROJ", T.LongType(), False),
+    T.StructField("NM_RCM_PDRO", T.StringType(), False),
+    T.StructField("CD_EST_RCM", T.LongType(), False),
+    T.StructField("TX_DCR_DETD", T.StringType(), False),
+    T.StructField("NR_VLDO_VRS", T.LongType(), False),
+    T.StructField("NR_VRS_PRPT", T.LongType(), False),
+    T.StructField("NR_PRI_SELD", T.LongType(), False),
+    T.StructField("TS_ULT_ATL", T.TimestampType(), True),
+])
+
+dados_vldd = [
+    (
+        1001,
+        1,
+        "Open Finance BB – Crédito e Limite",
+        1,
+        "Em preparação com versão 1 aguardando aprovação.",
+        0,
+        1,
+        1,
+        None,
+    ),
+    (
+        1002,
+        1,
+        "Open Finance BB – Portabilidade de Crédito",
+        1,
+        "Em preparação com versão 1 reprovada.",
+        0,
+        1,
+        2,
+        None,
+    ),
+    (
+        1003,
+        1,
+        "Open Finance BB – Gestão Financeira",
+        2,
+        "Aguardando vigência com versão 1 aprovada.",
+        1,
+        1,
+        3,
+        None,
+    ),
+    (
+        1004,
+        1,
+        "Consórcio Imobiliário BB – Compra de Imóvel",
+        3,
+        "Vigente com versão 1 aprovada.",
+        1,
+        1,
+        4,
+        None,
+    ),
+    (
+        1005,
+        1,
+        "Consórcio Imobiliário BB – Reforma ou Construção",
+        4,
+        "Expirada com versão 1 aprovada.",
+        1,
+        1,
+        5,
+        None,
+    ),
+    (
+        1006,
+        1,
+        "Consórcio Imobiliário BB – Planejamento sem Juros",
+        5,
+        "Finalizada com versão 1 aprovada.",
+        1,
+        1,
+        6,
+        None,
+    ),
+    (
+        1007,
+        1,
+        "Consórcio de Eletro e Eletrônicos BB – Celular",
+        1,
+        "Em preparação com versão 1 aguardando aprovação.",
+        0,
+        1,
+        7,
+        None,
+    ),
+    (
+        1008,
+        1,
+        "Consórcio de Eletro e Eletrônicos BB – Casa",
+        2,
+        "Aguardando vigência com versão 1 válida e versão 2 aguardando aprovação.",
+        1,
+        2,
+        8,
+        None,
+    ),
+    (
+        1009,
+        1,
+        "Consórcio de Eletro e Eletrônicos BB – Escritório",
+        3,
+        "Vigente com versão 1 válida e versão 2 aguardando aprovação.",
+        1,
+        2,
+        9,
+        None,
+    ),
+    (
+        1010,
+        1,
+        "Empréstimo Pessoal BB – Simulação no App",
+        3,
+        "Vigente com versão 1 válida e versão 2 reprovada.",
+        1,
+        2,
+        10,
+        None,
+    ),
+    (
+        1011,
+        1,
+        "Empréstimo Pessoal BB – Crédito de Uso Livre",
+        3,
+        "Vigente com versão 2 aprovada e promovida.",
+        2,
+        2,
+        11,
+        None,
+    ),
+    (
+        1012,
+        1,
+        "Empréstimo Pessoal BB – Prazo para Começar a Pagar",
+        1,
+        "Em preparação com versão 1 aguardando aprovação.",
+        0,
+        1,
+        12,
+        None,
+    ),
+    (
+        1013,
+        1,
+        "Cofrinho BB – Guardar Dinheiro do Seu Jeito",
+        1,
+        "Em preparação com versão 1 aguardando aprovação.",
+        0,
+        1,
+        13,
+        None,
+    ),
+    (
+        1014,
+        1,
+        "Shopping BB – Celulares com Cashback ou Desconto",
+        1,
+        "Em preparação com versão 1 aguardando aprovação.",
+        0,
+        1,
+        14,
+        None,
+    ),
+    (
+        1015,
+        1,
+        "Parcelamento do Limite Especial BB – Organizar o Valor Usado",
+        1,
+        "Em preparação com versão 1 aguardando aprovação.",
+        0,
+        1,
+        15,
+        None,
+    ),
+    (
+        1016,
+        1,
+        "ITP BB – Pagamento com Dinheiro de Outro Banco",
+        1,
+        "Em preparação com versão 1 aguardando aprovação.",
+        0,
+        1,
+        16,
+        None,
+    ),
+    (
+        1017,
+        1,
+        "Educação Financeira – Categorização dos Gastos",
+        1,
+        "Em preparação com versão 1 aguardando aprovação.",
+        0,
+        1,
+        17,
+        None,
+    ),
+    (
+        1018,
+        1,
+        "Educação Financeira – Gestão do Orçamento",
+        1,
+        "Em preparação com versão 1 aguardando aprovação.",
+        0,
+        1,
+        18,
+        None,
+    ),
+    (
+        1019,
+        1,
+        "Educação Financeira – Uso Consciente do Crédito",
+        1,
+        "Em preparação com versão 1 aguardando aprovação.",
+        0,
+        1,
+        19,
+        None,
+    ),
+    (
+        1020,
+        1,
+        "Educação Financeira – Consumo Planejado",
+        1,
+        "Em preparação com versão 1 aguardando aprovação.",
+        0,
+        1,
+        20,
+        None,
+    ),
+    (
+        1021,
+        1,
+        "Educação Financeira – Formação de Reserva",
+        1,
+        "Em preparação com versão 1 aguardando aprovação.",
+        0,
+        1,
+        21,
+        None,
+    ),
+]
+
+df_vldd = (
+    spark.createDataFrame(dados_vldd, schema_vldd)
+        .withColumn("TS_ULT_ATL", current_timestamp())
+)
+
+cliente_oracle.reload_dataframe(
+    df=df_vldd,
+    table_name=ref_table,
+    batchsize=5000,
+    num_partitions=1,
+    use_truncate=False
+)
+
+
+# ============================================================
+# 2. RCM_VRS — VERSÕES DAS RECOMENDAÇÕES
+# ============================================================
+
+ref_table = "RCM_VRS"
+
+schema_vrs = T.StructType([
+    T.StructField("NR_IDFR_RCM", T.LongType(), False),
+    T.StructField("NR_IDFR_PROJ", T.LongType(), False),
+    T.StructField("NR_VRS_PRPT", T.LongType(), False),
+    T.StructField("NR_AVS_SELD", T.LongType(), False),
+    T.StructField("CD_EST_RCM_VRS", T.LongType(), False),
+    T.StructField("TX_DCR_DETD", T.StringType(), False),
+    T.StructField("DT_PRPT_INC_RCM", T.StringType(), False),
+    T.StructField("DT_PRPT_FIM_RCM", T.StringType(), False),
+    T.StructField("TX_PRPT_PRM_HDR_API", T.StringType(), False),
+    T.StructField("TX_MTV_AVLC", T.StringType(), True),
+    T.StructField("TS_ULT_ALT", T.TimestampType(), True),
+    T.StructField("CD_USU_RSP_CAD", T.StringType(), False),
+])
+
+dados_vrs = [
+    # ========================================================
+    # VERSÕES 1 — 21 recomendações iniciais
+    # ========================================================
+
+    (
+        1001, 1, 1, 5001, 1,
+        "Versão 1 aguardando aprovação para Open Finance BB – Crédito e Limite.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1001,"versao":1,"avs":5001,"mock":"v1_aguardando_aprovacao"}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1002, 1, 1, 5002, 3,
+        "Versão 1 reprovada para Open Finance BB – Portabilidade de Crédito.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1002,"versao":1,"avs":5002,"mock":"v1_reprovada"}',
+        "Versão 1 reprovada para demonstração.",
+        None,
+        "USR00001",
+    ),
+    (
+        1003, 1, 1, 5003, 2,
+        "Versão 1 aprovada para Open Finance BB – Gestão Financeira, aguardando início da vigência.",
+        "2026-08-01",
+        "2026-12-20",
+        '{"rcm":1003,"versao":1,"avs":5003,"mock":"v1_aprovada_aguardando_vigencia"}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1004, 1, 1, 5004, 2,
+        "Versão 1 aprovada e vigente para Consórcio Imobiliário BB – Compra de Imóvel.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1004,"versao":1,"avs":5004,"mock":"v1_aprovada_vigente"}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1005, 1, 1, 5005, 2,
+        "Versão 1 aprovada e expirada para Consórcio Imobiliário BB – Reforma ou Construção.",
+        "2026-01-01",
+        "2026-03-31",
+        '{"rcm":1005,"versao":1,"avs":5005,"mock":"v1_aprovada_expirada"}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1006, 1, 1, 5006, 2,
+        "Versão 1 aprovada e finalizada para Consórcio Imobiliário BB – Planejamento sem Juros.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1006,"versao":1,"avs":5006,"mock":"v1_aprovada_finalizada"}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1007, 1, 1, 5007, 1,
+        "Versão 1 aguardando aprovação para Consórcio de Eletro e Eletrônicos BB – Celular.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1007,"versao":1,"avs":5007,"mock":"v1_aguardando_aprovacao"}',
+        None,
+        None,
+        "USR00001",
+    ),
+
+    # V1 aprovada para permitir mock correto de edição com V2
+    (
+        1008, 1, 1, 5008, 2,
+        "Versão 1 aprovada e válida antes da criação da versão 2 para Consórcio de Eletro e Eletrônicos BB – Casa.",
+        "2026-08-01",
+        "2026-12-20",
+        '{"rcm":1008,"versao":1,"avs":5008,"mock":"v1_valida_antes_v2"}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1009, 1, 1, 5009, 2,
+        "Versão 1 aprovada e válida antes da criação da versão 2 para Consórcio de Eletro e Eletrônicos BB – Escritório.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1009,"versao":1,"avs":5009,"mock":"v1_valida_antes_v2"}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1010, 1, 1, 5010, 2,
+        "Versão 1 aprovada e válida antes da criação da versão 2 para Empréstimo Pessoal BB – Simulação no App.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1010,"versao":1,"avs":5010,"mock":"v1_valida_antes_v2"}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1011, 1, 1, 5011, 2,
+        "Versão 1 aprovada antes da promoção da versão 2 para Empréstimo Pessoal BB – Crédito de Uso Livre.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1011,"versao":1,"avs":5011,"mock":"v1_antes_promocao_v2"}',
+        None,
+        None,
+        "USR00001",
+    ),
+
+    (
+        1012, 1, 1, 5012, 1,
+        "Versão 1 aguardando aprovação para Empréstimo Pessoal BB – Prazo para Começar a Pagar.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1012,"versao":1,"avs":5012,"mock":"v1_aguardando_aprovacao"}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1013, 1, 1, 5013, 1,
+        "Versão 1 aguardando aprovação para Cofrinho BB – Guardar Dinheiro do Seu Jeito.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1013,"versao":1,"avs":5013,"mock":"v1_aguardando_aprovacao"}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1014, 1, 1, 5014, 1,
+        "Versão 1 aguardando aprovação para Shopping BB – Celulares com Cashback ou Desconto.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1014,"versao":1,"avs":5014,"mock":"v1_aguardando_aprovacao"}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1015, 1, 1, 5015, 1,
+        "Versão 1 aguardando aprovação para Parcelamento do Limite Especial BB – Organizar o Valor Usado.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1015,"versao":1,"avs":5015,"mock":"v1_aguardando_aprovacao"}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1016, 1, 1, 5016, 1,
+        "Versão 1 aguardando aprovação para ITP BB – Pagamento com Dinheiro de Outro Banco.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1016,"versao":1,"avs":5016,"mock":"v1_aguardando_aprovacao"}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1017, 1, 1, 5017, 1,
+        "Versão 1 aguardando aprovação para Educação Financeira – Categorização dos Gastos.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1017,"versao":1,"avs":5017,"mock":"v1_aguardando_aprovacao"}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1018, 1, 1, 5018, 1,
+        "Versão 1 aguardando aprovação para Educação Financeira – Gestão do Orçamento.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1018,"versao":1,"avs":5018,"mock":"v1_aguardando_aprovacao"}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1019, 1, 1, 5019, 1,
+        "Versão 1 aguardando aprovação para Educação Financeira – Uso Consciente do Crédito.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1019,"versao":1,"avs":5019,"mock":"v1_aguardando_aprovacao"}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1020, 1, 1, 5020, 1,
+        "Versão 1 aguardando aprovação para Educação Financeira – Consumo Planejado.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1020,"versao":1,"avs":5020,"mock":"v1_aguardando_aprovacao"}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1021, 1, 1, 5021, 1,
+        "Versão 1 aguardando aprovação para Educação Financeira – Formação de Reserva.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1021,"versao":1,"avs":5021,"mock":"v1_aguardando_aprovacao"}',
+        None,
+        None,
+        "USR00001",
+    ),
+
+    # ========================================================
+    # VERSÕES 2 — REUTILIZANDO OS AVS_SELD EXISTENTES
+    # ========================================================
+
+    (
+        1008, 1, 2, 5008, 1,
+        "Versão 2 aguardando aprovação para Consórcio de Eletro e Eletrônicos BB – Casa.",
+        "2026-08-01",
+        "2026-12-20",
+        '{"rcm":1008,"versao":2,"avs":5008,"mock":"v2_aguardando_aprovacao_reutiliza_avs"}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1009, 1, 2, 5009, 1,
+        "Versão 2 aguardando aprovação para Consórcio de Eletro e Eletrônicos BB – Escritório.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1009,"versao":2,"avs":5009,"mock":"v2_aguardando_aprovacao_reutiliza_avs"}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1010, 1, 2, 5010, 3,
+        "Versão 2 reprovada para Empréstimo Pessoal BB – Simulação no App.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1010,"versao":2,"avs":5010,"mock":"v2_reprovada_reutiliza_avs"}',
+        "Versão 2 reprovada para demonstração do fluxo.",
+        None,
+        "USR00001",
+    ),
+    (
+        1011, 1, 2, 5011, 2,
+        "Versão 2 aprovada e promovida para Empréstimo Pessoal BB – Crédito de Uso Livre.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1011,"versao":2,"avs":5011,"mock":"v2_aprovada_promovida_reutiliza_avs"}',
+        None,
+        None,
+        "USR00001",
+    ),
+]
+
+df_vrs = (
+    spark.createDataFrame(dados_vrs, schema_vrs)
+        .withColumn("DT_PRPT_INC_RCM", F.to_date("DT_PRPT_INC_RCM"))
+        .withColumn("DT_PRPT_FIM_RCM", F.to_date("DT_PRPT_FIM_RCM"))
+        .withColumn("TS_ULT_ALT", F.current_timestamp())
+)
+
+cliente_oracle.reload_dataframe(
+    df=df_vrs,
+    table_name=ref_table,
+    batchsize=5000,
+    num_partitions=1,
+    use_truncate=False
+)
+
+
+# ============================================================
+# 3. CONFERÊNCIA
+# ============================================================
+
+df_rcm_vldd = cliente_oracle.selecionar_tabela("RCM_VLDD", show=True)
+df_rcm_vrs = cliente_oracle.selecionar_tabela("RCM_VRS", show=True)
+
+# Conferência específica das campanhas com nova versão
+df_rcm_vrs.filter(
+    F.col("NR_IDFR_RCM").isin([1008, 1009, 1010, 1011])
+).orderBy(
+    "NR_IDFR_RCM",
+    "NR_VRS_PRPT"
+).show(truncate=False)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+%%spark
+
 from pyspark.sql import types as T
 from pyspark.sql import functions as F
 
