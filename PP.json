@@ -8,6 +8,126 @@
 # tabela = SGT_CADD
 # coluna = NM_SGT_PDRO
 #
+# Publico:
+# tabela = PBCO_CADD
+# coluna = NM_PBCO_PDRO
+#
+# Criterio:
+# - nomes curtos
+# - sem acento
+# - sem travessao
+# - sem caractere especial
+# - publico deve conter o nome do produto
+# - apenas texto simples para exibicao
+
+# ============================================================
+# 1. PRODUTOS — SGT_CADD
+# ============================================================
+
+updates_produto = [
+    # NR_IDFR_SGT, NM_SGT_PDRO
+
+    (4008, "Open Finance Credito"),
+    (4009, "Open Finance Portabilidade"),
+    (4010, "Open Finance Gestao"),
+    (4011, "Consorcio Imovel"),
+    (4012, "Consorcio Reforma"),
+    (4013, "Consorcio Sem Juros"),
+    (4014, "Consorcio Celular"),
+    (4015, "Consorcio Casa"),
+    (4016, "Consorcio Escritorio"),
+    (4017, "Emprestimo Simulacao"),
+    (4018, "Emprestimo Livre"),
+    (4019, "Emprestimo Prazo"),
+    (4020, "Cofrinho"),
+    (4021, "Shopping Celular"),
+    (4022, "Limite Especial"),
+    (4023, "ITP Pagamento"),
+    (4024, "Educacao Gastos"),
+    (4025, "Educacao Orcamento"),
+    (4026, "Educacao Credito"),
+    (4027, "Educacao Consumo"),
+    (4028, "Educacao Reserva"),
+]
+
+for nr_idfr_sgt, nm_sgt_pdro in updates_produto:
+    cliente_oracle.update_line(
+        tabela="SGT_CADD",
+        coluna_where="NR_IDFR_SGT",
+        valor_where=nr_idfr_sgt,
+        coluna_update="NM_SGT_PDRO",
+        novo_valor=nm_sgt_pdro
+    )
+
+
+# ============================================================
+# 2. PUBLICOS — PBCO_CADD
+# ============================================================
+
+updates_publico = [
+    # NR_IDFR_PBCO, NM_PBCO_PDRO
+
+    (3010, "Open Finance Credito Historico"),
+    (3011, "Open Finance Portabilidade Comparar"),
+    (3012, "Open Finance Gestao Contas"),
+    (3013, "Consorcio Imovel Compra"),
+    (3014, "Consorcio Reforma Projeto"),
+    (3015, "Consorcio Sem Juros Imovel"),
+    (3016, "Consorcio Celular Troca"),
+    (3017, "Consorcio Casa Equipar"),
+    (3018, "Consorcio Escritorio Eletronicos"),
+    (3019, "Emprestimo Simulacao Credito"),
+    (3020, "Emprestimo Livre Necessidade"),
+    (3021, "Emprestimo Prazo Pagamento"),
+    (3022, "Cofrinho Metas"),
+    (3023, "Shopping Celular Compra"),
+    (3024, "Limite Especial Usado"),
+    (3025, "ITP Pagamento Outro Banco"),
+    (3026, "Educacao Gastos Mes"),
+    (3027, "Educacao Orcamento Contas"),
+    (3028, "Educacao Credito Revisao"),
+    (3029, "Educacao Consumo Compra"),
+    (3030, "Educacao Reserva Comecar"),
+]
+
+for nr_idfr_pbco, nm_pbco_pdro in updates_publico:
+    cliente_oracle.update_line(
+        tabela="PBCO_CADD",
+        coluna_where="NR_IDFR_PBCO",
+        valor_where=nr_idfr_pbco,
+        coluna_update="NM_PBCO_PDRO",
+        novo_valor=nm_pbco_pdro
+    )
+
+
+# ============================================================
+# 3. CONFERENCIA
+# ============================================================
+
+df_sgt = cliente_oracle.selecionar_tabela("SGT_CADD", show=True)
+df_pbco = cliente_oracle.selecionar_tabela("PBCO_CADD", show=True)
+
+
+
+
+
+
+
+
+
+
+
+
+%%spark
+
+# ============================================================
+# UPDATE PONTUAL — NOMES CURTOS SEM CARACTERE ESPECIAL
+# ============================================================
+#
+# Produto:
+# tabela = SGT_CADD
+# coluna = NM_SGT_PDRO
+#
 # Público:
 # tabela = PBCQ_CADD
 # coluna = NM_PBCO_PDRO
