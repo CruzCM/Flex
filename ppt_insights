@@ -1,0 +1,1304 @@
+# Apresentação — Módulo de Insights
+
+> Estrutura consolidada para apresentação do fluxo operacional do módulo de Insights, com organização por slide, pontos visuais, mensagem de apoio e fala do apresentador.
+
+---
+
+## Visão geral da apresentação
+
+| Slide | Tema | Papel na narrativa |
+|---:|---|---|
+| 1 | Tela Inicial | Apresenta o banco operacional de insights |
+| 2 | Tela de Criação | Mostra como o briefing da recomendação é estruturado |
+| 3 | Curadoria | Explica como o usuário escolhe uma das mensagens geradas |
+| 4 | Aprovação/Reprovação | Mostra a etapa de validação e governança |
+| 5 | Funcionalidades e Fluxo | Fecha a apresentação com a esteira completa |
+
+---
+
+# Slide 1 — Tela Inicial: Banco Operacional de Insights
+
+## Objetivo do slide
+
+Apresentar a tela inicial como o **ponto central de governança operacional** do módulo.
+
+Ela não é apenas uma lista de registros: é onde o usuário consulta, acompanha, filtra e opera o ciclo de vida das recomendações.
+
+---
+
+## Estrutura do slide
+
+### Imagem principal
+
+Print grande da **Tela Inicial**, ocupando a maior parte do slide.
+
+### Título do slide
+
+**Tela Inicial — Banco Operacional de Insights**
+
+### Mensagem de apoio
+
+**Ponto único para consultar o acervo, acompanhar versões e conduzir o ciclo de aprovação das recomendações.**
+
+---
+
+## Destaques no slide
+
+- Acervo central com todas as recomendações do projeto
+- Filtros por nome, produto e público
+- Controle de versão ativa, vigência e criação
+- Separação entre estado da recomendação e situação da versão proposta
+- Ações para criar, editar, validar, reprovar ou detalhar insights
+
+---
+
+## Callouts visuais sugeridos
+
+| Área da tela | O que destacar |
+|---|---|
+| Filtros superiores | Consulta por nome, produto e público |
+| Coluna Versão ativa | Versão atualmente válida |
+| Colunas Estado e Alterações | Controle operacional e aprovação |
+| Ícones laterais | Ações disponíveis por recomendação |
+
+---
+
+## Fala do slide
+
+> “Esta é a tela inicial do módulo de Insights. Ela funciona como o banco operacional do projeto, reunindo todas as recomendações cadastradas e permitindo acompanhar o ciclo de vida de cada uma.
+>
+> Cada linha representa uma recomendação, com seu ID, nome, produto, público, versão ativa, período de vigência, data de criação e estado atual.
+>
+> Um ponto central dessa tela é a separação entre o estado da recomendação e a situação das alterações. O estado mostra a situação operacional da recomendação válida no momento. Já alterações mostra a situação da versão proposta, que pode estar aguardando aprovação ou ter sido reprovada.
+>
+> Isso é importante porque editar uma recomendação não muda automaticamente a versão ativa. A edição cria uma nova proposta, que precisa passar pelo processo de validação antes de virar a versão válida.
+>
+> Com isso, a tela apoia a governança do processo: o usuário consulta o acervo, filtra os insights, cria uma nova recomendação e acessa as ações de edição, validação, reprovação ou detalhamento conforme o estágio de cada item.”
+
+---
+
+## Frase de fechamento do slide
+
+**A Tela Inicial é o banco operacional que concentra consulta, status, versões e ações sobre cada recomendação.**
+
+---
+
+# Slide 2 — Tela de Criação: Briefing para Geração de Insights
+
+## Objetivo do slide
+
+Mostrar que a criação de um insight começa com um **briefing estruturado**, não com uma geração solta de texto.
+
+Essa tela transforma a intenção de negócio em parâmetros controlados para o Genera.
+
+---
+
+## Estrutura do slide
+
+### Imagem principal
+
+Print grande da `criar_dados.jpeg`, com destaque visual em quatro áreas:
+
+| Área | Campos |
+|---|---|
+| Dados básicos | Nome e Link |
+| Contexto de negócio | Produto e Público |
+| Direção da mensagem | Tipo de apresentação e Tipo de copywriting |
+| Regras operacionais | Limites de caracteres, vigência e botão Gerar Insights |
+
+### Título do slide
+
+**Tela de Criação — Briefing do Insight**
+
+### Mensagem de apoio
+
+**Etapa em que o usuário define o contexto, as regras e a direção de comunicação antes de acionar a geração automática dos insights.**
+
+---
+
+## Pontos de destaque no slide
+
+- Define o briefing operacional da recomendação
+- Seleciona produto, público, apresentação e tipo de copywriting
+- Informa limites de caracteres para título e mensagem
+- Define vigência inicial e final da recomendação
+- Aciona o Genera para produzir as sugestões de insight
+
+---
+
+## Papel de cada campo no fluxo
+
+| Campo na tela | Papel no fluxo |
+|---|---|
+| Nome | Identifica a recomendação no banco de insights |
+| Link | Associa a recomendação a um destino ou parâmetro operacional |
+| Produto | Define a oferta, serviço ou sugestão trabalhada |
+| Público | Define para quem a recomendação será direcionada |
+| Tipo de apresentação | Define a estrutura-base da proposta de valor |
+| Tipo de copywriting | Define o cenário narrativo da mensagem |
+| Limite de título | Controla o tamanho da headline gerada |
+| Limite de mensagem | Controla o tamanho do texto principal |
+| Início e Fim | Definem o período de vigência da recomendação |
+| Gerar Insights | Aciona o fluxo de geração automática |
+
+---
+
+## Fala do slide
+
+> “Depois de acessar o banco de insights e escolher criar uma nova recomendação, o usuário chega nesta tela.
+>
+> Aqui começa o processo operacional de criação. Antes de gerar qualquer mensagem, o sistema coleta os dados que orientam a inteligência artificial: qual produto será trabalhado, para qual público, em qual formato de apresentação e com qual abordagem de copywriting.
+>
+> O nome identifica a recomendação dentro do banco de insights. O produto e o público definem o contexto de negócio. O tipo de apresentação orienta a estrutura da mensagem, enquanto o tipo de copywriting define a lógica narrativa usada na geração.
+>
+> A tela também recebe regras práticas, como o link associado, o limite de caracteres para título e mensagem, além do período de vigência da recomendação.
+>
+> Quando o usuário clica em Gerar Insights, essas escolhas viram o briefing enviado ao Genera. A partir daí, o sistema gera alternativas de mensagens para que o usuário possa avaliar, escolher e seguir no fluxo de curadoria.”
+
+---
+
+## Observação para aprofundar
+
+No backend, essa tela conversa com cadastros de apoio:
+
+| Campo | Origem conceitual |
+|---|---|
+| Produto | Sugestões ou produtos cadastrados |
+| Público | Públicos cadastrados |
+| Tipo de apresentação | Estruturas técnicas de apresentação |
+| Tipo de copywriting | Cenários narrativos de copywriting |
+| Limites de caracteres | Parâmetros de geração |
+| Vigência | Controle operacional da recomendação |
+
+---
+
+## Frase de fechamento do slide
+
+**Essa tela não é só cadastro: ela transforma a intenção de negócio em briefing controlado para geração de insights.**
+
+---
+
+# Slide 3 — Curadoria: Mensagens Geradas
+
+## Objetivo do slide
+
+Explicar que a IA não entrega uma única resposta final.
+
+Ela propõe alternativas, e o usuário assume o papel de **curador da recomendação**.
+
+---
+
+## Estrutura do slide
+
+### Imagem principal
+
+Print grande da `curadoria_msg_gerada.jpeg`, com destaque visual em:
+
+| Área | O que destacar |
+|---|---|
+| Título da tela | Insights gerados |
+| Cards de alternativas | Lista de mensagens retornadas pelo Genera |
+| Botão de seleção | Escolha de uma alternativa |
+| Estrutura da mensagem | Título, Mensagem e CTA |
+| Tendência aplicada | Contraste, Curiosidade, Especificidade, Pertencimento etc. |
+
+### Título do slide
+
+**Curadoria — Seleção da Mensagem Gerada**
+
+### Mensagem de apoio
+
+**Etapa em que o usuário avalia as alternativas criadas pelo Genera e escolhe a melhor mensagem para seguir no fluxo.**
+
+---
+
+## Pontos de destaque no slide
+
+- O Genera retorna 10 alternativas de insight
+- Cada alternativa usa uma tendência cognitiva diferente
+- Cada insight contém título, mensagem e CTA
+- O usuário compara as opções e seleciona uma
+- A opção escolhida segue para criação ou edição da recomendação
+
+---
+
+## Como as mensagens são geradas
+
+Depois do briefing, o sistema envia ao Genera:
+
+- Produto
+- Público
+- Tipo de apresentação
+- Tipo de copywriting
+- Limites de caracteres
+- Dados de vigência e contexto
+
+Com esses dados, o Genera cria **10 alternativas**.
+
+A diferença entre elas não é aleatória: cada mensagem aplica uma tendência cognitiva para explorar uma forma distinta de comunicar o mesmo valor.
+
+---
+
+## Tendências cognitivas usadas no fluxo
+
+| Número | Tendência |
+|---:|---|
+| 1 | Contraste |
+| 2 | Curiosidade |
+| 3 | Especificidade |
+| 4 | Pertencimento |
+| 5 | Previsibilidade |
+| 6 | Simplicidade |
+| 7 | Transformação |
+| 8 | Consistência |
+| 9 | Afinidade |
+| 10 | Congruência Final |
+
+---
+
+## Estrutura retornada por alternativa
+
+Cada alternativa retorna com:
+
+| Informação | Função |
+|---|---|
+| Tendência | Indica a rota cognitiva aplicada |
+| Título | Headline da recomendação |
+| Mensagem | Texto principal do insight |
+| CTA | Chamada para ação |
+| Identificador da geração | Permite rastrear a geração |
+| Identificador da iteração | Permite rastrear a alternativa escolhida |
+
+---
+
+## Fala do slide
+
+> “Depois que o usuário informa os dados para criação do insight, o sistema aciona o Genera e retorna para esta tela um conjunto de mensagens geradas.
+>
+> Aqui começa a etapa de curadoria. O usuário não recebe uma única sugestão pronta; ele recebe 10 alternativas, cada uma construída com uma abordagem cognitiva diferente.
+>
+> Todas partem do mesmo briefing de negócio, mas exploram formas diferentes de apresentar o valor para o público escolhido.
+>
+> Cada card mostra a estrutura final da comunicação: título, mensagem e CTA. O usuário compara as opções e seleciona aquela que faz mais sentido para a recomendação.
+>
+> Essa escolha é importante porque é ela que segue para o próximo passo do fluxo. A mensagem selecionada carrega os identificadores da geração e da iteração, permitindo rastrear qual alternativa foi escolhida e persistir essa recomendação no banco de insights.”
+
+---
+
+## Frase de fechamento do slide
+
+**Esta tela transforma a geração automática em curadoria controlada: o sistema propõe 10 caminhos de comunicação e o usuário escolhe a melhor mensagem para virar recomendação.**
+
+---
+
+# Slide 4 — Aprovação/Reprovação: Decisão da Recomendação
+
+## Objetivo do slide
+
+Mostrar o ponto de governança do fluxo.
+
+A mensagem gerada e escolhida ainda não entra automaticamente em operação: ela precisa ser revisada e aprovada.
+
+---
+
+## Estrutura do slide
+
+### Imagem principal
+
+Print grande da `aprovacao_reprovacao.jpeg`, com destaque visual em três áreas:
+
+| Área | Campos |
+|---|---|
+| Dados da campanha | Nome, Produto, Público, Link, Início e Fim |
+| Dados do insight | Título, Mensagem e CTA |
+| Botões de decisão | Reprovar e Aprovar |
+
+### Título do slide
+
+**Validação Final — Aprovação ou Reprovação**
+
+### Mensagem de apoio
+
+**Etapa de governança em que o usuário revisa a campanha e decide se a versão proposta será aprovada ou reprovada.**
+
+---
+
+## Pontos de destaque no slide
+
+- Consolida os dados da campanha antes da decisão
+- Exibe a mensagem escolhida na curadoria
+- Permite revisar título, mensagem e CTA
+- Aprovação promove a versão proposta para versão válida
+- Reprovação mantém a recomendação sem ativar aquela versão
+
+---
+
+## Decisões disponíveis
+
+| Ação | Efeito no fluxo |
+|---|---|
+| Aprovar | A versão proposta passa a ser aprovada e pode virar a versão válida |
+| Reprovar | A versão proposta é marcada como reprovada e não entra em operação |
+| Voltar | Retorna ao fluxo sem concluir a decisão |
+
+---
+
+## Regras operacionais
+
+### Na aprovação
+
+- A versão proposta precisa estar aguardando aprovação
+- A recomendação não pode estar expirada ou finalizada
+- `RCM_VRS.CD_EST_RCM_VRS` passa para aprovada
+- `RCM_VLDD.NR_VLDO_VRS` recebe a versão proposta
+- O estado da recomendação é recalculado pela vigência
+
+### Na reprovação
+
+- A versão proposta precisa estar aguardando aprovação
+- `RCM_VRS.CD_EST_RCM_VRS` passa para reprovada
+- A versão válida atual não muda
+- O estado operacional da recomendação não muda
+
+---
+
+## Fala do slide
+
+> “Depois que o usuário escolhe uma das mensagens geradas, o fluxo apresenta esta tela de confirmação.
+>
+> Aqui a recomendação passa por uma etapa de governança. O usuário revisa os dados da campanha, como nome, produto, público, link e período de vigência, e também confere os dados do insight selecionado: título, mensagem e CTA.
+>
+> Essa tela é importante porque separa geração de aprovação. A mensagem pode ter sido criada pelo Genera e escolhida na curadoria, mas ela ainda não passa automaticamente a valer. Antes disso, precisa ser aprovada.
+>
+> Quando o usuário aprova, a versão proposta muda para aprovada e passa a ser a versão válida da recomendação. A partir das datas de vigência, o sistema calcula se ela ficará aguardando vigência, vigente ou expirada.
+>
+> Quando o usuário reprova, aquela versão proposta é marcada como reprovada. A versão ativa da recomendação não muda. Depois disso, o banco de insights passa a refletir a decisão, e o usuário pode iniciar um ajuste ou uma nova versão quando necessário.
+>
+> Na prática, esta tela garante controle e rastreabilidade. Toda decisão fica refletida no versionamento da recomendação, evitando que uma alteração entre em operação sem validação explícita.”
+
+---
+
+## Frase de fechamento do slide
+
+**Esta tela é o ponto de controle do fluxo: ela confirma se a mensagem escolhida vira uma recomendação válida ou fica registrada como versão reprovada.**
+
+---
+
+# Slide Final — Funcionalidades e Fluxo do Módulo de Insights
+
+## Objetivo do slide
+
+Fechar a apresentação mostrando a visão completa da esteira operacional.
+
+O foco é consolidar que o módulo não é apenas um gerador de mensagens, mas um sistema de criação, curadoria, aprovação, versionamento e acompanhamento.
+
+---
+
+## Estrutura do slide
+
+### Título do slide
+
+**Esteira Operacional de Insights**
+
+### Mensagem central
+
+**O módulo organiza todo o ciclo de vida das recomendações: criação, geração automática, curadoria, aprovação, versionamento e acompanhamento operacional.**
+
+---
+
+## Fluxograma sugerido no slide
+
+```mermaid
+flowchart TD
+    A[Banco de Insights] --> B[Novo Insight]
+    B --> C[Briefing]
+    C --> C1[Produto]
+    C --> C2[Público]
+    C --> C3[Apresentação]
+    C --> C4[Copywriting]
+    C --> C5[Vigência]
+    C1 --> D[Genera]
+    C2 --> D
+    C3 --> D
+    C4 --> D
+    C5 --> D
+    D --> E[10 mensagens por tendências cognitivas]
+    E --> F[Curadoria]
+    F --> G[Seleciona 1 mensagem]
+    G --> H[Revisão Final]
+    H --> I[Decisão]
+    I --> J[Reprovar]
+    I --> K[Aprovar]
+    J --> L[Versão reprovada]
+    K --> M[Versão válida]
+    L --> N[Banco de Insights atualizado]
+    M --> N
+```
+
+---
+
+## Versão textual do fluxo
+
+```text
+Banco de Insights
+        |
+        v
+Novo Insight
+        |
+        v
+Briefing
+Produto | Publico | Apresentacao | Copywriting | Vigencia
+        |
+        v
+Genera
+10 mensagens por tendencias cognitivas
+        |
+        v
+Curadoria
+Seleciona 1 mensagem
+        |
+        v
+Revisao Final
+Campanha + Insight
+        |
+        v
+Decisao
+   /              \
+Reprovar        Aprovar
+   |              |
+Versao          Versao
+reprovada       valida
+   \              /
+Banco de Insights atualizado
+```
+
+---
+
+## Blocos de apoio no slide
+
+| Bloco | Função |
+|---|---|
+| Banco de Insights | Consulta, filtros, status e histórico das recomendações |
+| Criação Orientada | Briefing estruturado com produto, público, apresentação, copywriting, limites e vigência |
+| Geração com IA | 10 alternativas geradas pelo Genera, cada uma com uma tendência cognitiva |
+| Curadoria e Governança | Usuário escolhe, revisa, aprova ou reprova a mensagem |
+| Versionamento | Edição cria versão proposta; aprovação promove versão válida; reprovação preserva a versão ativa |
+
+---
+
+## Funcionalidades consolidadas
+
+### 1. Banco de Insights
+
+- Consulta centralizada do acervo
+- Filtros por nome, produto e público
+- Visualização de status operacional
+- Visualização de versão ativa
+- Acesso a ações por recomendação
+- Rastreabilidade por ID, criação e vigência
+
+### 2. Criação orientada por briefing
+
+- Cadastro do nome da recomendação
+- Seleção de produto
+- Seleção de público
+- Definição do tipo de apresentação
+- Definição do tipo de copywriting
+- Inclusão de link
+- Controle de limites de caracteres
+- Definição de vigência inicial e final
+
+### 3. Geração automática com IA
+
+- Geração baseada em briefing estruturado
+- Retorno de 10 alternativas
+- Aplicação de tendências cognitivas
+- Produção de título, mensagem e CTA
+- Identificação da geração e da iteração
+- Base para rastreabilidade posterior
+
+### 4. Curadoria humana
+
+- Comparação entre alternativas geradas
+- Escolha de uma mensagem
+- Validação de aderência ao produto
+- Validação de aderência ao público
+- Seleção da mensagem que seguirá no fluxo
+
+### 5. Aprovação e reprovação
+
+- Revisão final da campanha
+- Revisão final do insight
+- Aprovação explícita
+- Reprovação explícita
+- Registro da decisão
+- Bloqueio de ativação automática sem aprovação
+
+### 6. Versionamento
+
+- Edição cria versão proposta
+- Versão ativa não muda automaticamente
+- Aprovação promove versão proposta
+- Reprovação mantém versão ativa
+- Histórico preservado por recomendação
+
+### 7. Manutenção e encerramento
+
+- Edição de recomendações existentes
+- Criação de nova versão proposta
+- Encerramento de recomendações quando aplicável
+- Preservação do histórico operacional
+- Retorno ao banco de insights com status atualizado
+
+### 8. Ciclo de vida operacional
+
+- Em preparação
+- Aguardando vigência
+- Vigente
+- Expirada
+- Finalizada
+- Aguardando aprovação
+- Aprovada
+- Reprovada
+
+---
+
+## Fala do slide
+
+> “Esse slide resume a esteira operacional do módulo de Insights.
+>
+> O processo começa no Banco de Insights, onde o usuário consulta o acervo existente ou inicia uma nova recomendação.
+>
+> Na criação, ele monta um briefing estruturado com produto, público, apresentação, tipo de copywriting, limites de caracteres e vigência.
+>
+> Esses dados são enviados ao Genera, que retorna 10 alternativas de mensagem, cada uma guiada por uma tendência cognitiva diferente.
+>
+> Depois vem a curadoria. O usuário compara as opções, escolhe a melhor mensagem e segue para a revisão final.
+>
+> Na decisão, se aprovar, a versão proposta passa a ser a versão válida. Se reprovar, ela fica registrada como versão reprovada, sem alterar a versão ativa. A partir do banco de insights, o usuário pode iniciar um ajuste ou uma nova versão quando necessário.
+>
+> Com isso, o módulo não é apenas um gerador de mensagens. Ele é uma esteira operacional de criação, curadoria, aprovação, versionamento e controle de recomendações.”
+
+---
+
+## Frase de fechamento da apresentação
+
+**O módulo de Insights transforma uma intenção de comunicação em uma recomendação controlada, rastreável e governada de ponta a ponta.**
+
+---
+
+# Apêndice — Vocabulário operacional
+
+| Termo | Significado |
+|---|---|
+| Insight | Recomendação comunicacional criada no fluxo |
+| Banco de Insights | Tela central com todas as recomendações |
+| Briefing | Conjunto de parâmetros que orienta a geração |
+| Genera | Motor de geração automática das mensagens |
+| Tendência cognitiva | Rota de comunicação aplicada a cada alternativa |
+| Curadoria | Escolha humana da melhor mensagem gerada |
+| Versão proposta | Versão criada por geração ou edição e ainda pendente de decisão |
+| Versão válida | Versão aprovada e considerada ativa no fluxo |
+| Aprovação | Decisão que promove uma versão proposta |
+| Reprovação | Decisão que impede a versão proposta de entrar em operação |
+| Vigência | Período em que a recomendação pode operar |
+| Estado | Situação operacional da recomendação |
+| Alterações | Situação da versão proposta |
+
+---
+
+# Apêndice — Resumo executivo
+
+O módulo de Insights estrutura uma esteira completa para criação e gestão de recomendações.
+
+Ele começa com um banco operacional, passa por briefing, geração automática com IA, curadoria humana, aprovação ou reprovação, e termina com versionamento e acompanhamento de status.
+
+A principal força do fluxo é separar **geração**, **curadoria**, **aprovação** e **ativação**.
+
+Com isso, a IA apoia a criação, mas a operação mantém controle, rastreabilidade e governança sobre cada recomendação publicada.
+
+
+# Guia de Paleta de Cores — Banco do Brasil
+
+## Aplicação na apresentação do Módulo de Insights
+
+Este guia organiza a aplicação da identidade visual inspirada no Banco do Brasil para uma apresentação sobre o fluxo operacional do Módulo de Insights.
+
+A proposta visual utiliza azul, amarelo e branco como base, complementados por cores auxiliares para textos, fundos, estados operacionais, aprovação, reprovação e versionamento.
+
+---
+
+## 1. Direção visual da apresentação
+
+A apresentação deve transmitir:
+
+- tecnologia;
+- organização;
+- inteligência;
+- governança;
+- clareza operacional;
+- confiança;
+- rastreabilidade.
+
+A lógica visual principal será:
+
+> **O azul estrutura, o amarelo direciona e as cores semânticas informam o estado.**
+
+### Distribuição recomendada das cores
+
+- **65% a 70%:** branco ou cinza muito claro;
+- **20% a 25%:** azul;
+- **5% a 10%:** amarelo;
+- **uso pontual:** verde, âmbar, vermelho e cinza para estados operacionais.
+
+O amarelo deve funcionar como marcador de atenção, seleção ou ação. Evite utilizá-lo como fundo dominante em todos os slides.
+
+---
+
+## 2. Paleta principal
+
+| Função | Nome | HEX | RGB | Uso recomendado |
+|---|---|---:|---:|---|
+| Cor principal | Azul BB | `#465EFF` | 70, 94, 255 | Títulos, faixas, botões, gráficos e elementos estruturais |
+| Cor de destaque | Amarelo BB | `#FCFC30` | 252, 252, 48 | Chamadas, números, seleções, setas e pontos de atenção |
+| Fundo principal | Branco | `#FFFFFF` | 255, 255, 255 | Fundo geral, cartões e áreas de respiro |
+| Texto principal | Azul-marinho | `#17234D` | 23, 35, 77 | Títulos escuros, textos e rodapés |
+| Fundo secundário | Cinza azulado | `#F4F6FA` | 244, 246, 250 | Fundo de seções, tabelas e áreas técnicas |
+| Borda e divisórias | Cinza médio | `#D9DEE8` | 217, 222, 232 | Contornos, divisores e elementos inativos |
+| Texto secundário | Cinza-escuro | `#4A5160` | 74, 81, 96 | Textos complementares e informações de apoio |
+| Azul de apoio | Azul-claro | `#F0F2FF` | 240, 242, 255 | Cards, caixas explicativas e áreas de destaque leve |
+| Azul intermediário | Azul médio | `#DCE1FF` | 220, 225, 255 | Tags, faixas secundárias e planos de fundo suaves |
+
+> As cores auxiliares são recomendações para uso em apresentações e não devem ser apresentadas como cores institucionais oficiais.
+
+---
+
+## 3. Paleta de estados operacionais
+
+A apresentação trata de aprovação, reprovação, versão válida, vigência, expiração e seleção. Esses estados devem manter cores consistentes em todos os slides.
+
+| Estado | Cor | HEX | Uso |
+|---|---|---:|---|
+| Ativo ou vigente | Azul BB | `#465EFF` | Versão ativa, recomendação vigente ou item em operação |
+| Aprovado | Verde | `#217A50` | Aprovação concluída e versão validada |
+| Aguardando aprovação | Âmbar | `#A86600` | Pendências, validações e versões propostas |
+| Reprovado | Vermelho | `#C43D46` | Reprovações, bloqueios e decisões negativas |
+| Expirado ou inativo | Cinza | `#707786` | Itens encerrados, expirados ou fora de operação |
+| Selecionado | Amarelo BB | `#FCFC30` | Alternativa escolhida na curadoria |
+| Informação | Azul-claro | `#F0F2FF` | Mensagens explicativas e orientações |
+
+### Regras de acessibilidade
+
+- Não comunique um estado apenas pela cor.
+- Combine cor com texto, ícone ou etiqueta.
+- Evite texto branco sobre amarelo.
+- Sobre o amarelo, use azul-marinho ou preto.
+- Sobre azul, verde ou vermelho, use texto branco.
+- Use cores de estado apenas em áreas relacionadas a status ou decisão.
+
+---
+
+## 4. Configuração do tema no PowerPoint
+
+No PowerPoint, acesse:
+
+**Design → Variantes → Cores → Personalizar Cores**
+
+Configure os campos da seguinte forma:
+
+| Campo do PowerPoint | Cor |
+|---|---:|
+| Texto/Fundo escuro 1 | `#17234D` |
+| Texto/Fundo claro 1 | `#FFFFFF` |
+| Texto/Fundo escuro 2 | `#4A5160` |
+| Texto/Fundo claro 2 | `#F4F6FA` |
+| Destaque 1 | `#465EFF` |
+| Destaque 2 | `#FCFC30` |
+| Destaque 3 | `#DCE1FF` |
+| Destaque 4 | `#217A50` |
+| Destaque 5 | `#A86600` |
+| Destaque 6 | `#C43D46` |
+| Hiperlink | `#465EFF` |
+| Hiperlink visitado | `#5F55A5` |
+
+---
+
+## 5. Tipografia
+
+Quando a fonte institucional não estiver disponível, utilize uma fonte segura e compatível com o PowerPoint.
+
+### Fonte recomendada
+
+- **Calibri**
+- Alternativa: **Aptos**
+
+### Hierarquia tipográfica
+
+| Elemento | Configuração recomendada |
+|---|---|
+| Título principal | 28 a 32 pt, negrito |
+| Subtítulo | 20 a 24 pt, negrito |
+| Mensagem de apoio | 16 a 19 pt, regular |
+| Destaques | 15 a 18 pt, negrito |
+| Corpo do texto | 14 a 18 pt, regular |
+| Callouts | 12 a 15 pt |
+| Rodapé | 9 a 11 pt |
+| Indicadores numéricos | 24 a 40 pt, negrito |
+
+### Cores dos textos
+
+- Títulos sobre fundo branco: azul BB ou azul-marinho.
+- Títulos sobre fundo azul: branco.
+- Texto principal: azul-marinho.
+- Texto secundário: cinza-escuro.
+- Texto sobre amarelo: azul-marinho.
+- Texto sobre verde ou vermelho: branco.
+
+---
+
+## 6. Estrutura visual geral
+
+### Cabeçalhos
+
+- Título alinhado à esquerda.
+- Pequena barra, linha ou marcador amarelo.
+- Número do slide ou etapa em amarelo.
+- Evite faixas muito altas que reduzam a área do print.
+
+### Rodapé
+
+- Linha fina em cinza médio.
+- Nome do projeto em azul-marinho.
+- Número do slide em azul BB.
+- Pequeno detalhe amarelo opcional.
+
+### Cards
+
+- Fundo branco.
+- Contorno cinza claro.
+- Cantos levemente arredondados.
+- Sombra discreta.
+- Título em azul-marinho.
+- Ícone ou número em amarelo.
+
+### Callouts
+
+- Fundo branco.
+- Borda azul de 1 a 1,5 pt.
+- Número ou ícone em amarelo.
+- Texto em azul-marinho.
+- Linhas conectoras em azul.
+- Evite posicionar callouts sobre áreas densas do print.
+
+### Prints de tela
+
+- Não aplicar filtros de cor.
+- Manter boa resolução.
+- Utilizar moldura branca.
+- Aplicar sombra leve.
+- Ampliar detalhes importantes em recortes.
+- Não deformar a proporção original.
+
+---
+
+# 7. Aplicação por slide
+
+---
+
+## Slide 1 — Tela Inicial: Banco Operacional de Insights
+
+### Objetivo visual
+
+Apresentar a tela como o ponto central de consulta, governança e acompanhamento das recomendações.
+
+### Composição
+
+- Fundo branco.
+- Título em azul BB.
+- Mensagem de apoio em azul-marinho.
+- Linha curta amarela abaixo do título.
+- Print ocupando aproximadamente 65% a 75% do slide.
+- Callouts distribuídos nas laterais ou na parte inferior.
+
+### Paleta aplicada
+
+| Elemento | Cor |
+|---|---|
+| Título | Azul BB `#465EFF` |
+| Mensagem de apoio | Azul-marinho `#17234D` |
+| Fundo | Branco `#FFFFFF` |
+| Moldura do print | Branco com borda `#D9DEE8` |
+| Callouts | Branco com borda azul |
+| Numeração dos callouts | Amarelo BB |
+| Linhas conectoras | Azul BB |
+| Áreas destacadas no print | Contorno azul ou amarelo |
+
+### Callouts sugeridos
+
+1. **Filtros superiores**  
+   Consulta por nome, produto e público.
+
+2. **Versão ativa**  
+   Identifica a versão atualmente válida.
+
+3. **Estado e alterações**  
+   Diferencia a situação operacional da recomendação e a situação da versão proposta.
+
+4. **Ações laterais**  
+   Permite criar, editar, validar, reprovar ou detalhar recomendações.
+
+### Tratamento visual
+
+- Use números em círculos amarelos.
+- Destaque “Versão ativa” com contorno azul.
+- Destaque “Estado” e “Alterações” com fundo azul-claro.
+- Marque os ícones laterais com pequenos pontos amarelos.
+- Evite usar quatro caixas inteiramente amarelas.
+
+### Mensagem principal
+
+> Ponto único para consultar o acervo, acompanhar versões e conduzir o ciclo de aprovação das recomendações.
+
+---
+
+## Slide 2 — Tela de Criação: Briefing do Insight
+
+### Objetivo visual
+
+Mostrar que a tela transforma uma intenção de negócio em parâmetros estruturados para geração automática de mensagens.
+
+### Composição
+
+- Fundo cinza azulado.
+- Print dentro de um grande cartão branco.
+- Quatro áreas numeradas.
+- Botão “Gerar Insights” como ponto final do percurso visual.
+
+### Áreas de destaque
+
+| Número | Área | Tratamento |
+|---|---|---|
+| 01 | Dados básicos | Barra superior azul |
+| 02 | Contexto de negócio | Barra superior azul médio |
+| 03 | Direção da mensagem | Barra superior azul-claro |
+| 04 | Regras operacionais | Barra superior amarela |
+
+### Paleta aplicada
+
+| Elemento | Cor |
+|---|---|
+| Fundo geral | `#F4F6FA` |
+| Cartão do print | Branco |
+| Título | Azul BB |
+| Números 01 a 04 | Amarelo BB |
+| Títulos das áreas | Azul-marinho |
+| Setas do fluxo | Azul BB |
+| Botão Gerar Insights | Amarelo com texto azul-marinho |
+| Bordas | Cinza médio |
+
+### Regras visuais
+
+- Não preencher cada área inteira com uma cor diferente.
+- Use apenas uma barra superior, marcador ou contorno.
+- Mantenha todos os campos dentro do mesmo sistema visual.
+- Direcione o olhar para o botão “Gerar Insights”.
+- Use uma seta azul ou sequência numerada até o botão.
+
+### Mensagem principal
+
+> Etapa em que o usuário define o contexto, as regras e a direção de comunicação antes de acionar a geração automática dos insights.
+
+---
+
+## Slide 3 — Curadoria: Seleção da Mensagem Gerada
+
+### Objetivo visual
+
+Demonstrar a comparação entre alternativas geradas e destacar a opção selecionada pelo usuário.
+
+### Composição
+
+- Fundo branco.
+- Faixa superior azul.
+- Cards organizados em lista ou grade.
+- Card escolhido claramente diferenciado.
+- Pequena legenda sobre as tendências cognitivas.
+
+### Tratamento dos cards
+
+#### Card não selecionado
+
+- Fundo branco.
+- Contorno cinza.
+- Título em azul-marinho.
+- Texto em cinza-escuro.
+- Tag de tendência em azul-claro.
+
+#### Card selecionado
+
+- Contorno azul BB de 2 a 3 pt.
+- Faixa lateral amarela.
+- Ícone de seleção azul.
+- Etiqueta “Selecionado”.
+- Tendência em amarelo com texto azul-marinho.
+
+### Hierarquia do conteúdo
+
+1. Tendência cognitiva.
+2. Título.
+3. Mensagem.
+4. CTA.
+5. Identificador da geração.
+6. Identificador da iteração.
+
+### Tendências cognitivas
+
+As tendências podem utilizar o mesmo padrão visual, evitando uma cor diferente para cada uma:
+
+- Contraste;
+- Curiosidade;
+- Especificidade;
+- Pertencimento;
+- Previsibilidade;
+- Simplicidade;
+- Transformação;
+- Consistência;
+- Afinidade;
+- Congruência Final.
+
+### Paleta aplicada
+
+| Elemento | Cor |
+|---|---|
+| Faixa superior | Azul BB |
+| Fundo | Branco |
+| Card padrão | Branco com borda cinza |
+| Card selecionado | Branco com borda azul |
+| Marcador de seleção | Amarelo BB |
+| Tags | Azul-claro |
+| Tag selecionada | Amarelo BB |
+| CTA | Azul BB |
+| Texto técnico | Cinza |
+
+### Mensagem principal
+
+> Etapa em que o usuário avalia as alternativas criadas pelo Genera e escolhe a melhor mensagem para seguir no fluxo.
+
+### Frase-resumo
+
+> Esta tela transforma a geração automática em curadoria controlada: o sistema propõe dez caminhos de comunicação e o usuário escolhe a melhor mensagem para virar recomendação.
+
+---
+
+## Slide 4 — Validação Final: Aprovação ou Reprovação
+
+### Objetivo visual
+
+Apresentar a etapa de governança em que a versão proposta é aprovada ou reprovada.
+
+### Composição
+
+- Cabeçalho azul BB.
+- Duas caixas principais.
+- Área de decisão separada por uma linha amarela.
+- Botões de aprovação e reprovação com cores semânticas.
+
+### Caixas principais
+
+#### Dados da campanha
+
+- Fundo branco.
+- Borda cinza.
+- Título em azul-marinho.
+
+#### Dados do insight
+
+- Fundo azul-claro.
+- Barra lateral azul.
+- Título em azul BB.
+
+### Botões de decisão
+
+| Ação | Fundo | Texto | Ícone |
+|---|---:|---:|---|
+| Aprovar | `#217A50` | Branco | Confirmação |
+| Reprovar | `#C43D46` | Branco | Bloqueio ou fechamento |
+| Voltar | Branco | Azul-marinho | Seta de retorno |
+
+### Caixa de atenção
+
+Utilize uma caixa com fundo amarelo suave e texto azul-marinho:
+
+> A mensagem selecionada somente entra em operação após aprovação explícita.
+
+### Paleta aplicada
+
+| Elemento | Cor |
+|---|---|
+| Cabeçalho | Azul BB |
+| Linha de separação | Amarelo BB |
+| Dados da campanha | Branco |
+| Dados do insight | Azul-claro |
+| Aprovar | Verde |
+| Reprovar | Vermelho |
+| Voltar | Branco e cinza |
+| Informação técnica | Cinza-escuro |
+
+### Mensagem principal
+
+> Etapa de governança em que o usuário revisa a campanha e decide se a versão proposta será aprovada ou reprovada.
+
+### Frase-resumo
+
+> Esta tela é o ponto de controle do fluxo: ela confirma se a mensagem escolhida vira uma recomendação válida ou fica registrada como versão reprovada.
+
+---
+
+## Slide final — Esteira Operacional de Insights
+
+### Objetivo visual
+
+Consolidar o ciclo completo de criação, geração, curadoria, aprovação, versionamento e acompanhamento operacional.
+
+### Fundo
+
+Para criar contraste com os slides anteriores, utilize:
+
+- azul-marinho `#17234D`; ou
+- azul BB `#465EFF`.
+
+O azul-marinho oferece um encerramento mais sóbrio.
+
+### Estrutura do fluxograma
+
+```text
+Banco de Insights
+        ↓
+Novo Insight
+        ↓
+Briefing
+Produto | Público | Apresentação | Copywriting | Vigência
+        ↓
+Genera
+10 mensagens por tendências cognitivas
+        ↓
+Curadoria
+Seleciona 1 mensagem
+        ↓
+Revisão Final
+Campanha + Insight
+        ↓
+Decisão
+   ↙          ↘
+Reprovar    Aprovar
+   ↓          ↓
+Versão     Versão válida
+reprovada
+   ↘          ↙
+Banco de Insights atualizado
+```
+
+### Tratamento dos elementos
+
+| Elemento | Tratamento |
+|---|---|
+| Etapas principais | Caixas brancas com texto azul-marinho |
+| Setas | Amarelo BB |
+| Genera | Caixa amarela com texto azul-marinho |
+| Curadoria | Caixa branca com borda amarela |
+| Aprovar | Verde |
+| Reprovar | Vermelho |
+| Versão reprovada | Vermelho suave ou cinza-claro |
+| Versão válida | Azul BB ou branco com selo azul |
+| Banco atualizado | Caixa amarela ou branca com destaque amarelo |
+
+### Caminhos da decisão
+
+- Aprovar → versão válida: seta verde.
+- Reprovar → versão reprovada: seta vermelha.
+- Ajuste ou nova versão: retorno opcional a partir do banco de insights, em linha tracejada cinza.
+- Fluxo principal: setas amarelas.
+
+### Blocos de apoio
+
+#### Banco de Insights
+
+Consulta, filtros, status e histórico das recomendações.
+
+#### Criação Orientada
+
+Briefing estruturado com produto, público, apresentação, copywriting, limites e vigência.
+
+#### Geração com IA
+
+Dez alternativas geradas pelo Genera, cada uma com uma tendência cognitiva.
+
+#### Curadoria e Governança
+
+O usuário escolhe, revisa, aprova ou reprova a mensagem.
+
+#### Versionamento
+
+A edição cria uma versão proposta; a aprovação promove a versão válida.
+
+### Mensagem principal
+
+> O módulo organiza todo o ciclo de vida das recomendações: criação, geração automática, curadoria, aprovação, versionamento e acompanhamento operacional.
+
+---
+
+# 8. Padrões para tabelas
+
+### Cabeçalho
+
+- Fundo azul BB.
+- Texto branco.
+- Negrito.
+- Altura um pouco maior que as linhas de conteúdo.
+
+### Corpo
+
+- Linhas alternadas entre branco e cinza azulado.
+- Texto azul-marinho.
+- Divisórias em cinza médio.
+
+### Estados
+
+- Aprovado: verde.
+- Aguardando: âmbar.
+- Reprovado: vermelho.
+- Vigente: azul.
+- Expirado: cinza.
+
+### Destaque de célula
+
+Use amarelo apenas para:
+
+- coluna principal;
+- dado selecionado;
+- versão proposta;
+- informação que exige atenção.
+
+---
+
+# 9. Padrões para ícones
+
+Utilize ícones simples, lineares e consistentes.
+
+### Cores
+
+- Ícone principal: azul BB.
+- Ícone sobre azul: branco.
+- Ícone de destaque: amarelo BB.
+- Aprovação: verde.
+- Reprovação: vermelho.
+- Informação secundária: cinza.
+
+### Ícones sugeridos
+
+| Conceito | Ícone |
+|---|---|
+| Banco de insights | Banco de dados ou tabela |
+| Filtros | Funil |
+| Versão | Camadas ou histórico |
+| Criação | Sinal de adição |
+| IA ou Genera | Estrela, brilho ou circuito |
+| Curadoria | Seleção ou lista |
+| Aprovação | Círculo com confirmação |
+| Reprovação | Círculo com fechamento |
+| Vigência | Calendário |
+| Público | Grupo de pessoas |
+| Produto | Caixa ou etiqueta |
+| Copywriting | Texto ou balão |
+| Link | Corrente |
+| CTA | Seta ou cursor |
+
+---
+
+# 10. Regras de consistência
+
+1. Utilize a mesma posição para títulos em todos os slides.
+2. Mantenha a mesma espessura de borda nos cards.
+3. Use o amarelo apenas para atenção, seleção ou ação.
+4. Evite mais de três cores fortes no mesmo slide.
+5. Não utilize verde e vermelho fora de contextos de decisão ou estado.
+6. Mantenha o azul como cor dominante da estrutura.
+7. Preserve espaço em branco.
+8. Não aplique sombras pesadas.
+9. Não use gradientes complexos.
+10. Evite bordas pretas.
+11. Não use uma cor diferente para cada tendência cognitiva.
+12. Mantenha o tratamento dos prints consistente.
+13. Use textos curtos nos callouts.
+14. Evite sobrepor caixas aos principais campos da interface.
+15. Garanta contraste suficiente entre fundo e texto.
+
+---
+
+# 11. Checklist por slide
+
+## Slide 1
+
+- [ ] Título em azul.
+- [ ] Linha amarela sob o título.
+- [ ] Print em destaque.
+- [ ] Callouts numerados.
+- [ ] Versão ativa destacada.
+- [ ] Estado e alterações diferenciados.
+- [ ] Ícones de ações sinalizados.
+
+## Slide 2
+
+- [ ] Quatro áreas numeradas.
+- [ ] Fundo cinza-claro.
+- [ ] Print dentro de cartão branco.
+- [ ] Botão “Gerar Insights” destacado.
+- [ ] Fluxo visual entre os campos.
+- [ ] Amarelo concentrado na ação final.
+
+## Slide 3
+
+- [ ] Cards não selecionados neutros.
+- [ ] Card selecionado com azul e amarelo.
+- [ ] Tendências com padrão único.
+- [ ] CTA destacado.
+- [ ] Identificadores técnicos em cinza.
+- [ ] Seleção claramente visível.
+
+## Slide 4
+
+- [ ] Dados da campanha separados dos dados do insight.
+- [ ] Linha amarela antes da decisão.
+- [ ] Aprovar em verde.
+- [ ] Reprovar em vermelho.
+- [ ] Voltar em branco ou cinza.
+- [ ] Aviso sobre aprovação explícita.
+
+## Slide final
+
+- [ ] Fundo azul ou azul-marinho.
+- [ ] Caixas do fluxo em branco.
+- [ ] Setas amarelas.
+- [ ] Genera em amarelo.
+- [ ] Aprovação em verde.
+- [ ] Reprovação em vermelho.
+- [ ] Retorno opcional para ajuste ou nova versão em linha tracejada.
+- [ ] Destino final claramente destacado.
+
+---
+
+# 12. Resumo executivo
+
+A identidade visual da apresentação deve apoiar a narrativa operacional do Módulo de Insights.
+
+- O **azul** representa tecnologia, estrutura, confiança e governança.
+- O **amarelo** representa inteligência, atenção, seleção e ação.
+- O **branco** representa clareza, organização e espaço visual.
+- O **verde** representa aprovação.
+- O **vermelho** representa reprovação.
+- O **âmbar** representa pendência.
+- O **cinza** representa informação secundária, inatividade ou expiração.
+
+A apresentação deve manter uma linguagem visual única em todas as etapas, alterando apenas a intensidade dos destaques conforme o momento do fluxo.
+
+> **Resultado esperado:** uma apresentação institucional, clara, tecnológica e orientada a processo, sem perder a identidade visual associada ao Banco do Brasil.
