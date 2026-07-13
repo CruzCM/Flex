@@ -1,3 +1,212 @@
+%%spark
+
+ref_table = "AVS_SELD"
+
+# cliente_oracle.limpar_tabela(ref_table)
+
+from pyspark.sql import types as T
+from pyspark.sql.functions import current_timestamp
+import json
+
+schema = T.StructType([
+    T.StructField("NR_AVS_SELD", T.LongType(), False),
+    T.StructField("NR_IDFR_PBCO", T.LongType(), False),
+    T.StructField("NR_IDFR_SGT", T.LongType(), False),
+    T.StructField("CD_EXNO_CRIC", T.StringType(), False),
+    T.StructField("CD_EXNO_AVS", T.StringType(), False),
+    T.StructField("NR_IDFR_APSC", T.LongType(), False),
+    T.StructField("NR_IDFR_CNR", T.LongType(), False),
+    T.StructField("NR_IDFR_TND", T.LongType(), False),
+    T.StructField("TX_TIT_PDRO_AVS", T.StringType(), False),
+    T.StructField("TX_STIT_PDRO_AVS", T.StringType(), False),
+    T.StructField("TX_ACMT_PDRO_AVS", T.StringType(), False),
+    T.StructField("JS_AVS_PDRO", T.StringType(), False),
+    T.StructField("CD_USU_RSP_CAD", T.StringType(), False),
+    T.StructField("TS_CAD_AVS", T.TimestampType(), True),
+])
+
+pares_produto_publico = [
+    (
+        3010,
+        4008,
+        "Open Finance BB – Crédito e Limite",
+        "Histórico financeiro fora do BB"
+    ),
+    (
+        3011,
+        4009,
+        "Open Finance BB – Portabilidade de Crédito",
+        "Crédito em outro banco para comparar"
+    ),
+    (
+        3012,
+        4010,
+        "Open Finance BB – Gestão Financeira",
+        "Contas em mais de um banco"
+    ),
+    (
+        3013,
+        4011,
+        "Consórcio Imobiliário BB – Compra de Imóvel",
+        "Compra de imóvel planejada"
+    ),
+    (
+        3014,
+        4012,
+        "Consórcio Imobiliário BB – Reforma ou Construção",
+        "Reforma ou construção planejada"
+    ),
+    (
+        3015,
+        4013,
+        "Consórcio Imobiliário BB – Planejamento sem Juros",
+        "Imóvel com planejamento financeiro"
+    ),
+    (
+        3016,
+        4014,
+        "Consórcio de Eletro e Eletrônicos BB – Celular",
+        "Troca de celular planejada"
+    ),
+    (
+        3017,
+        4015,
+        "Consórcio de Eletro e Eletrônicos BB – Casa",
+        "Casa para equipar com planejamento"
+    ),
+    (
+        3018,
+        4016,
+        "Consórcio de Eletro e Eletrônicos BB – Escritório",
+        "Eletrônicos para trabalho ou estudo"
+    ),
+    (
+        3019,
+        4017,
+        "Empréstimo Pessoal BB – Simulação no App",
+        "Crédito para simular antes de decidir"
+    ),
+    (
+        3020,
+        4018,
+        "Empréstimo Pessoal BB – Crédito de Uso Livre",
+        "Necessidade de crédito de uso livre"
+    ),
+    (
+        3021,
+        4019,
+        "Empréstimo Pessoal BB – Prazo para Começar a Pagar",
+        "Crédito com fôlego para começar a pagar"
+    ),
+    (
+        3022,
+        4020,
+        "Cofrinho BB – Guardar Dinheiro do Seu Jeito",
+        "Objetivos misturados aos gastos do dia a dia"
+    ),
+    (
+        3023,
+        4021,
+        "Shopping BB – Celulares com Cashback ou Desconto",
+        "Compra de celular com boa condição"
+    ),
+    (
+        3024,
+        4022,
+        "Parcelamento do Limite Especial BB – Organizar o Valor Usado",
+        "Limite Especial usado na conta"
+    ),
+    (
+        3025,
+        4023,
+        "ITP BB – Pagamento com Dinheiro de Outro Banco",
+        "Dinheiro em outro banco para pagar"
+    ),
+    (
+        3026,
+        4024,
+        "Educação Financeira – Categorização dos Gastos",
+        "Gastos do mês pouco organizados"
+    ),
+    (
+        3027,
+        4025,
+        "Educação Financeira – Gestão do Orçamento",
+        "Contas do mês para organizar"
+    ),
+    (
+        3028,
+        4026,
+        "Educação Financeira – Uso Consciente do Crédito",
+        "Crédito para revisar antes de usar mais"
+    ),
+    (
+        3029,
+        4027,
+        "Educação Financeira – Consumo Planejado",
+        "Compra para avaliar antes de decidir"
+    ),
+    (
+        3030,
+        4028,
+        "Educação Financeira – Formação de Reserva",
+        "Reserva ainda sem começar"
+    ),
+]
+
+dados = []
+
+for idx, (nr_idfr_pbco, nr_idfr_sgt, nm_sgt_pdro, referencia_publico) in enumerate(
+    pares_produto_publico,
+    start=1
+):
+    nr_avs_seld = 5000 + idx
+
+    js_avs_pdro = {
+        "nr_avs_seld": nr_avs_seld,
+        "nr_idfr_pbco": nr_idfr_pbco,
+        "nr_idfr_sgt": nr_idfr_sgt,
+        "nr_idfr_apsc": 1025,
+        "nr_idfr_cnr": 1,
+        "nr_idfr_tnd": 1,
+        "nm_sgt_pdro": nm_sgt_pdro,
+        "referencia_publico": referencia_publico
+    }
+
+    dados.append((
+        nr_avs_seld,
+        nr_idfr_pbco,
+        nr_idfr_sgt,
+        f"CRIC-{nr_avs_seld}",
+        f"AVS-{nr_avs_seld}",
+        1025,
+        1,
+        1,
+        nm_sgt_pdro,
+        referencia_publico,
+        f"Aviso padrão para {nm_sgt_pdro} direcionado a {referencia_publico}.",
+        json.dumps(js_avs_pdro, ensure_ascii=False),
+        "ADMIN",
+        None
+    ))
+
+df = (
+    spark.createDataFrame(dados, schema)
+        .withColumn("TS_CAD_AVS", current_timestamp())
+)
+
+cliente_oracle.reload_dataframe(
+    df=df,
+    table_name=ref_table,
+    batchsize=5000,
+    num_partitions=1,
+    use_truncate=False
+)
+
+df_oracle = cliente_oracle.selecionar_tabela(ref_table, show=True)
+
+
+
 
 
 
