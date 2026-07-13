@@ -1,317 +1,344 @@
-%%spark
 
-ref_table = "PBCO_CADD"
 
-from pyspark.sql import types as T
-from pyspark.sql.functions import current_timestamp
-
-schema = T.StructType([
-    T.StructField("NR_IDFR_PBCO", T.LongType(), False),             # PK NOT NULL
-    T.StructField("TX_REG_EXNO_PBCO", T.StringType(), True),        # VARCHAR2(400)
-    T.StructField("NM_PBCO_PDRO", T.StringType(), False),           # VARCHAR2(2000)
-    T.StructField("TX_DCR_DETD_PBCO", T.StringType(), False),       # CLOB
-    T.StructField("TX_NCSS_RCNL_PBCO", T.StringType(), False),      # CLOB
-    T.StructField("TX_NCSS_EMOC_PBCO", T.StringType(), False),      # CLOB
-    T.StructField("TX_TRM_OBG_PBCO", T.StringType(), True),         # CLOB NULL
-    T.StructField("TX_TRM_N_PMT_PBCO", T.StringType(), True),       # CLOB NULL
-    T.StructField("CD_EST_PBCO", T.IntegerType(), False),           # NUMBER(1)
-    T.StructField("TS_CAD_PBCO", T.TimestampType(), True),          # TIMESTAMP NOT NULL
-    T.StructField("CD_USU_RSP_CAD_PBCO", T.StringType(), False)     # VARCHAR2(32)
-])
 
 dados = [
     (
         1,
-        None,
-        "Clientes com histórico financeiro fora do BB — Histórico financeiro para análise de crédito",
+        "Open Finance BB — Crédito e Limite — Histórico financeiro fora do BB",
+        1,
         "Pessoas que querem melhorar a análise de crédito no BB e têm parte do histórico financeiro em outros bancos.",
         "Permitir que o BB considere informações financeiras de outros bancos na análise de crédito.",
         "Mais confiança para buscar crédito com um histórico financeiro mais completo.",
         None,
         None,
+        "HIVE",
         1,
+        "PBCQ_CADD",
         None,
-        "ADMIN"
+        "ADMIN",
+        None
     ),
     (
         2,
-        None,
-        "Clientes com crédito em outro banco — Crédito em outro banco para comparar",
+        "Open Finance BB — Portabilidade de Crédito — Crédito em outro banco para comparar",
+        1,
         "Pessoas que têm empréstimo em outro banco e querem avaliar se vale trazer esse crédito para o BB.",
         "Comparar opções de crédito e entender se a portabilidade faz sentido.",
         "Mais segurança para decidir antes de trazer o crédito para o BB.",
         None,
         None,
+        "HIVE",
         1,
+        "PBCQ_CADD",
         None,
-        "ADMIN"
+        "ADMIN",
+        None
     ),
     (
         3,
-        None,
-        "Clientes com contas em mais de um banco — Contas em mais de um banco",
+        "Open Finance BB — Gestão Financeira — Contas em mais de um banco",
+        1,
         "Pessoas que têm contas em mais de um banco e querem acompanhar a vida financeira com mais clareza.",
         "Reunir informações financeiras de diferentes bancos em um só lugar.",
         "Mais tranquilidade para decidir com uma visão mais completa.",
         None,
         None,
+        "HIVE",
         1,
+        "PBCQ_CADD",
         None,
-        "ADMIN"
+        "ADMIN",
+        None
     ),
     (
         4,
-        None,
-        "Pessoas com projeto imobiliário — Compra de imóvel planejada",
+        "Consórcio Imobiliário BB — Compra de Imóvel — Compra de imóvel planejada",
+        1,
         "Pessoas que querem comprar um imóvel e buscam uma forma planejada de realizar esse objetivo.",
         "Planejar a compra do imóvel com parcelas mensais e carta de crédito quando a cota for contemplada.",
         "Mais segurança para seguir em direção ao imóvel próprio.",
         None,
         None,
+        "HIVE",
         1,
+        "PBCQ_CADD",
         None,
-        "ADMIN"
+        "ADMIN",
+        None
     ),
     (
         5,
-        None,
-        "Pessoas com projeto imobiliário — Reforma ou construção planejada",
+        "Consórcio Imobiliário BB — Reforma ou Construção — Reforma ou construção planejada",
+        1,
         "Pessoas que querem construir ou reformar um imóvel e precisam planejar esse projeto com antecedência.",
         "Planejar a construção ou reforma com parcelas mensais e carta de crédito quando a cota for contemplada.",
         "Mais confiança para organizar um projeto importante sem pressa.",
         None,
         None,
+        "HIVE",
         1,
+        "PBCQ_CADD",
         None,
-        "ADMIN"
+        "ADMIN",
+        None
     ),
     (
         6,
-        None,
-        "Pessoas com projeto imobiliário — Imóvel com planejamento financeiro",
+        "Consórcio Imobiliário BB — Planejamento sem Juros — Imóvel com planejamento financeiro",
+        1,
         "Pessoas que querem realizar um projeto imobiliário e buscam uma forma de planejar os pagamentos.",
         "Organizar parcelas mensais para um projeto de compra, construção ou reforma.",
         "Mais segurança para planejar uma conquista importante.",
         None,
         None,
+        "HIVE",
         1,
+        "PBCQ_CADD",
         None,
-        "ADMIN"
+        "ADMIN",
+        None
     ),
     (
         7,
-        None,
-        "Pessoas que querem comprar eletrônicos — Troca de celular planejada",
+        "Consórcio de Eletro e Eletrônicos BB — Celular — Troca de celular planejada",
+        1,
         "Pessoas que querem trocar de celular e preferem planejar a compra em parcelas.",
         "Planejar a compra de um celular sem comprometer tudo de uma vez.",
         "Mais tranquilidade para trocar de celular com planejamento.",
         None,
         None,
+        "HIVE",
         1,
+        "PBCQ_CADD",
         None,
-        "ADMIN"
+        "ADMIN",
+        None
     ),
     (
         8,
-        None,
-        "Pessoas que querem comprar eletrônicos — Casa para equipar com planejamento",
+        "Consórcio de Eletro e Eletrônicos BB — Casa — Casa para equipar com planejamento",
+        1,
         "Pessoas que querem equipar a casa com eletrodomésticos ou eletrônicos e preferem fazer isso com planejamento.",
         "Planejar a compra de itens para casa em parcelas mensais.",
         "Mais segurança para realizar compras importantes no próprio ritmo.",
         None,
         None,
+        "HIVE",
         1,
+        "PBCQ_CADD",
         None,
-        "ADMIN"
+        "ADMIN",
+        None
     ),
     (
         9,
-        None,
-        "Pessoas que querem comprar eletrônicos — Eletrônicos para trabalho ou estudo",
+        "Consórcio de Eletro e Eletrônicos BB — Escritório — Eletrônicos para trabalho ou estudo",
+        1,
         "Pessoas que querem comprar eletrônicos para trabalho, estudo ou escritório e precisam planejar esse investimento.",
         "Planejar a compra de eletrônicos sem decidir tudo de uma vez.",
         "Mais tranquilidade para organizar uma compra importante.",
         None,
         None,
+        "HIVE",
         1,
+        "PBCQ_CADD",
         None,
-        "ADMIN"
+        "ADMIN",
+        None
     ),
     (
         10,
-        None,
-        "Pessoas que precisam de crédito — Crédito para simular antes de decidir",
+        "Empréstimo Pessoal BB — Simulação no App — Crédito para simular antes de decidir",
+        1,
         "Pessoas que precisam de crédito e querem simular valores e prazos antes de decidir.",
         "Comparar valores e prazos antes de contratar um empréstimo.",
         "Mais segurança para decidir com clareza.",
         None,
         None,
+        "HIVE",
         1,
+        "PBCQ_CADD",
         None,
-        "ADMIN"
+        "ADMIN",
+        None
     ),
     (
         11,
-        None,
-        "Pessoas que precisam de crédito — Necessidade de crédito de uso livre",
+        "Empréstimo Pessoal BB — Crédito de Uso Livre — Necessidade de crédito de uso livre",
+        1,
         "Pessoas que precisam de dinheiro para uma necessidade pessoal e buscam uma opção de crédito de uso livre.",
         "Consultar uma opção de empréstimo pessoal disponível para uso livre.",
         "Mais tranquilidade para avaliar uma alternativa de crédito.",
         None,
         None,
+        "HIVE",
         1,
+        "PBCQ_CADD",
         None,
-        "ADMIN"
+        "ADMIN",
+        None
     ),
     (
         12,
-        None,
-        "Pessoas que precisam de crédito — Crédito com fôlego para começar a pagar",
+        "Empréstimo Pessoal BB — Prazo para Começar a Pagar — Crédito com fôlego para começar a pagar",
+        1,
         "Pessoas que precisam de crédito, mas querem organizar o início do pagamento com mais fôlego.",
         "Avaliar opções de empréstimo considerando o prazo para começar a pagar.",
         "Mais segurança para planejar o primeiro pagamento.",
         None,
         None,
+        "HIVE",
         1,
+        "PBCQ_CADD",
         None,
-        "ADMIN"
+        "ADMIN",
+        None
     ),
     (
         13,
-        None,
-        "Pessoas que querem guardar dinheiro — Objetivos misturados aos gastos do dia a dia",
+        "Cofrinho BB — Guardar Dinheiro do Seu Jeito — Objetivos misturados aos gastos do dia a dia",
+        1,
         "Pessoas que querem guardar dinheiro para sonhos e objetivos, mas ainda deixam esse valor junto com o dinheiro do dia a dia.",
         "Separar dinheiro para cada meta sem misturar com os gastos do mês.",
         "Mais segurança para começar a guardar no próprio ritmo.",
         None,
         None,
+        "HIVE",
         1,
+        "PBCQ_CADD",
         None,
-        "ADMIN"
+        "ADMIN",
+        None
     ),
     (
         14,
-        None,
-        "Pessoas que querem comprar celular — Compra de celular com boa condição",
+        "Shopping BB — Celulares com Cashback ou Desconto — Compra de celular com boa condição",
+        1,
         "Pessoas que querem comprar celular e buscam uma boa condição de compra nos canais do BB.",
         "Encontrar ofertas de celulares com cashback ou desconto quando houver oferta participante.",
         "Mais satisfação por comprar com uma condição mais vantajosa.",
         None,
         None,
+        "HIVE",
         1,
+        "PBCQ_CADD",
         None,
-        "ADMIN"
+        "ADMIN",
+        None
     ),
     (
         15,
-        None,
-        "Pessoas que usaram o Limite Especial — Limite Especial usado na conta",
+        "Parcelamento do Limite Especial BB — Organizar o Valor Usado — Limite Especial usado na conta",
+        1,
         "Pessoas que usaram o Limite Especial da conta e precisam organizar como pagar esse valor.",
         "Dividir o valor usado no Limite Especial em parcelas e prazo definidos.",
         "Mais tranquilidade para saber como o saldo será pago.",
         None,
         None,
+        "HIVE",
         1,
+        "PBCQ_CADD",
         None,
-        "ADMIN"
+        "ADMIN",
+        None
     ),
     (
         16,
-        None,
-        "Pessoas com dinheiro em outro banco — Pagamento com dinheiro de outro banco",
+        "ITP BB — Pagamento com Dinheiro de Outro Banco — Dinheiro em outro banco para pagar",
+        1,
         "Pessoas que fazem pagamentos ou transferências com dinheiro que está em outro banco.",
         "Fazer pagamentos ou transferências sem precisar abrir o aplicativo do outro banco, quando disponível.",
         "Mais tranquilidade para concluir pagamentos em uma única experiência.",
         None,
         None,
+        "HIVE",
         1,
+        "PBCQ_CADD",
         None,
-        "ADMIN"
+        "ADMIN",
+        None
     ),
     (
         17,
-        None,
-        "Pessoas que querem organizar a vida financeira — Gastos do mês pouco organizados",
+        "Educação Financeira — Categorização dos Gastos — Gastos do mês pouco organizados",
+        1,
         "Pessoas que querem entender melhor os gastos do mês e organizar despesas em grupos.",
         "Separar os gastos do mês por categorias, como alimentação, transporte, contas e lazer.",
         "Mais segurança para decidir o que manter ou ajustar no mês.",
         None,
         None,
+        "HIVE",
         1,
+        "PBCQ_CADD",
         None,
-        "ADMIN"
+        "ADMIN",
+        None
     ),
     (
         18,
-        None,
-        "Pessoas que querem organizar a vida financeira — Contas do mês para organizar",
+        "Educação Financeira — Gestão do Orçamento — Contas do mês para organizar",
+        1,
         "Pessoas que querem comparar o dinheiro que entra com as contas e os gastos do mês.",
         "Definir quais contas e gastos devem vir primeiro no mês.",
         "Mais tranquilidade para lidar com as contas do mês.",
         None,
         None,
+        "HIVE",
         1,
+        "PBCQ_CADD",
         None,
-        "ADMIN"
+        "ADMIN",
+        None
     ),
     (
         19,
-        None,
-        "Pessoas que querem organizar a vida financeira — Crédito para revisar antes de usar mais",
+        "Educação Financeira — Uso Consciente do Crédito — Crédito para revisar antes de usar mais",
+        1,
         "Pessoas que usam crédito ou pensam em usar mais crédito e querem decidir com mais critério.",
         "Revisar parcelas, juros e datas de vencimento antes de usar mais crédito.",
         "Mais confiança para decidir antes de assumir novos pagamentos.",
         None,
         None,
+        "HIVE",
         1,
+        "PBCQ_CADD",
         None,
-        "ADMIN"
+        "ADMIN",
+        None
     ),
     (
         20,
-        None,
-        "Pessoas que querem organizar a vida financeira — Compra para avaliar antes de decidir",
+        "Educação Financeira — Consumo Planejado — Compra para avaliar antes de decidir",
+        1,
         "Pessoas que querem avaliar uma compra antes de decidir, considerando necessidade, prioridade e dinheiro disponível.",
         "Comparar a compra desejada com o dinheiro disponível e as prioridades do mês.",
         "Mais autonomia para fazer escolhas de compra.",
         None,
         None,
+        "HIVE",
         1,
+        "PBCQ_CADD",
         None,
-        "ADMIN"
+        "ADMIN",
+        None
     ),
     (
         21,
-        None,
-        "Pessoas que querem organizar a vida financeira — Reserva ainda sem começar",
+        "Educação Financeira — Formação de Reserva — Reserva ainda sem começar",
+        1,
         "Pessoas que querem começar a guardar dinheiro, mas ainda não definiram uma meta ou um primeiro valor.",
         "Definir um objetivo e um primeiro valor para começar a guardar.",
         "Mais segurança para olhar para o futuro.",
         None,
         None,
+        "HIVE",
         1,
+        "PBCQ_CADD",
         None,
-        "ADMIN"
+        "ADMIN",
+        None
     )
 ]
-
-df = (
-    spark.createDataFrame(dados, schema)
-        .withColumn("TS_CAD_PBCO", current_timestamp())
-)
-
-cliente_oracle.reload_dataframe(
-    df=df,
-    table_name=ref_table,
-    batchsize=5000,
-    num_partitions=1,
-    use_truncate=False
-)
-
-df_oracle = cliente_oracle.selecionar_tabela(ref_table, show=True)
-
-
-
 
 
 
