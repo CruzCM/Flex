@@ -1,5 +1,260 @@
 %%spark
 
+ref_table = "RCM_VRS"
+
+# cliente_oracle.limpar_tabela(ref_table)
+
+from pyspark.sql import types as T
+from pyspark.sql import functions as F
+
+schema = T.StructType([
+    T.StructField("NR_IDFR_RCM", T.LongType(), False),
+    T.StructField("NR_IDFR_PROJ", T.LongType(), False),
+    T.StructField("NR_VRS_PRPT", T.LongType(), False),
+    T.StructField("NR_AVS_SELD", T.LongType(), False),
+    T.StructField("CD_EST_RCM_VRS", T.LongType(), False),
+    T.StructField("TX_DCR_DETD", T.StringType(), False),
+    T.StructField("DT_PRPT_INC_RCM", T.StringType(), False),
+    T.StructField("DT_PRPT_FIM_RCM", T.StringType(), False),
+    T.StructField("TX_PRPT_PRM_HDR_API", T.StringType(), False),
+    T.StructField("TX_MTV_AVLC", T.StringType(), True),
+    T.StructField("TS_ULT_ALT", T.TimestampType(), True),
+    T.StructField("CD_USU_RSP_CAD", T.StringType(), False),
+])
+
+dados = [
+    (
+        1001, 1, 1, 5001, 1,
+        "Recomendação para Open Finance BB – Crédito e Limite direcionada a histórico financeiro fora do BB.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1001,"versao":1,"avs":5001,"pbco":3010,"sgt":4008}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1002, 1, 1, 5002, 1,
+        "Recomendação para Open Finance BB – Portabilidade de Crédito direcionada a crédito em outro banco para comparar.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1002,"versao":1,"avs":5002,"pbco":3011,"sgt":4009}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1003, 1, 1, 5003, 1,
+        "Recomendação para Open Finance BB – Gestão Financeira direcionada a contas em mais de um banco.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1003,"versao":1,"avs":5003,"pbco":3012,"sgt":4010}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1004, 1, 1, 5004, 1,
+        "Recomendação para Consórcio Imobiliário BB – Compra de Imóvel direcionada a compra de imóvel planejada.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1004,"versao":1,"avs":5004,"pbco":3013,"sgt":4011}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1005, 1, 1, 5005, 1,
+        "Recomendação para Consórcio Imobiliário BB – Reforma ou Construção direcionada a reforma ou construção planejada.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1005,"versao":1,"avs":5005,"pbco":3014,"sgt":4012}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1006, 1, 1, 5006, 1,
+        "Recomendação para Consórcio Imobiliário BB – Planejamento sem Juros direcionada a imóvel com planejamento financeiro.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1006,"versao":1,"avs":5006,"pbco":3015,"sgt":4013}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1007, 1, 1, 5007, 1,
+        "Recomendação para Consórcio de Eletro e Eletrônicos BB – Celular direcionada a troca de celular planejada.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1007,"versao":1,"avs":5007,"pbco":3016,"sgt":4014}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1008, 1, 1, 5008, 1,
+        "Recomendação para Consórcio de Eletro e Eletrônicos BB – Casa direcionada a casa para equipar com planejamento.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1008,"versao":1,"avs":5008,"pbco":3017,"sgt":4015}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1009, 1, 1, 5009, 1,
+        "Recomendação para Consórcio de Eletro e Eletrônicos BB – Escritório direcionada a eletrônicos para trabalho ou estudo.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1009,"versao":1,"avs":5009,"pbco":3018,"sgt":4016}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1010, 1, 1, 5010, 1,
+        "Recomendação para Empréstimo Pessoal BB – Simulação no App direcionada a crédito para simular antes de decidir.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1010,"versao":1,"avs":5010,"pbco":3019,"sgt":4017}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1011, 1, 1, 5011, 1,
+        "Recomendação para Empréstimo Pessoal BB – Crédito de Uso Livre direcionada a necessidade de crédito de uso livre.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1011,"versao":1,"avs":5011,"pbco":3020,"sgt":4018}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1012, 1, 1, 5012, 1,
+        "Recomendação para Empréstimo Pessoal BB – Prazo para Começar a Pagar direcionada a crédito com fôlego para começar a pagar.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1012,"versao":1,"avs":5012,"pbco":3021,"sgt":4019}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1013, 1, 1, 5013, 1,
+        "Recomendação para Cofrinho BB – Guardar Dinheiro do Seu Jeito direcionada a objetivos misturados aos gastos do dia a dia.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1013,"versao":1,"avs":5013,"pbco":3022,"sgt":4020}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1014, 1, 1, 5014, 1,
+        "Recomendação para Shopping BB – Celulares com Cashback ou Desconto direcionada a compra de celular com boa condição.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1014,"versao":1,"avs":5014,"pbco":3023,"sgt":4021}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1015, 1, 1, 5015, 1,
+        "Recomendação para Parcelamento do Limite Especial BB – Organizar o Valor Usado direcionada a limite especial usado na conta.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1015,"versao":1,"avs":5015,"pbco":3024,"sgt":4022}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1016, 1, 1, 5016, 1,
+        "Recomendação para ITP BB – Pagamento com Dinheiro de Outro Banco direcionada a dinheiro em outro banco para pagar.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1016,"versao":1,"avs":5016,"pbco":3025,"sgt":4023}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1017, 1, 1, 5017, 1,
+        "Recomendação para Educação Financeira – Categorização dos Gastos direcionada a gastos do mês pouco organizados.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1017,"versao":1,"avs":5017,"pbco":3026,"sgt":4024}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1018, 1, 1, 5018, 1,
+        "Recomendação para Educação Financeira – Gestão do Orçamento direcionada a contas do mês para organizar.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1018,"versao":1,"avs":5018,"pbco":3027,"sgt":4025}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1019, 1, 1, 5019, 1,
+        "Recomendação para Educação Financeira – Uso Consciente do Crédito direcionada a crédito para revisar antes de usar mais.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1019,"versao":1,"avs":5019,"pbco":3028,"sgt":4026}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1020, 1, 1, 5020, 1,
+        "Recomendação para Educação Financeira – Consumo Planejado direcionada a compra para avaliar antes de decidir.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1020,"versao":1,"avs":5020,"pbco":3029,"sgt":4027}',
+        None,
+        None,
+        "USR00001",
+    ),
+    (
+        1021, 1, 1, 5021, 1,
+        "Recomendação para Educação Financeira – Formação de Reserva direcionada a reserva ainda sem começar.",
+        "2026-04-20",
+        "2026-12-20",
+        '{"rcm":1021,"versao":1,"avs":5021,"pbco":3030,"sgt":4028}',
+        None,
+        None,
+        "USR00001",
+    ),
+]
+
+df = (
+    spark.createDataFrame(dados, schema)
+        .withColumn("DT_PRPT_INC_RCM", F.to_date("DT_PRPT_INC_RCM"))
+        .withColumn("DT_PRPT_FIM_RCM", F.to_date("DT_PRPT_FIM_RCM"))
+        .withColumn("TS_ULT_ALT", F.current_timestamp())
+)
+
+cliente_oracle.reload_dataframe(
+    df=df,
+    table_name=ref_table,
+    batchsize=5000,
+    num_partitions=1,
+    use_truncate=False
+)
+
+df_oracle = cliente_oracle.selecionar_tabela(ref_table, show=True)
+
+
+%%spark
+
 ref_table = "AVS_SELD"
 
 # cliente_oracle.limpar_tabela(ref_table)
