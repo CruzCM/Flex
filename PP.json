@@ -1,3 +1,652 @@
+%%spark
+
+ref_table = "PBCO_CADD"
+
+from pyspark.sql import types as T
+from pyspark.sql.functions import current_timestamp
+
+schema = T.StructType([
+    T.StructField("NR_IDFR_PBCO", T.LongType(), False),             # PK NOT NULL
+    T.StructField("TX_REG_EXNO_PBCO", T.StringType(), True),        # VARCHAR2(400)
+    T.StructField("NM_PBCO_PDRO", T.StringType(), False),           # VARCHAR2(2000)
+    T.StructField("TX_DCR_DETD_PBCO", T.StringType(), False),       # CLOB
+    T.StructField("TX_NCSS_RCNL_PBCO", T.StringType(), False),      # CLOB
+    T.StructField("TX_NCSS_EMOC_PBCO", T.StringType(), False),      # CLOB
+    T.StructField("TX_TRM_OBG_PBCO", T.StringType(), True),         # CLOB NULL
+    T.StructField("TX_TRM_N_PMT_PBCO", T.StringType(), True),       # CLOB NULL
+    T.StructField("CD_EST_PBCO", T.IntegerType(), False),           # NUMBER(1)
+    T.StructField("TS_CAD_PBCO", T.TimestampType(), True),          # TIMESTAMP NOT NULL
+    T.StructField("CD_USU_RSP_CAD_PBCO", T.StringType(), False)     # VARCHAR2(32)
+])
+
+dados = [
+    (
+        1,
+        None,
+        "Clientes com histórico financeiro fora do BB — Histórico financeiro para análise de crédito",
+        "Pessoas que querem melhorar a análise de crédito no BB e têm parte do histórico financeiro em outros bancos.",
+        "Permitir que o BB considere informações financeiras de outros bancos na análise de crédito.",
+        "Mais confiança para buscar crédito com um histórico financeiro mais completo.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        2,
+        None,
+        "Clientes com crédito em outro banco — Crédito em outro banco para comparar",
+        "Pessoas que têm empréstimo em outro banco e querem avaliar se vale trazer esse crédito para o BB.",
+        "Comparar opções de crédito e entender se a portabilidade faz sentido.",
+        "Mais segurança para decidir antes de trazer o crédito para o BB.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        3,
+        None,
+        "Clientes com contas em mais de um banco — Contas em mais de um banco",
+        "Pessoas que têm contas em mais de um banco e querem acompanhar a vida financeira com mais clareza.",
+        "Reunir informações financeiras de diferentes bancos em um só lugar.",
+        "Mais tranquilidade para decidir com uma visão mais completa.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        4,
+        None,
+        "Pessoas com projeto imobiliário — Compra de imóvel planejada",
+        "Pessoas que querem comprar um imóvel e buscam uma forma planejada de realizar esse objetivo.",
+        "Planejar a compra do imóvel com parcelas mensais e carta de crédito quando a cota for contemplada.",
+        "Mais segurança para seguir em direção ao imóvel próprio.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        5,
+        None,
+        "Pessoas com projeto imobiliário — Reforma ou construção planejada",
+        "Pessoas que querem construir ou reformar um imóvel e precisam planejar esse projeto com antecedência.",
+        "Planejar a construção ou reforma com parcelas mensais e carta de crédito quando a cota for contemplada.",
+        "Mais confiança para organizar um projeto importante sem pressa.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        6,
+        None,
+        "Pessoas com projeto imobiliário — Imóvel com planejamento financeiro",
+        "Pessoas que querem realizar um projeto imobiliário e buscam uma forma de planejar os pagamentos.",
+        "Organizar parcelas mensais para um projeto de compra, construção ou reforma.",
+        "Mais segurança para planejar uma conquista importante.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        7,
+        None,
+        "Pessoas que querem comprar eletrônicos — Troca de celular planejada",
+        "Pessoas que querem trocar de celular e preferem planejar a compra em parcelas.",
+        "Planejar a compra de um celular sem comprometer tudo de uma vez.",
+        "Mais tranquilidade para trocar de celular com planejamento.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        8,
+        None,
+        "Pessoas que querem comprar eletrônicos — Casa para equipar com planejamento",
+        "Pessoas que querem equipar a casa com eletrodomésticos ou eletrônicos e preferem fazer isso com planejamento.",
+        "Planejar a compra de itens para casa em parcelas mensais.",
+        "Mais segurança para realizar compras importantes no próprio ritmo.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        9,
+        None,
+        "Pessoas que querem comprar eletrônicos — Eletrônicos para trabalho ou estudo",
+        "Pessoas que querem comprar eletrônicos para trabalho, estudo ou escritório e precisam planejar esse investimento.",
+        "Planejar a compra de eletrônicos sem decidir tudo de uma vez.",
+        "Mais tranquilidade para organizar uma compra importante.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        10,
+        None,
+        "Pessoas que precisam de crédito — Crédito para simular antes de decidir",
+        "Pessoas que precisam de crédito e querem simular valores e prazos antes de decidir.",
+        "Comparar valores e prazos antes de contratar um empréstimo.",
+        "Mais segurança para decidir com clareza.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        11,
+        None,
+        "Pessoas que precisam de crédito — Necessidade de crédito de uso livre",
+        "Pessoas que precisam de dinheiro para uma necessidade pessoal e buscam uma opção de crédito de uso livre.",
+        "Consultar uma opção de empréstimo pessoal disponível para uso livre.",
+        "Mais tranquilidade para avaliar uma alternativa de crédito.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        12,
+        None,
+        "Pessoas que precisam de crédito — Crédito com fôlego para começar a pagar",
+        "Pessoas que precisam de crédito, mas querem organizar o início do pagamento com mais fôlego.",
+        "Avaliar opções de empréstimo considerando o prazo para começar a pagar.",
+        "Mais segurança para planejar o primeiro pagamento.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        13,
+        None,
+        "Pessoas que querem guardar dinheiro — Objetivos misturados aos gastos do dia a dia",
+        "Pessoas que querem guardar dinheiro para sonhos e objetivos, mas ainda deixam esse valor junto com o dinheiro do dia a dia.",
+        "Separar dinheiro para cada meta sem misturar com os gastos do mês.",
+        "Mais segurança para começar a guardar no próprio ritmo.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        14,
+        None,
+        "Pessoas que querem comprar celular — Compra de celular com boa condição",
+        "Pessoas que querem comprar celular e buscam uma boa condição de compra nos canais do BB.",
+        "Encontrar ofertas de celulares com cashback ou desconto quando houver oferta participante.",
+        "Mais satisfação por comprar com uma condição mais vantajosa.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        15,
+        None,
+        "Pessoas que usaram o Limite Especial — Limite Especial usado na conta",
+        "Pessoas que usaram o Limite Especial da conta e precisam organizar como pagar esse valor.",
+        "Dividir o valor usado no Limite Especial em parcelas e prazo definidos.",
+        "Mais tranquilidade para saber como o saldo será pago.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        16,
+        None,
+        "Pessoas com dinheiro em outro banco — Pagamento com dinheiro de outro banco",
+        "Pessoas que fazem pagamentos ou transferências com dinheiro que está em outro banco.",
+        "Fazer pagamentos ou transferências sem precisar abrir o aplicativo do outro banco, quando disponível.",
+        "Mais tranquilidade para concluir pagamentos em uma única experiência.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        17,
+        None,
+        "Pessoas que querem organizar a vida financeira — Gastos do mês pouco organizados",
+        "Pessoas que querem entender melhor os gastos do mês e organizar despesas em grupos.",
+        "Separar os gastos do mês por categorias, como alimentação, transporte, contas e lazer.",
+        "Mais segurança para decidir o que manter ou ajustar no mês.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        18,
+        None,
+        "Pessoas que querem organizar a vida financeira — Contas do mês para organizar",
+        "Pessoas que querem comparar o dinheiro que entra com as contas e os gastos do mês.",
+        "Definir quais contas e gastos devem vir primeiro no mês.",
+        "Mais tranquilidade para lidar com as contas do mês.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        19,
+        None,
+        "Pessoas que querem organizar a vida financeira — Crédito para revisar antes de usar mais",
+        "Pessoas que usam crédito ou pensam em usar mais crédito e querem decidir com mais critério.",
+        "Revisar parcelas, juros e datas de vencimento antes de usar mais crédito.",
+        "Mais confiança para decidir antes de assumir novos pagamentos.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        20,
+        None,
+        "Pessoas que querem organizar a vida financeira — Compra para avaliar antes de decidir",
+        "Pessoas que querem avaliar uma compra antes de decidir, considerando necessidade, prioridade e dinheiro disponível.",
+        "Comparar a compra desejada com o dinheiro disponível e as prioridades do mês.",
+        "Mais autonomia para fazer escolhas de compra.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        21,
+        None,
+        "Pessoas que querem organizar a vida financeira — Reserva ainda sem começar",
+        "Pessoas que querem começar a guardar dinheiro, mas ainda não definiram uma meta ou um primeiro valor.",
+        "Definir um objetivo e um primeiro valor para começar a guardar.",
+        "Mais segurança para olhar para o futuro.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    )
+]
+
+df = (
+    spark.createDataFrame(dados, schema)
+        .withColumn("TS_CAD_PBCO", current_timestamp())
+)
+
+cliente_oracle.reload_dataframe(
+    df=df,
+    table_name=ref_table,
+    batchsize=5000,
+    num_partitions=1,
+    use_truncate=False
+)
+
+df_oracle = cliente_oracle.selecionar_tabela(ref_table, show=True)
+
+
+
+
+
+
+
+
+
+%%spark
+
+ref_table = "SGT_CADD"
+
+from pyspark.sql import types as T
+from pyspark.sql.functions import current_timestamp
+
+schema = T.StructType([
+    T.StructField("NR_IDFR_SGT", T.LongType(), False),          # PK NOT NULL
+    T.StructField("TX_REG_EXNO_SGT", T.StringType(), True),     # VARCHAR2(400)
+    T.StructField("NM_SGT_PDRO", T.StringType(), False),        # VARCHAR2(2000)
+    T.StructField("TX_DCR_DETD_SGT", T.StringType(), False),    # CLOB
+    T.StructField("TX_BNF_FCNL_SGT", T.StringType(), False),    # CLOB
+    T.StructField("TX_BNF_EMOC_SGT", T.StringType(), False),    # CLOB
+    T.StructField("TX_TRM_OBG_SGT", T.StringType(), True),      # CLOB NULL
+    T.StructField("TX_TRM_N_PMT_SGT", T.StringType(), True),    # CLOB NULL
+    T.StructField("CD_EST_SGT", T.IntegerType(), False),        # NUMBER(1)
+    T.StructField("TS_CAD_SGT", T.TimestampType(), True),       # TIMESTAMP NOT NULL
+    T.StructField("CD_USU_RSP_CAD_SGT", T.StringType(), False)  # VARCHAR2(32)
+])
+
+dados = [
+    (
+        1,
+        None,
+        "Open Finance BB — Crédito e Limite",
+        "Um serviço que permite ao BB considerar informações financeiras de outros bancos na análise de crédito.",
+        "Usar um histórico financeiro mais completo para apoiar a análise de crédito, limites e condições.",
+        "Mais confiança para buscar crédito com informações financeiras mais completas.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        2,
+        None,
+        "Open Finance BB — Portabilidade de Crédito",
+        "Um recurso que ajuda a comparar e trazer informações de crédito de outros bancos para o BB.",
+        "Comparar opções e iniciar a portabilidade de crédito com menos etapas, quando disponível.",
+        "Mais segurança para avaliar se vale trazer o crédito para o BB.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        3,
+        None,
+        "Open Finance BB — Gestão Financeira",
+        "Um serviço que permite visualizar informações financeiras de outros bancos no ambiente do BB.",
+        "Ver contas de outros bancos em um só lugar para acompanhar melhor a vida financeira.",
+        "Mais clareza para tomar decisões financeiras com uma visão mais completa.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        4,
+        None,
+        "Consórcio Imobiliário BB — Compra de Imóvel",
+        "Uma forma de planejar a compra de um imóvel pagando parcelas mensais.",
+        "Usar uma carta de crédito para comprar um imóvel quando a cota for contemplada.",
+        "Mais segurança para planejar a conquista do imóvel com o apoio do BB.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        5,
+        None,
+        "Consórcio Imobiliário BB — Reforma ou Construção",
+        "Uma forma de planejar a construção ou reforma de um imóvel pagando parcelas mensais.",
+        "Usar uma carta de crédito para construir ou reformar quando a cota for contemplada.",
+        "Mais segurança para tirar do papel um projeto imobiliário planejado.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        6,
+        None,
+        "Consórcio Imobiliário BB — Planejamento sem Juros",
+        "Uma forma de planejar a compra, construção ou reforma de um imóvel por consórcio, sem juros.",
+        "Planejar um projeto imobiliário com carta de crédito disponível quando a cota for contemplada.",
+        "Mais tranquilidade para seguir com um plano de imóvel no próprio ritmo.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        7,
+        None,
+        "Consórcio de Eletro e Eletrônicos BB — Celular",
+        "Uma forma de planejar a compra de um celular pagando parcelas mensais.",
+        "Usar um valor de crédito para escolher o celular depois que a cota for contemplada.",
+        "Mais tranquilidade para planejar a troca de celular no próprio ritmo.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        8,
+        None,
+        "Consórcio de Eletro e Eletrônicos BB — Casa",
+        "Uma forma de planejar a compra de eletrodomésticos ou eletrônicos para casa pagando parcelas mensais.",
+        "Usar um valor de crédito para comprar itens para casa quando a cota for contemplada.",
+        "Mais tranquilidade para equipar a casa com planejamento.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        9,
+        None,
+        "Consórcio de Eletro e Eletrônicos BB — Escritório",
+        "Uma forma de planejar a compra de eletrônicos para trabalho, estudo ou escritório pagando parcelas mensais.",
+        "Usar um valor de crédito para comprar eletrônicos quando a cota for contemplada.",
+        "Mais confiança para planejar equipamentos importantes para a rotina.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        10,
+        None,
+        "Empréstimo Pessoal BB — Simulação no App",
+        "Uma forma de simular valores, escolher prazo e contratar empréstimo pessoal pelo App BB.",
+        "Simular valores e prazos antes de contratar, conforme as opções disponíveis para o cliente.",
+        "Mais segurança para avaliar o crédito antes de decidir.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        11,
+        None,
+        "Empréstimo Pessoal BB — Crédito de Uso Livre",
+        "Uma linha de empréstimo pessoal que pode estar disponível para contratação online no BB.",
+        "Contratar crédito para uso livre, conforme as condições disponíveis para o cliente.",
+        "Mais tranquilidade para lidar com uma necessidade de dinheiro.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        12,
+        None,
+        "Empréstimo Pessoal BB — Prazo para Começar a Pagar",
+        "Uma opção de empréstimo pessoal que pode oferecer prazo para começar a pagar, conforme as condições disponíveis para o cliente.",
+        "Consultar opções com prazo para iniciar o pagamento, quando disponível.",
+        "Mais tranquilidade para organizar o crédito com atenção ao mês.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        13,
+        None,
+        "Cofrinho BB — Guardar Dinheiro do Seu Jeito",
+        "Uma ferramenta no App BB para criar cofrinhos diferentes para cada meta e começar a guardar dinheiro aos poucos.",
+        "Criar um cofrinho para cada objetivo e começar a guardar com valores a partir de R$ 0,01.",
+        "Mais motivação para transformar sonhos em planos possíveis.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        14,
+        None,
+        "Shopping BB — Celulares com Cashback ou Desconto",
+        "Uma área de compras nos canais do BB que reúne lojas parceiras e ofertas de celulares.",
+        "Receber cashback ou desconto na compra de celulares participantes, conforme a oferta.",
+        "Mais satisfação por encontrar uma boa condição de compra.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        15,
+        None,
+        "Parcelamento do Limite Especial BB — Organizar o Valor Usado",
+        "Uma opção para dividir em parcelas o valor usado no Limite Especial da conta.",
+        "Ter parcelas e prazo definidos para pagar o valor usado.",
+        "Mais tranquilidade para saber como o saldo será pago.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        16,
+        None,
+        "ITP BB — Pagamento com Dinheiro de Outro Banco",
+        "Uma forma de fazer pagamentos ou transferências com dinheiro que está em outro banco sem sair do ambiente do BB.",
+        "Fazer um pagamento sem precisar abrir o aplicativo do outro banco, quando o serviço estiver disponível.",
+        "Mais tranquilidade para concluir pagamentos em uma única experiência.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        17,
+        None,
+        "Educação Financeira — Categorização dos Gastos",
+        "Uma orientação de Educação Financeira para organizar os gastos do mês em grupos, como alimentação, transporte, contas e lazer.",
+        "Identificar quais gastos se repetem e para onde vai mais dinheiro no mês.",
+        "Mais segurança para decidir o que manter ou ajustar no mês.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        18,
+        None,
+        "Educação Financeira — Gestão do Orçamento",
+        "Uma orientação de Educação Financeira para comparar o dinheiro que entra com as contas e os gastos do mês.",
+        "Definir quais contas e gastos devem vir primeiro no mês.",
+        "Mais tranquilidade para lidar com as contas do mês.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        19,
+        None,
+        "Educação Financeira — Uso Consciente do Crédito",
+        "Uma orientação de Educação Financeira para revisar parcelas, juros e datas de vencimento antes de usar mais crédito.",
+        "Ver quanto do dinheiro do mês já está comprometido com parcelas e juros.",
+        "Mais confiança para decidir antes de assumir novos pagamentos.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        20,
+        None,
+        "Educação Financeira — Consumo Planejado",
+        "Uma orientação de Educação Financeira para avaliar uma compra antes de decidir, considerando necessidade, prioridade e dinheiro disponível.",
+        "Comparar a compra desejada com o dinheiro disponível e as prioridades do mês.",
+        "Mais autonomia para fazer escolhas de compra.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    ),
+    (
+        21,
+        None,
+        "Educação Financeira — Formação de Reserva",
+        "Uma orientação de Educação Financeira para definir uma meta e começar a guardar dinheiro aos poucos.",
+        "Definir um objetivo e um primeiro valor para começar a guardar.",
+        "Mais segurança para olhar para o futuro.",
+        None,
+        None,
+        1,
+        None,
+        "ADMIN"
+    )
+]
+
+df = (
+    spark.createDataFrame(dados, schema)
+        .withColumn("TS_CAD_SGT", current_timestamp())
+)
+
+cliente_oracle.reload_dataframe(
+    df=df,
+    table_name=ref_table,
+    batchsize=5000,
+    num_partitions=1,
+    use_truncate=False
+)
+
+df_oracle = cliente_oracle.selecionar_tabela(ref_table, show=True)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 {
   "SGT_CADD": [
     {
