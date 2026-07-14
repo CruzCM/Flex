@@ -1,0 +1,370 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+
+tabela_saida = "sbx_t2i2016.ana_edu_fin_cli"
+
+query_estudo_radar = f"""
+WITH base AS (
+    SELECT
+        CD_CLI,
+        DT_MES_REF,
+        NM_PRFL,
+        NM_PRFL_FIN,
+        TX_RES_ORC,
+        TX_STS_FINAL,
+        VL_ENT_TOTAL,
+        VL_SAI_TOTAL,
+        VL_ENT_EMPR,
+        PC_SAI_ENT,
+        PC_SAI_GEN,
+        PC_SAI_ESS,
+        PC_SAI_FLEX,
+        PC_SAI_RES,
+        PC_SAI_DIV,
+        COALESCE(PC_REF_GEN, 0.750000)  AS PC_REF_GEN,
+        COALESCE(PC_REF_ESS, 0.500000)  AS PC_REF_ESS,
+        COALESCE(PC_REF_FLEX, 0.300000) AS PC_REF_FLEX,
+        COALESCE(PC_REF_RES, 0.200000)  AS PC_REF_RES,
+        COALESCE(PC_REF_CRED, 0.300000) AS PC_REF_CRED,
+        NR_PONT_CATEG,
+        NR_PONT_ORC,
+        NR_PONT_CONS,
+        NR_PONT_RES,
+        NR_PONT_CRED
+    FROM {tabela_saida}
+),
+
+temas AS (
+    SELECT
+        b.*,
+        t.CD_TEMA,
+        t.NM_TEMA,
+        t.NR_PONT_TEMA,
+        t.NR_SCORE_COMP,
+        t.NR_ORDEM_DESEMPATE
+    FROM base b
+    LATERAL VIEW STACK(
+        5,
+        'CATEG', 'Categorização de Gastos',       CAST(NR_PONT_CATEG AS DOUBLE), CASE WHEN NR_PONT_CATEG >= 99 THEN 6.0 ELSE 0.0 END, 5,
+        'ORC',   'Gestão de Orçamento',           CAST(NR_PONT_ORC   AS DOUBLE), CAST(NR_PONT_ORC   AS DOUBLE), 2,
+        'CONS',  'Consumo Planejado',             CAST(NR_PONT_CONS  AS DOUBLE), CAST(NR_PONT_CONS  AS DOUBLE), 4,
+        'RES',   'Formação de Reserva',           CAST(NR_PONT_RES   AS DOUBLE), CAST(NR_PONT_RES   AS DOUBLE), 3,
+        'CRED',  'Uso Consciente do Crédito',     CAST(NR_PONT_CRED  AS DOUBLE), CAST(NR_PONT_CRED  AS DOUBLE), 1
+    ) t AS CD_TEMA, NM_TEMA, NR_PONT_TEMA, NR_SCORE_COMP, NR_ORDEM_DESEMPATE
+),
+
+tema_cliente AS (
+    SELECT *
+    FROM (
+        SELECT
+            *,
+            ROW_NUMBER() OVER (
+                PARTITION BY CD_CLI, DT_MES_REF
+                ORDER BY NR_SCORE_COMP DESC, NR_ORDEM_DESEMPATE ASC
+            ) AS RN_TEMA
+        FROM temas
+    )
+    WHERE RN_TEMA = 1
+),
+
+cliente_classificado AS (
+    SELECT
+        *,
+        CASE
+            WHEN CD_TEMA = 'CRED'  AND LOWER(NM_PRFL_FIN) LIKE '%endividado%' AND PC_SAI_DIV >= PC_REF_CRED
+                THEN 'Clientes endividados com pressão de crédito'
+            WHEN CD_TEMA = 'CRED'  AND PC_SAI_DIV >= PC_REF_CRED
+                THEN 'Clientes com alto peso de dívidas/crédito'
+            WHEN CD_TEMA = 'ORC'   AND LOWER(TX_RES_ORC) LIKE 'deficit%'
+                THEN 'Clientes com orçamento deficitário'
+            WHEN CD_TEMA = 'ORC'   AND PC_SAI_ENT >= 1
+                THEN 'Clientes com saídas próximas ou acima das entradas'
+            WHEN CD_TEMA = 'CONS'  AND PC_SAI_FLEX >= PC_REF_FLEX
+                THEN 'Clientes com alto peso de gastos flexíveis'
+            WHEN CD_TEMA = 'RES'   AND PC_SAI_RES < PC_REF_RES
+                THEN 'Clientes com baixa formação de reserva'
+            WHEN CD_TEMA = 'CATEG' AND PC_SAI_GEN > PC_REF_GEN
+                THEN 'Clientes com gastos pouco categorizados'
+            ELSE CONCAT('Público geral - ', NM_TEMA)
+        END AS TX_PUBLICO_ALVO
+    FROM tema_cliente
+),
+
+total AS (
+    SELECT COUNT(*) AS QT_TOTAL
+    FROM cliente_classificado
+),
+
+ranking_tema AS (
+    SELECT
+        NM_TEMA,
+        COUNT(*) AS QT_CLIENTES,
+        ROUND(COUNT(*) / MAX(t.QT_TOTAL), 6) AS PC_CLIENTES,
+        ROUND(AVG(NR_SCORE_COMP), 2) AS SCORE_MEDIO
+    FROM cliente_classificado c
+    CROSS JOIN total t
+    GROUP BY NM_TEMA
+),
+
+tema_vencedor AS (
+    SELECT NM_TEMA
+    FROM (
+        SELECT
+            *,
+            ROW_NUMBER() OVER (ORDER BY QT_CLIENTES DESC, SCORE_MEDIO DESC) AS RN
+        FROM ranking_tema
+    )
+    WHERE RN = 1
+),
+
+ranking_publico AS (
+    SELECT
+        c.NM_TEMA,
+        c.TX_PUBLICO_ALVO,
+        COUNT(*) AS QT_CLIENTES,
+        ROUND(AVG(c.NR_SCORE_COMP), 2) AS SCORE_MEDIO,
+        ROUND(AVG(c.PC_SAI_ENT), 4) AS PC_MEDIO_SAI_ENT,
+        ROUND(AVG(c.PC_SAI_DIV), 4) AS PC_MEDIO_DIVIDA,
+        ROUND(AVG(c.PC_SAI_RES), 4) AS PC_MEDIO_RESERVA
+    FROM cliente_classificado c
+    JOIN tema_vencedor tv
+        ON c.NM_TEMA = tv.NM_TEMA
+    GROUP BY c.NM_TEMA, c.TX_PUBLICO_ALVO
+),
+
+matriz_tema_perfil AS (
+    SELECT
+        NM_TEMA,
+        NM_PRFL_FIN,
+        COUNT(*) AS QT_CLIENTES,
+        ROUND(AVG(NR_SCORE_COMP), 2) AS SCORE_MEDIO
+    FROM cliente_classificado
+    GROUP BY NM_TEMA, NM_PRFL_FIN
+)
+
+SELECT
+    '01_RANKING_TEMAS' AS TP_BLOCO,
+    'grafico_barra_horizontal' AS TP_VISUAL,
+    NM_TEMA,
+    CAST(NULL AS STRING) AS TX_PUBLICO_ALVO,
+    CAST(NULL AS STRING) AS NM_PRFL_FIN,
+    QT_CLIENTES,
+    PC_CLIENTES,
+    SCORE_MEDIO,
+    CAST(NULL AS DOUBLE) AS PC_MEDIO_SAI_ENT,
+    CAST(NULL AS DOUBLE) AS PC_MEDIO_DIVIDA,
+    CAST(NULL AS DOUBLE) AS PC_MEDIO_RESERVA
+FROM ranking_tema
+
+UNION ALL
+
+SELECT
+    '02_PUBLICO_TEMA_VENCEDOR' AS TP_BLOCO,
+    'tabela_e_barra_horizontal' AS TP_VISUAL,
+    NM_TEMA,
+    TX_PUBLICO_ALVO,
+    CAST(NULL AS STRING) AS NM_PRFL_FIN,
+    QT_CLIENTES,
+    CAST(NULL AS DOUBLE) AS PC_CLIENTES,
+    SCORE_MEDIO,
+    PC_MEDIO_SAI_ENT,
+    PC_MEDIO_DIVIDA,
+    PC_MEDIO_RESERVA
+FROM ranking_publico
+
+UNION ALL
+
+SELECT
+    '03_MATRIZ_TEMA_PERFIL' AS TP_BLOCO,
+    'heatmap' AS TP_VISUAL,
+    NM_TEMA,
+    CAST(NULL AS STRING) AS TX_PUBLICO_ALVO,
+    NM_PRFL_FIN,
+    QT_CLIENTES,
+    CAST(NULL AS DOUBLE) AS PC_CLIENTES,
+    SCORE_MEDIO,
+    CAST(NULL AS DOUBLE) AS PC_MEDIO_SAI_ENT,
+    CAST(NULL AS DOUBLE) AS PC_MEDIO_DIVIDA,
+    CAST(NULL AS DOUBLE) AS PC_MEDIO_RESERVA
+FROM matriz_tema_perfil
+
+ORDER BY TP_BLOCO, QT_CLIENTES DESC
+"""
+
+df_estudo = spark.sql(query_estudo_radar).toPandas()
+
+for col in [
+    "QT_CLIENTES",
+    "PC_CLIENTES",
+    "SCORE_MEDIO",
+    "PC_MEDIO_SAI_ENT",
+    "PC_MEDIO_DIVIDA",
+    "PC_MEDIO_RESERVA"
+]:
+    if col in df_estudo.columns:
+        df_estudo[col] = pd.to_numeric(df_estudo[col], errors="coerce")
+
+# ============================================================
+# 1. Ranking de temas vencedores
+# ============================================================
+
+df_temas = (
+    df_estudo[df_estudo["TP_BLOCO"] == "01_RANKING_TEMAS"]
+    .sort_values("QT_CLIENTES", ascending=True)
+)
+
+fig, ax = plt.subplots(figsize=(11, 5))
+
+ax.barh(df_temas["NM_TEMA"], df_temas["QT_CLIENTES"])
+
+ax.set_title("Ranking de temas vencedores")
+ax.set_xlabel("Quantidade de clientes")
+ax.set_ylabel("Tema")
+
+for i, row in enumerate(df_temas.itertuples()):
+    ax.text(
+        row.QT_CLIENTES,
+        i,
+        f" {row.QT_CLIENTES:,.0f} ({row.PC_CLIENTES:.1%})",
+        va="center"
+    )
+
+plt.tight_layout()
+plt.show()
+
+# ============================================================
+# 2. Públicos-alvo do tema vencedor
+# ============================================================
+
+df_publico = (
+    df_estudo[df_estudo["TP_BLOCO"] == "02_PUBLICO_TEMA_VENCEDOR"]
+    .sort_values("QT_CLIENTES", ascending=True)
+)
+
+if len(df_publico) > 0:
+    tema_vencedor = df_publico["NM_TEMA"].iloc[0]
+
+    fig, ax = plt.subplots(figsize=(13, 6))
+
+    ax.barh(df_publico["TX_PUBLICO_ALVO"], df_publico["QT_CLIENTES"])
+
+    ax.set_title(f"Públicos-alvo do tema vencedor: {tema_vencedor}")
+    ax.set_xlabel("Quantidade de clientes")
+    ax.set_ylabel("Público-alvo")
+
+    for i, row in enumerate(df_publico.itertuples()):
+        ax.text(
+            row.QT_CLIENTES,
+            i,
+            f" {row.QT_CLIENTES:,.0f} | score {row.SCORE_MEDIO:.1f}",
+            va="center"
+        )
+
+    plt.tight_layout()
+    plt.show()
+
+# ============================================================
+# 3. Tabela executiva dos públicos-alvo
+# ============================================================
+
+df_tabela_publico = (
+    df_publico
+    .sort_values("QT_CLIENTES", ascending=False)
+    [[
+        "TX_PUBLICO_ALVO",
+        "QT_CLIENTES",
+        "SCORE_MEDIO",
+        "PC_MEDIO_SAI_ENT",
+        "PC_MEDIO_DIVIDA",
+        "PC_MEDIO_RESERVA"
+    ]]
+    .head(10)
+)
+
+df_tabela_publico_formatada = df_tabela_publico.copy()
+
+df_tabela_publico_formatada["QT_CLIENTES"] = (
+    df_tabela_publico_formatada["QT_CLIENTES"].map(lambda x: f"{x:,.0f}")
+)
+
+df_tabela_publico_formatada["SCORE_MEDIO"] = (
+    df_tabela_publico_formatada["SCORE_MEDIO"].map(lambda x: f"{x:.1f}")
+)
+
+for col in ["PC_MEDIO_SAI_ENT", "PC_MEDIO_DIVIDA", "PC_MEDIO_RESERVA"]:
+    df_tabela_publico_formatada[col] = (
+        df_tabela_publico_formatada[col].map(lambda x: f"{x:.1%}" if pd.notnull(x) else "")
+    )
+
+fig, ax = plt.subplots(figsize=(15, 4.5))
+ax.axis("off")
+
+tabela = ax.table(
+    cellText=df_tabela_publico_formatada.values,
+    colLabels=[
+        "Público-alvo",
+        "Clientes",
+        "Score médio",
+        "% saída/entrada",
+        "% dívida",
+        "% reserva"
+    ],
+    loc="center",
+    cellLoc="left",
+    colLoc="left"
+)
+
+tabela.auto_set_font_size(False)
+tabela.set_fontsize(9)
+tabela.scale(1, 1.5)
+
+ax.set_title("Top públicos-alvo do tema vencedor", pad=20)
+
+plt.tight_layout()
+plt.show()
+
+# ============================================================
+# 4. Heatmap tema x perfil financeiro
+# ============================================================
+
+df_matriz = df_estudo[df_estudo["TP_BLOCO"] == "03_MATRIZ_TEMA_PERFIL"]
+
+pivot = df_matriz.pivot_table(
+    index="NM_PRFL_FIN",
+    columns="NM_TEMA",
+    values="QT_CLIENTES",
+    aggfunc="sum",
+    fill_value=0
+)
+
+fig, ax = plt.subplots(figsize=(13, 7))
+
+im = ax.imshow(pivot.values, aspect="auto")
+
+ax.set_title("Distribuição de clientes por tema e perfil financeiro")
+ax.set_xlabel("Tema")
+ax.set_ylabel("Perfil financeiro")
+
+ax.set_xticks(range(len(pivot.columns)))
+ax.set_xticklabels(pivot.columns, rotation=30, ha="right")
+
+ax.set_yticks(range(len(pivot.index)))
+ax.set_yticklabels(pivot.index)
+
+fig.colorbar(im, ax=ax, label="Quantidade de clientes")
+
+for i in range(len(pivot.index)):
+    for j in range(len(pivot.columns)):
+        valor = pivot.values[i, j]
+        if valor > 0:
+            ax.text(
+                j,
+                i,
+                f"{valor:,.0f}",
+                ha="center",
+                va="center",
+                fontsize=8
+            )
+
+plt.tight_layout()
+plt.show()
