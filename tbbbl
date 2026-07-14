@@ -1,0 +1,1689 @@
+%%spark
+
+from datetime import date, datetime
+from decimal import Decimal
+
+from pyspark.sql import functions as F
+from pyspark.sql.types import (
+    ByteType,
+    ShortType,
+    IntegerType,
+    LongType,
+    FloatType,
+    DoubleType,
+    DecimalType,
+    DateType,
+    TimestampType,
+    BooleanType,
+)
+
+
+# ============================================================
+# REPOSITÓRIO DE TABELAS MARKDOWN
+# ============================================================
+
+class TabelasMarkdown:
+
+    def __init__(self):
+
+        self.itens = {}
+
+    # ========================================================
+    # UTILITÁRIOS
+    # ========================================================
+
+    @staticmethod
+    def _escapar_markdown(valor):
+
+        return (
+            str(valor)
+            .replace("|", r"\|")
+            .replace("\n", " ")
+            .replace("\r", " ")
+        )
+
+    @staticmethod
+    def _formatar_inteiro(valor):
+
+        return (
+            f"{int(valor):,}"
+            .replace(",", ".")
+        )
+
+    @staticmethod
+    def _formatar_decimal(
+        valor,
+        casas_decimais=2,
+    ):
+
+        texto = f"{float(valor):,.{casas_decimais}f}"
+
+        return (
+            texto
+            .replace(",", "__MILHAR__")
+            .replace(".", ",")
+            .replace("__MILHAR__", ".")
+        )
+
+    def _formatar_percentual(
+        self,
+        valor,
+        casas_decimais=2,
+        valor_em_fracao=False,
+    ):
+
+        numero = float(valor)
+
+        if valor_em_fracao:
+            numero = numero * 100
+
+        return (
+            self._formatar_decimal(
+                numero,
+                casas_decimais,
+            )
+            + "%"
+        )
+
+    def _formatar_moeda(
+        self,
+        valor,
+        casas_decimais=2,
+    ):
+
+        return (
+            "R$ "
+            + self._formatar_decimal(
+                valor,
+                casas_decimais,
+            )
+        )
+
+    @staticmethod
+    def _parece_percentual(nome_coluna):
+
+        nome = nome_coluna.upper()
+
+        prefixos = (
+            "PC_",
+            "PCT_",
+            "PERC_",
+            "PERCENTUAL_",
+        )
+
+        termos = (
+            "PERCENTUAL",
+            "PERCENT",
+            "% DA BASE",
+            "%_BASE",
+            "TAXA",
+        )
+
+        return (
+            nome.startswith(prefixos)
+            or any(
+                termo in nome
+                for termo in termos
+            )
+        )
+
+    @staticmethod
+    def _parece_quantidade(nome_coluna):
+
+        nome = nome_coluna.upper()
+
+        prefixos = (
+            "QT_",
+            "QTD_",
+            "NR_",
+        )
+
+        termos = (
+            "QUANTIDADE",
+            "CLIENTES",
+            "CONTAGEM",
+            "COUNT",
+            "TOTAL_REGISTROS",
+            "TOTAL_CLIENTES",
+        )
+
+        return (
+            nome.startswith(prefixos)
+            or any(
+                termo in nome
+                for termo in termos
+            )
+        )
+
+    @staticmethod
+    def _parece_moeda(nome_coluna):
+
+        nome = nome_coluna.upper()
+
+        prefixos = (
+            "VL_",
+            "VALOR_",
+        )
+
+        termos = (
+            "RECEITA",
+            "DESPESA",
+            "SALDO",
+            "RENDA",
+            "FATURAMENTO",
+        )
+
+        return (
+            nome.startswith(prefixos)
+            or any(
+                termo in nome
+                for termo in termos
+            )
+        )
+
+    # ========================================================
+    # FORMATAÇÃO DE VALORES
+    # ========================================================
+
+    def _formatar_valor(
+        self,
+        valor,
+        nome_coluna,
+        tipo_spark,
+        formato=None,
+        casas_decimais=2,
+        percentual_fracao=False,
+    ):
+
+        if valor is None:
+            return ""
+
+        # ----------------------------------------------------
+        # FORMATO EXPLICITAMENTE DEFINIDO
+        # ----------------------------------------------------
+
+        if formato == "texto":
+
+            return self._escapar_markdown(valor)
+
+        if formato == "inteiro":
+
+            return self._formatar_inteiro(valor)
+
+        if formato == "decimal":
+
+            return self._formatar_decimal(
+                valor,
+                casas_decimais,
+            )
+
+        if formato == "percentual":
+
+            return self._formatar_percentual(
+                valor,
+                casas_decimais,
+                valor_em_fracao=False,
+            )
+
+        if formato == "percentual_fracao":
+
+            return self._formatar_percentual(
+                valor,
+                casas_decimais,
+                valor_em_fracao=True,
+            )
+
+        if formato == "moeda":
+
+            return self._formatar_moeda(
+                valor,
+                casas_decimais,
+            )
+
+        if formato == "data":
+
+            if hasattr(valor, "strftime"):
+
+                return valor.strftime(
+                    "%d/%m/%Y"
+                )
+
+            return self._escapar_markdown(valor)
+
+        if formato == "data_hora":
+
+            if hasattr(valor, "strftime"):
+
+                return valor.strftime(
+                    "%d/%m/%Y %H:%M:%S"
+                )
+
+            return self._escapar_markdown(valor)
+
+        if formato == "booleano":
+
+            return (
+                "Sim"
+                if bool(valor)
+                else "Não"
+            )
+
+        # ----------------------------------------------------
+        # DETECÇÃO PELO NOME DA COLUNA
+        # ----------------------------------------------------
+
+        if self._parece_percentual(
+            nome_coluna
+        ):
+
+            return self._formatar_percentual(
+                valor,
+                casas_decimais,
+                valor_em_fracao=percentual_fracao,
+            )
+
+        if self._parece_moeda(
+            nome_coluna
+        ):
+
+            return self._formatar_moeda(
+                valor,
+                casas_decimais,
+            )
+
+        if self._parece_quantidade(
+            nome_coluna
+        ):
+
+            return self._formatar_inteiro(
+                valor
+            )
+
+        # ----------------------------------------------------
+        # DETECÇÃO PELO TIPO SPARK
+        # ----------------------------------------------------
+
+        if isinstance(
+            tipo_spark,
+            (
+                ByteType,
+                ShortType,
+                IntegerType,
+                LongType,
+            ),
+        ):
+
+            return self._formatar_inteiro(
+                valor
+            )
+
+        if isinstance(
+            tipo_spark,
+            (
+                FloatType,
+                DoubleType,
+                DecimalType,
+            ),
+        ):
+
+            return self._formatar_decimal(
+                valor,
+                casas_decimais,
+            )
+
+        if isinstance(
+            tipo_spark,
+            DateType,
+        ):
+
+            return valor.strftime(
+                "%d/%m/%Y"
+            )
+
+        if isinstance(
+            tipo_spark,
+            TimestampType,
+        ):
+
+            return valor.strftime(
+                "%d/%m/%Y %H:%M:%S"
+            )
+
+        if isinstance(
+            tipo_spark,
+            BooleanType,
+        ):
+
+            return (
+                "Sim"
+                if valor
+                else "Não"
+            )
+
+        if isinstance(
+            valor,
+            datetime,
+        ):
+
+            return valor.strftime(
+                "%d/%m/%Y %H:%M:%S"
+            )
+
+        if isinstance(
+            valor,
+            date,
+        ):
+
+            return valor.strftime(
+                "%d/%m/%Y"
+            )
+
+        return self._escapar_markdown(
+            valor
+        )
+
+    # ========================================================
+    # PUBLICAÇÃO DA TABELA
+    # ========================================================
+
+    def publicar(
+        self,
+        nome,
+        dataframe,
+        colunas=None,
+        nomes_colunas=None,
+        formatos=None,
+        percentuais_fracao=None,
+        casas_decimais=2,
+        limite=100,
+        titulo=None,
+        subtitulo=None,
+        observacao=None,
+        ordenar_por=None,
+        crescente=True,
+    ):
+
+        """
+        Publica um DataFrame Spark como tabela Markdown.
+
+        Parâmetros
+        ----------
+        nome:
+            Nome utilizado para recuperar a tabela localmente.
+
+        dataframe:
+            DataFrame Spark que será publicado.
+
+        colunas:
+            Colunas que serão exibidas e sua ordem.
+            Quando None, utiliza todas as colunas.
+
+        nomes_colunas:
+            Dicionário para alterar os cabeçalhos.
+
+            Exemplo:
+            {
+                "QT_CLIENTES": "Clientes",
+                "PC_BASE": "% da base"
+            }
+
+        formatos:
+            Dicionário com o formato de cada coluna.
+
+            Formatos disponíveis:
+            - texto
+            - inteiro
+            - decimal
+            - percentual
+            - percentual_fracao
+            - moeda
+            - data
+            - data_hora
+            - booleano
+
+        percentuais_fracao:
+            Lista de colunas percentuais armazenadas
+            entre 0 e 1.
+
+        limite:
+            Número máximo de linhas transportadas
+            para o ambiente local.
+
+        titulo:
+            Título Markdown opcional.
+
+        subtitulo:
+            Texto opcional abaixo do título.
+
+        observacao:
+            Nota opcional exibida após a tabela.
+
+        ordenar_por:
+            Coluna ou lista de colunas para ordenação.
+        """
+
+        if colunas is None:
+
+            colunas = dataframe.columns
+
+        if nomes_colunas is None:
+
+            nomes_colunas = {}
+
+        if formatos is None:
+
+            formatos = {}
+
+        if percentuais_fracao is None:
+
+            percentuais_fracao = []
+
+        df_publicacao = dataframe
+
+        # ----------------------------------------------------
+        # ORDENAÇÃO
+        # ----------------------------------------------------
+
+        if ordenar_por is not None:
+
+            if isinstance(
+                ordenar_por,
+                str,
+            ):
+
+                ordenar_por = [
+                    ordenar_por
+                ]
+
+            expressoes_ordenacao = []
+
+            for coluna in ordenar_por:
+
+                if crescente:
+
+                    expressoes_ordenacao.append(
+                        F.col(coluna).asc()
+                    )
+
+                else:
+
+                    expressoes_ordenacao.append(
+                        F.col(coluna).desc()
+                    )
+
+            df_publicacao = (
+                df_publicacao
+                .orderBy(
+                    *expressoes_ordenacao
+                )
+            )
+
+        # ----------------------------------------------------
+        # VALIDAÇÃO DAS COLUNAS
+        # ----------------------------------------------------
+
+        colunas_inexistentes = [
+            coluna
+            for coluna in colunas
+            if coluna
+            not in dataframe.columns
+        ]
+
+        if colunas_inexistentes:
+
+            raise ValueError(
+                "Colunas não encontradas no DataFrame: "
+                + ", ".join(
+                    colunas_inexistentes
+                )
+            )
+
+        # ----------------------------------------------------
+        # TIPOS SPARK
+        # ----------------------------------------------------
+
+        tipos = {
+            campo.name: campo.dataType
+            for campo
+            in dataframe.schema.fields
+        }
+
+        # ----------------------------------------------------
+        # COLETA LIMITADA
+        # ----------------------------------------------------
+
+        registros = (
+            df_publicacao
+            .select(
+                *colunas
+            )
+            .limit(
+                limite + 1
+            )
+            .collect()
+        )
+
+        truncada = (
+            len(registros)
+            > limite
+        )
+
+        registros = (
+            registros[:limite]
+        )
+
+        # ----------------------------------------------------
+        # CABEÇALHO
+        # ----------------------------------------------------
+
+        cabecalhos = [
+            nomes_colunas.get(
+                coluna,
+                coluna,
+            )
+            for coluna in colunas
+        ]
+
+        cabecalho_markdown = (
+            "| "
+            + " | ".join(
+                cabecalhos
+            )
+            + " |"
+        )
+
+        # ----------------------------------------------------
+        # ALINHAMENTO
+        # ----------------------------------------------------
+
+        alinhamentos = []
+
+        for coluna in colunas:
+
+            tipo = tipos[coluna]
+
+            formato = formatos.get(
+                coluna
+            )
+
+            coluna_numerica = isinstance(
+                tipo,
+                (
+                    ByteType,
+                    ShortType,
+                    IntegerType,
+                    LongType,
+                    FloatType,
+                    DoubleType,
+                    DecimalType,
+                ),
+            )
+
+            formato_numerico = formato in (
+                "inteiro",
+                "decimal",
+                "percentual",
+                "percentual_fracao",
+                "moeda",
+            )
+
+            if (
+                coluna_numerica
+                or formato_numerico
+            ):
+
+                alinhamentos.append(
+                    "---:"
+                )
+
+            else:
+
+                alinhamentos.append(
+                    "---"
+                )
+
+        separador_markdown = (
+            "| "
+            + " | ".join(
+                alinhamentos
+            )
+            + " |"
+        )
+
+        # ----------------------------------------------------
+        # LINHAS
+        # ----------------------------------------------------
+
+        linhas_markdown = []
+
+        for registro in registros:
+
+            valores = []
+
+            for coluna in colunas:
+
+                valor_formatado = (
+                    self._formatar_valor(
+                        valor=registro[coluna],
+                        nome_coluna=coluna,
+                        tipo_spark=tipos[coluna],
+                        formato=formatos.get(
+                            coluna
+                        ),
+                        casas_decimais=(
+                            casas_decimais
+                        ),
+                        percentual_fracao=(
+                            coluna
+                            in percentuais_fracao
+                        ),
+                    )
+                )
+
+                valores.append(
+                    valor_formatado
+                )
+
+            linha_markdown = (
+                "| "
+                + " | ".join(
+                    valores
+                )
+                + " |"
+            )
+
+            linhas_markdown.append(
+                linha_markdown
+            )
+
+        # ----------------------------------------------------
+        # DOCUMENTO MARKDOWN
+        # ----------------------------------------------------
+
+        partes = []
+
+        if titulo:
+
+            partes.extend([
+                f"### {titulo}",
+                "",
+            ])
+
+        if subtitulo:
+
+            partes.extend([
+                subtitulo,
+                "",
+            ])
+
+        partes.extend([
+            cabecalho_markdown,
+            separador_markdown,
+            *linhas_markdown,
+        ])
+
+        if truncada:
+
+            partes.extend([
+                "",
+                (
+                    f"*Exibição limitada às primeiras "
+                    f"{limite} linhas.*"
+                ),
+            ])
+
+        if observacao:
+
+            partes.extend([
+                "",
+                f"*{observacao}*",
+            ])
+
+        markdown = "\n".join(
+            partes
+        )
+
+        self.itens[nome] = markdown
+
+        print(
+            f"✅ Tabela publicada: {nome}"
+        )
+
+        print(
+            f"📋 Linhas publicadas: "
+            f"{len(registros)}"
+        )
+
+        if truncada:
+
+            print(
+                f"⚠️ Resultado limitado "
+                f"a {limite} linhas"
+            )
+
+    # ========================================================
+    # OUTROS MÉTODOS
+    # ========================================================
+
+    def remover(
+        self,
+        nome,
+    ):
+
+        if nome in self.itens:
+
+            del self.itens[nome]
+
+            print(
+                f"🗑️ Tabela removida: "
+                f"{nome}"
+            )
+
+        else:
+
+            print(
+                f"⚠️ Tabela não encontrada: "
+                f"{nome}"
+            )
+
+    def listar(self):
+
+        nomes = sorted(
+            self.itens.keys()
+        )
+
+        print(
+            "\n"
+            + "=" * 100
+        )
+
+        print(
+            "TABELAS MARKDOWN"
+        )
+
+        print(
+            "=" * 100
+        )
+
+        if not nomes:
+
+            print(
+                "⚠️ Nenhuma tabela publicada"
+            )
+
+            return
+
+        for i, nome in enumerate(
+            nomes,
+            start=1,
+        ):
+
+            print(
+                f"{i:02d} -> {nome}"
+            )
+
+        print(
+            "\n"
+            + "=" * 100
+        )
+
+        print(
+            "COPIE PARA O NOTEBOOK LOCAL"
+        )
+
+        print(
+            "=" * 100
+        )
+
+        print(
+            f"exibir_tabela_spark({nomes!r})"
+        )
+
+    def limpar(self):
+
+        quantidade = len(
+            self.itens
+        )
+
+        self.itens.clear()
+
+        print(
+            f"🗑️ {quantidade} "
+            f"tabela(s) removida(s)"
+        )
+
+
+# ============================================================
+# INSTÂNCIA GLOBAL
+# ============================================================
+
+if "tabelas_markdown" not in globals():
+
+    tabelas_markdown = (
+        TabelasMarkdown()
+    )
+
+    print(
+        "🚀 Repositório de tabelas "
+        "Markdown criado"
+    )
+
+
+# ============================================================
+# FUNÇÕES DE ATALHO
+# ============================================================
+
+def publicar_tabela(
+    nome,
+    dataframe,
+    **kwargs,
+):
+
+    tabelas_markdown.publicar(
+        nome=nome,
+        dataframe=dataframe,
+        **kwargs,
+    )
+
+
+def listar_tabelas_spark():
+
+    tabelas_markdown.listar()
+
+
+def remover_tabela_spark(
+    nome,
+):
+
+    tabelas_markdown.remover(
+        nome
+    )
+
+
+def limpar_tabelas_spark():
+
+    tabelas_markdown.limpar()
+
+
+----------------------------------------------------------------------
+
+
+from IPython.display import (
+    Markdown,
+    display,
+)
+
+
+# ============================================================
+# EXIBIR TABELAS PUBLICADAS NO SPARK
+# ============================================================
+
+def exibir_tabela_spark(
+    nomes,
+    sessao=None,
+    mostrar_cabecalho=True,
+):
+
+    """
+    Exibe uma ou várias tabelas Markdown
+    publicadas no ambiente Spark.
+
+    Parâmetros
+    ----------
+    nomes:
+        Nome da tabela ou lista de nomes.
+
+    sessao:
+        Sessão utilizada para acessar
+        o ambiente Spark.
+
+    mostrar_cabecalho:
+        Exibe o nome da tabela antes
+        do Markdown.
+    """
+
+    if sessao is None:
+
+        sessao = (
+            gerenciador_spark.spark
+        )
+
+    if isinstance(
+        nomes,
+        str,
+    ):
+
+        nomes = [nomes]
+
+    catalogo = (
+        sessao.get_from_spark(
+            "tabelas_markdown.itens"
+        )
+    )
+
+    if catalogo is None:
+
+        print(
+            "⚠️ O catálogo de tabelas "
+            "não foi encontrado no Spark"
+        )
+
+        return
+
+    for i, nome in enumerate(
+        nomes,
+        start=1,
+    ):
+
+        if mostrar_cabecalho:
+
+            print(
+                "\n"
+                + "=" * 100
+            )
+
+            print(
+                f"📋 {i:02d} | {nome}"
+            )
+
+            print(
+                "=" * 100
+            )
+
+        if nome not in catalogo:
+
+            print(
+                f"⚠️ Tabela não encontrada: "
+                f"{nome}"
+            )
+
+            continue
+
+        markdown = catalogo[nome]
+
+        display(
+            Markdown(
+                markdown
+            )
+        )
+
+
+# ============================================================
+# LISTAR TABELAS DISPONÍVEIS
+# ============================================================
+
+def listar_tabelas_locais(
+    sessao=None,
+):
+
+    if sessao is None:
+
+        sessao = (
+            gerenciador_spark.spark
+        )
+
+    catalogo = (
+        sessao.get_from_spark(
+            "tabelas_markdown.itens"
+        )
+    )
+
+    if not catalogo:
+
+        print(
+            "⚠️ Nenhuma tabela disponível"
+        )
+
+        return []
+
+    nomes = sorted(
+        catalogo.keys()
+    )
+
+    print(
+        "\n"
+        + "=" * 100
+    )
+
+    print(
+        "TABELAS DISPONÍVEIS"
+    )
+
+    print(
+        "=" * 100
+    )
+
+    for i, nome in enumerate(
+        nomes,
+        start=1,
+    ):
+
+        print(
+            f"{i:02d} -> {nome}"
+        )
+
+    return nomes
+
+
+# ============================================================
+# OBTER O MARKDOWN SEM EXIBIR
+# ============================================================
+
+def obter_tabela_markdown_spark(
+    nome,
+    sessao=None,
+):
+
+    if sessao is None:
+
+        sessao = (
+            gerenciador_spark.spark
+        )
+
+    catalogo = (
+        sessao.get_from_spark(
+            "tabelas_markdown.itens"
+        )
+    )
+
+    if not catalogo:
+
+        raise ValueError(
+            "O catálogo de tabelas "
+            "não foi encontrado."
+        )
+
+    if nome not in catalogo:
+
+        raise KeyError(
+            f"Tabela não encontrada: {nome}"
+        )
+
+    return catalogo[nome]
+
+
+
+------------------------------------------------------------------------
+
+%%spark
+
+from pyspark.sql import functions as F
+from pyspark.sql.types import (
+    StructType,
+    StructField,
+    IntegerType,
+    StringType,
+    LongType,
+    DoubleType,
+)
+
+
+# ============================================================
+# CONFIGURAÇÃO
+# ============================================================
+
+TABELA = (
+    "sbx_t2i2016."
+    "v1_ana_edu_fin_cli"
+)
+
+
+# ============================================================
+# LEITURA DA BASE
+# ============================================================
+
+df_origem = spark.table(
+    TABELA
+)
+
+
+# ============================================================
+# SELEÇÃO DA EXECUÇÃO MAIS RECENTE
+# ============================================================
+
+dt_exea_max = (
+    df_origem
+    .agg(
+        F.max(
+            "DT_EXEA"
+        ).alias(
+            "DT_EXEA_MAX"
+        )
+    )
+    .first()[
+        "DT_EXEA_MAX"
+    ]
+)
+
+
+df = (
+    df_origem
+    .filter(
+        F.col("DT_EXEA")
+        == F.lit(dt_exea_max)
+    )
+    .dropDuplicates([
+        "CD_CLI"
+    ])
+    .cache()
+)
+
+
+# ============================================================
+# INDICADORES EM UMA ÚNICA AGREGAÇÃO
+# ============================================================
+
+resumo = (
+    df
+    .agg(
+        F.count(
+            "*"
+        ).alias(
+            "TOTAL_CLIENTES"
+        ),
+
+        F.sum(
+            F.when(
+                F.upper(
+                    F.trim(
+                        F.col("NM_PRFL")
+                    )
+                )
+                == "A CLASSIFICAR",
+                1,
+            ).otherwise(0)
+        ).alias(
+            "NM_PRFL_A_CLASSIFICAR"
+        ),
+
+        F.sum(
+            F.when(
+                F.upper(
+                    F.trim(
+                        F.col(
+                            "NM_MAC_PRFL_CLI"
+                        )
+                    )
+                )
+                == "A CLASSIFICAR",
+                1,
+            ).otherwise(0)
+        ).alias(
+            "NM_MAC_PRFL_A_CLASSIFICAR"
+        ),
+
+        F.sum(
+            F.when(
+                F.upper(
+                    F.trim(
+                        F.col(
+                            "FL_TEM_MOV_AGRO"
+                        )
+                    )
+                )
+                == "S",
+                1,
+            ).otherwise(0)
+        ).alias(
+            "AGRO_SIM"
+        ),
+
+        F.sum(
+            F.when(
+                F.col(
+                    "QT_TRANS_ENT"
+                )
+                == 0,
+                1,
+            ).otherwise(0)
+        ).alias(
+            "ENTRADA_ZERO"
+        ),
+
+        F.sum(
+            F.when(
+                F.col(
+                    "QT_TRANS_SAI"
+                )
+                == 0,
+                1,
+            ).otherwise(0)
+        ).alias(
+            "SAIDA_ZERO"
+        ),
+
+        F.sum(
+            F.when(
+                F.upper(
+                    F.trim(
+                        F.col(
+                            "FL_PARTICIPA_RADAR"
+                        )
+                    )
+                )
+                == "S",
+                1,
+            ).otherwise(0)
+        ).alias(
+            "RADAR_SIM"
+        ),
+    )
+    .first()
+)
+
+
+# ============================================================
+# VARIÁVEIS
+# ============================================================
+
+total_clientes = int(
+    resumo[
+        "TOTAL_CLIENTES"
+    ]
+)
+
+
+nm_prfl_a_classificar = int(
+    resumo[
+        "NM_PRFL_A_CLASSIFICAR"
+    ]
+)
+
+nm_prfl_com_perfil = (
+    total_clientes
+    - nm_prfl_a_classificar
+)
+
+
+macro_a_classificar = int(
+    resumo[
+        "NM_MAC_PRFL_A_CLASSIFICAR"
+    ]
+)
+
+macro_com_perfil = (
+    total_clientes
+    - macro_a_classificar
+)
+
+
+agro_sim = int(
+    resumo[
+        "AGRO_SIM"
+    ]
+)
+
+agro_nao = (
+    total_clientes
+    - agro_sim
+)
+
+
+entrada_zero = int(
+    resumo[
+        "ENTRADA_ZERO"
+    ]
+)
+
+entrada_maior_zero = (
+    total_clientes
+    - entrada_zero
+)
+
+
+saida_zero = int(
+    resumo[
+        "SAIDA_ZERO"
+    ]
+)
+
+saida_maior_zero = (
+    total_clientes
+    - saida_zero
+)
+
+
+radar_sim = int(
+    resumo[
+        "RADAR_SIM"
+    ]
+)
+
+radar_nao = (
+    total_clientes
+    - radar_sim
+)
+
+
+# ============================================================
+# FUNÇÃO DE PERCENTUAL
+# ============================================================
+
+def calcular_percentual(
+    quantidade,
+):
+
+    if total_clientes == 0:
+
+        return 0.0
+
+    return round(
+        (
+            quantidade
+            / total_clientes
+        )
+        * 100,
+        2,
+    )
+
+
+# ============================================================
+# DADOS DA TABELA
+# ============================================================
+
+dados = [
+    (
+        1,
+        "Base analisada",
+        "Clientes únicos",
+        "Total",
+        total_clientes,
+        calcular_percentual(
+            total_clientes
+        ),
+    ),
+    (
+        2,
+        "Perfil de renda",
+        "NM_PRFL",
+        "Com perfil",
+        nm_prfl_com_perfil,
+        calcular_percentual(
+            nm_prfl_com_perfil
+        ),
+    ),
+    (
+        3,
+        "Perfil de renda",
+        "NM_PRFL",
+        "A CLASSIFICAR",
+        nm_prfl_a_classificar,
+        calcular_percentual(
+            nm_prfl_a_classificar
+        ),
+    ),
+    (
+        4,
+        "Macroperfil",
+        "NM_MAC_PRFL_CLI",
+        "Com perfil",
+        macro_com_perfil,
+        calcular_percentual(
+            macro_com_perfil
+        ),
+    ),
+    (
+        5,
+        "Macroperfil",
+        "NM_MAC_PRFL_CLI",
+        "A CLASSIFICAR",
+        macro_a_classificar,
+        calcular_percentual(
+            macro_a_classificar
+        ),
+    ),
+    (
+        6,
+        "Movimentação Agro",
+        "FL_TEM_MOV_AGRO",
+        "Não possui",
+        agro_nao,
+        calcular_percentual(
+            agro_nao
+        ),
+    ),
+    (
+        7,
+        "Movimentação Agro",
+        "FL_TEM_MOV_AGRO",
+        "Possui",
+        agro_sim,
+        calcular_percentual(
+            agro_sim
+        ),
+    ),
+    (
+        8,
+        "Transações de entrada",
+        "QT_TRANS_ENT",
+        "Maior que zero",
+        entrada_maior_zero,
+        calcular_percentual(
+            entrada_maior_zero
+        ),
+    ),
+    (
+        9,
+        "Transações de entrada",
+        "QT_TRANS_ENT",
+        "Igual a zero",
+        entrada_zero,
+        calcular_percentual(
+            entrada_zero
+        ),
+    ),
+    (
+        10,
+        "Transações de saída",
+        "QT_TRANS_SAI",
+        "Maior que zero",
+        saida_maior_zero,
+        calcular_percentual(
+            saida_maior_zero
+        ),
+    ),
+    (
+        11,
+        "Transações de saída",
+        "QT_TRANS_SAI",
+        "Igual a zero",
+        saida_zero,
+        calcular_percentual(
+            saida_zero
+        ),
+    ),
+    (
+        12,
+        "Resultado do Radar",
+        "FL_PARTICIPA_RADAR",
+        "Participa",
+        radar_sim,
+        calcular_percentual(
+            radar_sim
+        ),
+    ),
+    (
+        13,
+        "Resultado do Radar",
+        "FL_PARTICIPA_RADAR",
+        "Não participa",
+        radar_nao,
+        calcular_percentual(
+            radar_nao
+        ),
+    ),
+]
+
+
+# ============================================================
+# SCHEMA
+# ============================================================
+
+schema = StructType([
+    StructField(
+        "ORDEM",
+        IntegerType(),
+        False,
+    ),
+    StructField(
+        "TEMA",
+        StringType(),
+        False,
+    ),
+    StructField(
+        "INDICADOR",
+        StringType(),
+        False,
+    ),
+    StructField(
+        "SITUACAO",
+        StringType(),
+        False,
+    ),
+    StructField(
+        "CLIENTES",
+        LongType(),
+        False,
+    ),
+    StructField(
+        "PC_BASE",
+        DoubleType(),
+        False,
+    ),
+])
+
+
+# ============================================================
+# DATAFRAME FINAL
+# ============================================================
+
+tb_visao_geral_radar = (
+    spark
+    .createDataFrame(
+        dados,
+        schema,
+    )
+    .orderBy(
+        "ORDEM"
+    )
+)
+
+
+# ============================================================
+# VIEW TEMPORÁRIA
+# ============================================================
+
+tb_visao_geral_radar \
+    .createOrReplaceTempView(
+        "VW_VISAO_GERAL_PUBLICO_RADAR"
+    )
+
+
+# ============================================================
+# PUBLICAÇÃO EM MARKDOWN
+# ============================================================
+
+publicar_tabela(
+    nome=(
+        "SLIDE_01_"
+        "VISAO_GERAL_RADAR"
+    ),
+
+    dataframe=(
+        tb_visao_geral_radar
+    ),
+
+    colunas=[
+        "TEMA",
+        "INDICADOR",
+        "SITUACAO",
+        "CLIENTES",
+        "PC_BASE",
+    ],
+
+    nomes_colunas={
+        "TEMA": "Tema",
+        "INDICADOR": "Indicador",
+        "SITUACAO": "Situação",
+        "CLIENTES": "Clientes",
+        "PC_BASE": "% da base",
+    },
+
+    formatos={
+        "TEMA": "texto",
+        "INDICADOR": "texto",
+        "SITUACAO": "texto",
+        "CLIENTES": "inteiro",
+        "PC_BASE": "percentual",
+    },
+
+    titulo=(
+        "Visão geral do "
+        "público analisado"
+    ),
+
+    subtitulo=(
+        "Resumo dos principais critérios "
+        "relacionados à participação "
+        "no Radar."
+    ),
+
+    observacao=(
+        "A classificação de perfil considera "
+        "como não classificado apenas o valor "
+        "A CLASSIFICAR."
+    ),
+
+    ordenar_por="ORDEM",
+
+    limite=50,
+)
+
+
+# ============================================================
+# EXIBIÇÃO NO SPARK
+# ============================================================
+
+print(
+    "\n"
+    + "=" * 120
+)
+
+print(
+    "SLIDE 1 — VISÃO GERAL "
+    "DO PÚBLICO ANALISADO"
+)
+
+print(
+    f"Execução considerada: "
+    f"{dt_exea_max}"
+)
+
+print(
+    "=" * 120
+)
+
+
+tb_visao_geral_radar \
+    .select(
+        "TEMA",
+        "INDICADOR",
+        "SITUACAO",
+        "CLIENTES",
+        "PC_BASE",
+    ) \
+    .show(
+        50,
+        truncate=False,
+    )
+
+
+print(
+    "\n✅ View criada: "
+    "VW_VISAO_GERAL_PUBLICO_RADAR"
+)
+
+print(
+    "✅ Markdown criado: "
+    "SLIDE_01_VISAO_GERAL_RADAR"
+)
