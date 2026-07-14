@@ -1,0 +1,1413 @@
+%%spark
+
+# ============================================================
+# REPOSITÓRIO DE TABELAS HTML
+# ============================================================
+
+class TabelasHTML:
+
+    def __init__(self):
+        self.itens = {}
+
+    def publicar(
+        self,
+        nome,
+        html,
+    ):
+
+        if not isinstance(html, str):
+            raise TypeError(
+                "O conteúdo da tabela deve ser uma string HTML."
+            )
+
+        if not html.strip():
+            raise ValueError(
+                "O conteúdo HTML está vazio."
+            )
+
+        self.itens[nome] = html
+
+        print(
+            f"✅ Tabela HTML publicada: {nome}"
+        )
+
+        print(
+            f"📦 Tamanho: {len(html):,} caracteres"
+        )
+
+    def remover(
+        self,
+        nome,
+    ):
+
+        if nome not in self.itens:
+            print(
+                f"⚠️ Tabela não encontrada: {nome}"
+            )
+            return
+
+        del self.itens[nome]
+
+        print(
+            f"🗑️ Tabela removida: {nome}"
+        )
+
+    def listar(self):
+
+        nomes = sorted(
+            self.itens.keys()
+        )
+
+        print("\n" + "=" * 100)
+        print("TABELAS HTML")
+        print("=" * 100)
+
+        if not nomes:
+            print(
+                "⚠️ Nenhuma tabela publicada"
+            )
+            return
+
+        for i, nome in enumerate(
+            nomes,
+            start=1,
+        ):
+            print(
+                f"{i:02d} -> {nome}"
+            )
+
+        print("\n" + "=" * 100)
+        print("COMANDO PARA O NOTEBOOK LOCAL")
+        print("=" * 100)
+
+        print(
+            f"exibir_tabela_html_spark({nomes!r})"
+        )
+
+    def limpar(self):
+
+        quantidade = len(
+            self.itens
+        )
+
+        self.itens.clear()
+
+        print(
+            f"🗑️ {quantidade} tabela(s) removida(s)"
+        )
+
+
+# ============================================================
+# INSTÂNCIA GLOBAL
+# ============================================================
+
+if "tabelas_html" not in globals():
+
+    tabelas_html = TabelasHTML()
+
+    print(
+        "🚀 Repositório de tabelas HTML criado"
+    )
+
+
+# ============================================================
+# FUNÇÕES DE ATALHO
+# ============================================================
+
+def publicar_tabela_html(
+    nome,
+    html,
+):
+
+    tabelas_html.publicar(
+        nome=nome,
+        html=html,
+    )
+
+
+def listar_tabelas_html_spark():
+
+    tabelas_html.listar()
+
+
+def remover_tabela_html_spark(
+    nome,
+):
+
+    tabelas_html.remover(
+        nome
+    )
+
+
+def limpar_tabelas_html_spark():
+
+    tabelas_html.limpar()
+
+
+
+
+
+
+-----------------------
+
+
+
+
+
+%%spark
+
+from html import escape
+
+from pyspark.sql import functions as F
+from pyspark.sql.types import (
+    StructType,
+    StructField,
+    IntegerType,
+    StringType,
+    LongType,
+    DoubleType,
+)
+
+
+# ============================================================
+# CONFIGURAÇÃO
+# ============================================================
+
+TABELA = (
+    "sbx_t2i2016."
+    "v1_ana_edu_fin_cli"
+)
+
+NOME_PUBLICACAO = (
+    "SLIDE_01_VISAO_GERAL_RADAR"
+)
+
+
+# ============================================================
+# FUNÇÕES DE FORMATAÇÃO BRASILEIRA
+# ============================================================
+
+def formatar_inteiro_br(
+    valor,
+):
+
+    if valor is None:
+        return "-"
+
+    return (
+        f"{int(valor):,}"
+        .replace(",", ".")
+    )
+
+
+def formatar_decimal_br(
+    valor,
+    casas=2,
+):
+
+    if valor is None:
+        return "-"
+
+    texto = (
+        f"{float(valor):,.{casas}f}"
+    )
+
+    return (
+        texto
+        .replace(",", "__MILHAR__")
+        .replace(".", ",")
+        .replace("__MILHAR__", ".")
+    )
+
+
+def formatar_percentual_br(
+    valor,
+    casas=2,
+):
+
+    if valor is None:
+        return "-"
+
+    return (
+        formatar_decimal_br(
+            valor,
+            casas,
+        )
+        + "%"
+    )
+
+
+def calcular_percentual(
+    quantidade,
+    total,
+):
+
+    if not total:
+        return 0.0
+
+    return round(
+        quantidade
+        / total
+        * 100,
+        2,
+    )
+
+
+# ============================================================
+# LEITURA DA BASE
+# ============================================================
+
+df_origem = spark.table(
+    TABELA
+)
+
+
+# ============================================================
+# EXECUÇÃO MAIS RECENTE
+# ============================================================
+
+dt_exea_max = (
+    df_origem
+    .agg(
+        F.max(
+            "DT_EXEA"
+        ).alias(
+            "DT_EXEA_MAX"
+        )
+    )
+    .first()[
+        "DT_EXEA_MAX"
+    ]
+)
+
+
+df = (
+    df_origem
+    .filter(
+        F.col("DT_EXEA")
+        == F.lit(dt_exea_max)
+    )
+    .dropDuplicates([
+        "CD_CLI"
+    ])
+    .cache()
+)
+
+
+# ============================================================
+# AGREGAÇÃO DOS INDICADORES
+# ============================================================
+
+resumo = (
+    df
+    .agg(
+        F.count(
+            "*"
+        ).alias(
+            "TOTAL_CLIENTES"
+        ),
+
+        F.min(
+            "DT_REF_INI"
+        ).alias(
+            "DT_REF_INI"
+        ),
+
+        F.max(
+            "DT_REF_FIM"
+        ).alias(
+            "DT_REF_FIM"
+        ),
+
+        F.sum(
+            F.when(
+                F.upper(
+                    F.trim(
+                        F.col("NM_PRFL")
+                    )
+                )
+                == "A CLASSIFICAR",
+                1,
+            ).otherwise(0)
+        ).alias(
+            "PRFL_A_CLASSIFICAR"
+        ),
+
+        F.sum(
+            F.when(
+                F.upper(
+                    F.trim(
+                        F.col(
+                            "NM_MAC_PRFL_CLI"
+                        )
+                    )
+                )
+                == "A CLASSIFICAR",
+                1,
+            ).otherwise(0)
+        ).alias(
+            "MACRO_A_CLASSIFICAR"
+        ),
+
+        F.sum(
+            F.when(
+                F.upper(
+                    F.trim(
+                        F.col(
+                            "FL_TEM_MOV_AGRO"
+                        )
+                    )
+                )
+                == "S",
+                1,
+            ).otherwise(0)
+        ).alias(
+            "AGRO_SIM"
+        ),
+
+        F.sum(
+            F.when(
+                F.col(
+                    "QT_TRANS_ENT"
+                )
+                == 0,
+                1,
+            ).otherwise(0)
+        ).alias(
+            "ENTRADA_ZERO"
+        ),
+
+        F.sum(
+            F.when(
+                F.col(
+                    "QT_TRANS_SAI"
+                )
+                == 0,
+                1,
+            ).otherwise(0)
+        ).alias(
+            "SAIDA_ZERO"
+        ),
+
+        F.sum(
+            F.when(
+                F.upper(
+                    F.trim(
+                        F.col(
+                            "FL_PARTICIPA_RADAR"
+                        )
+                    )
+                )
+                == "S",
+                1,
+            ).otherwise(0)
+        ).alias(
+            "RADAR_SIM"
+        ),
+    )
+    .first()
+)
+
+
+# ============================================================
+# VARIÁVEIS CALCULADAS
+# ============================================================
+
+total_clientes = int(
+    resumo["TOTAL_CLIENTES"]
+)
+
+dt_ref_ini = resumo[
+    "DT_REF_INI"
+]
+
+dt_ref_fim = resumo[
+    "DT_REF_FIM"
+]
+
+
+prfl_a_classificar = int(
+    resumo["PRFL_A_CLASSIFICAR"]
+)
+
+prfl_com_perfil = (
+    total_clientes
+    - prfl_a_classificar
+)
+
+
+macro_a_classificar = int(
+    resumo["MACRO_A_CLASSIFICAR"]
+)
+
+macro_com_perfil = (
+    total_clientes
+    - macro_a_classificar
+)
+
+
+agro_sim = int(
+    resumo["AGRO_SIM"]
+)
+
+agro_nao = (
+    total_clientes
+    - agro_sim
+)
+
+
+entrada_zero = int(
+    resumo["ENTRADA_ZERO"]
+)
+
+entrada_maior_zero = (
+    total_clientes
+    - entrada_zero
+)
+
+
+saida_zero = int(
+    resumo["SAIDA_ZERO"]
+)
+
+saida_maior_zero = (
+    total_clientes
+    - saida_zero
+)
+
+
+radar_sim = int(
+    resumo["RADAR_SIM"]
+)
+
+radar_nao = (
+    total_clientes
+    - radar_sim
+)
+
+
+# ============================================================
+# PERÍODO
+# ============================================================
+
+if (
+    dt_ref_ini is not None
+    and dt_ref_fim is not None
+):
+
+    quantidade_dias = (
+        dt_ref_fim
+        - dt_ref_ini
+    ).days + 1
+
+    periodo_formatado = (
+        f"{dt_ref_ini.strftime('%d/%m/%Y')}"
+        f" a "
+        f"{dt_ref_fim.strftime('%d/%m/%Y')}"
+    )
+
+else:
+
+    quantidade_dias = None
+    periodo_formatado = "-"
+
+
+# ============================================================
+# DADOS DA TABELA EXECUTIVA
+# ============================================================
+
+dados = [
+    (
+        1,
+        "Perfil de renda",
+        "Com perfil",
+        prfl_com_perfil,
+        calcular_percentual(
+            prfl_com_perfil,
+            total_clientes,
+        ),
+        "A classificar",
+        prfl_a_classificar,
+        calcular_percentual(
+            prfl_a_classificar,
+            total_clientes,
+        ),
+    ),
+    (
+        2,
+        "Macroperfil",
+        "Com perfil",
+        macro_com_perfil,
+        calcular_percentual(
+            macro_com_perfil,
+            total_clientes,
+        ),
+        "A classificar",
+        macro_a_classificar,
+        calcular_percentual(
+            macro_a_classificar,
+            total_clientes,
+        ),
+    ),
+    (
+        3,
+        "Movimentação Agro",
+        "Não possui",
+        agro_nao,
+        calcular_percentual(
+            agro_nao,
+            total_clientes,
+        ),
+        "Possui",
+        agro_sim,
+        calcular_percentual(
+            agro_sim,
+            total_clientes,
+        ),
+    ),
+    (
+        4,
+        "Transações de entrada",
+        "Maior que zero",
+        entrada_maior_zero,
+        calcular_percentual(
+            entrada_maior_zero,
+            total_clientes,
+        ),
+        "Igual a zero",
+        entrada_zero,
+        calcular_percentual(
+            entrada_zero,
+            total_clientes,
+        ),
+    ),
+    (
+        5,
+        "Transações de saída",
+        "Maior que zero",
+        saida_maior_zero,
+        calcular_percentual(
+            saida_maior_zero,
+            total_clientes,
+        ),
+        "Igual a zero",
+        saida_zero,
+        calcular_percentual(
+            saida_zero,
+            total_clientes,
+        ),
+    ),
+]
+
+
+# ============================================================
+# DATAFRAME ANALÍTICO
+# ============================================================
+
+schema = StructType([
+    StructField(
+        "ORDEM",
+        IntegerType(),
+        False,
+    ),
+    StructField(
+        "INDICADOR",
+        StringType(),
+        False,
+    ),
+    StructField(
+        "CONDICAO_ADEQUADA",
+        StringType(),
+        False,
+    ),
+    StructField(
+        "CLIENTES_ADEQUADA",
+        LongType(),
+        False,
+    ),
+    StructField(
+        "PC_ADEQUADA",
+        DoubleType(),
+        False,
+    ),
+    StructField(
+        "PONTO_ATENCAO",
+        StringType(),
+        False,
+    ),
+    StructField(
+        "CLIENTES_ATENCAO",
+        LongType(),
+        False,
+    ),
+    StructField(
+        "PC_ATENCAO",
+        DoubleType(),
+        False,
+    ),
+])
+
+
+tb_slide_01_visao_geral = (
+    spark
+    .createDataFrame(
+        dados,
+        schema,
+    )
+    .orderBy(
+        "ORDEM"
+    )
+)
+
+
+tb_slide_01_visao_geral \
+    .createOrReplaceTempView(
+        "VW_SLIDE_01_VISAO_GERAL_RADAR"
+    )
+
+
+# ============================================================
+# LINHAS HTML
+# ============================================================
+
+linhas_html = []
+
+for linha in (
+    tb_slide_01_visao_geral
+    .orderBy("ORDEM")
+    .collect()
+):
+
+    linhas_html.append(
+        f"""
+        <tr>
+            <td class="radar-indicador">
+                {escape(linha["INDICADOR"])}
+            </td>
+
+            <td class="radar-condicao-adequada">
+                {escape(linha["CONDICAO_ADEQUADA"])}
+            </td>
+
+            <td class="radar-numero radar-adequada">
+                {formatar_inteiro_br(linha["CLIENTES_ADEQUADA"])}
+            </td>
+
+            <td class="radar-numero radar-adequada">
+                {formatar_percentual_br(linha["PC_ADEQUADA"])}
+            </td>
+
+            <td class="radar-condicao-atencao">
+                {escape(linha["PONTO_ATENCAO"])}
+            </td>
+
+            <td class="radar-numero radar-atencao">
+                {formatar_inteiro_br(linha["CLIENTES_ATENCAO"])}
+            </td>
+
+            <td class="radar-numero radar-atencao">
+                {formatar_percentual_br(linha["PC_ATENCAO"])}
+            </td>
+        </tr>
+        """
+    )
+
+
+linhas_html = "\n".join(
+    linhas_html
+)
+
+
+# ============================================================
+# CSS
+# ============================================================
+
+css = """
+<style>
+
+.radar-slide {
+    width: 100%;
+    max-width: 1180px;
+    box-sizing: border-box;
+    margin: 18px auto;
+    padding: 30px 34px;
+    border: 1px solid #dfe4ea;
+    border-radius: 18px;
+    background: #ffffff;
+    color: #17202a;
+    font-family:
+        -apple-system,
+        BlinkMacSystemFont,
+        "Segoe UI",
+        Arial,
+        sans-serif;
+    box-shadow:
+        0 12px 32px
+        rgba(22, 34, 51, 0.10);
+}
+
+.radar-titulo {
+    margin: 0;
+    font-size: 29px;
+    line-height: 1.2;
+    font-weight: 750;
+    color: #14213d;
+}
+
+.radar-subtitulo {
+    margin: 8px 0 22px 0;
+    font-size: 15px;
+    line-height: 1.5;
+    color: #5f6b7a;
+}
+
+.radar-resumo-superior {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    margin-bottom: 22px;
+    padding: 17px 20px;
+    border-radius: 14px;
+    background: #f3f6fb;
+    border-left: 6px solid #2f5bea;
+}
+
+.radar-base-label {
+    font-size: 13px;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 700;
+}
+
+.radar-base-valor {
+    margin-top: 2px;
+    font-size: 30px;
+    line-height: 1.15;
+    font-weight: 800;
+    color: #14213d;
+}
+
+.radar-periodo {
+    text-align: right;
+    font-size: 14px;
+    line-height: 1.6;
+    color: #475569;
+}
+
+.radar-tabela-container {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.radar-tabela {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    overflow: hidden;
+    border: 1px solid #d9e0ea;
+    border-radius: 12px;
+    font-size: 14px;
+}
+
+.radar-tabela thead th {
+    padding: 13px 12px;
+    border-bottom: 1px solid #d9e0ea;
+    background: #14213d;
+    color: #ffffff;
+    font-size: 12px;
+    line-height: 1.3;
+    text-transform: uppercase;
+    letter-spacing: 0.35px;
+    text-align: left;
+    white-space: nowrap;
+}
+
+.radar-tabela thead th.radar-header-numero {
+    text-align: right;
+}
+
+.radar-tabela tbody td {
+    padding: 13px 12px;
+    border-bottom: 1px solid #e8edf3;
+    vertical-align: middle;
+}
+
+.radar-tabela tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.radar-tabela tbody tr:nth-child(even) {
+    background: #fafbfd;
+}
+
+.radar-indicador {
+    min-width: 175px;
+    font-weight: 700;
+    color: #253046;
+}
+
+.radar-condicao-adequada {
+    min-width: 130px;
+    color: #166534;
+    font-weight: 650;
+}
+
+.radar-condicao-atencao {
+    min-width: 125px;
+    color: #9a3412;
+    font-weight: 650;
+}
+
+.radar-numero {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    font-weight: 700;
+}
+
+.radar-adequada {
+    color: #166534;
+}
+
+.radar-atencao {
+    color: #9a3412;
+}
+
+.radar-secao-resultado {
+    margin-top: 24px;
+}
+
+.radar-resultado-titulo {
+    margin-bottom: 11px;
+    font-size: 14px;
+    font-weight: 750;
+    color: #334155;
+    text-transform: uppercase;
+    letter-spacing: 0.45px;
+}
+
+.radar-cards {
+    display: grid;
+    grid-template-columns:
+        repeat(2, minmax(0, 1fr));
+    gap: 16px;
+}
+
+.radar-card {
+    padding: 20px 22px;
+    border-radius: 14px;
+}
+
+.radar-card-participa {
+    background: #ecfdf3;
+    border: 1px solid #bbf7d0;
+}
+
+.radar-card-nao-participa {
+    background: #fff7ed;
+    border: 1px solid #fed7aa;
+}
+
+.radar-card-label {
+    font-size: 14px;
+    font-weight: 750;
+}
+
+.radar-card-participa .radar-card-label,
+.radar-card-participa .radar-card-valor,
+.radar-card-participa .radar-card-percentual {
+    color: #166534;
+}
+
+.radar-card-nao-participa .radar-card-label,
+.radar-card-nao-participa .radar-card-valor,
+.radar-card-nao-participa .radar-card-percentual {
+    color: #9a3412;
+}
+
+.radar-card-valor {
+    margin-top: 7px;
+    font-size: 30px;
+    line-height: 1.05;
+    font-weight: 850;
+    font-variant-numeric: tabular-nums;
+}
+
+.radar-card-percentual {
+    margin-top: 5px;
+    font-size: 17px;
+    font-weight: 750;
+}
+
+.radar-observacao {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid #e8edf3;
+    font-size: 12px;
+    line-height: 1.55;
+    color: #64748b;
+}
+
+@media (max-width: 850px) {
+
+    .radar-slide {
+        padding: 22px 18px;
+    }
+
+    .radar-resumo-superior {
+        display: block;
+    }
+
+    .radar-periodo {
+        margin-top: 12px;
+        text-align: left;
+    }
+
+    .radar-cards {
+        grid-template-columns: 1fr;
+    }
+}
+
+</style>
+"""
+
+
+# ============================================================
+# HTML FINAL
+# ============================================================
+
+texto_dias = (
+    f"{quantidade_dias} dias"
+    if quantidade_dias is not None
+    else "-"
+)
+
+
+html_slide_01 = css + f"""
+<div class="radar-slide">
+
+    <h2 class="radar-titulo">
+        Visão geral do público analisado
+    </h2>
+
+    <div class="radar-subtitulo">
+        Resumo dos principais critérios relacionados
+        à participação no Radar.
+    </div>
+
+    <div class="radar-resumo-superior">
+
+        <div>
+            <div class="radar-base-label">
+                Clientes analisados
+            </div>
+
+            <div class="radar-base-valor">
+                {formatar_inteiro_br(total_clientes)}
+            </div>
+        </div>
+
+        <div class="radar-periodo">
+            <strong>Período de referência</strong><br>
+            {periodo_formatado}<br>
+            {texto_dias}
+        </div>
+
+    </div>
+
+    <div class="radar-tabela-container">
+
+        <table class="radar-tabela">
+
+            <thead>
+                <tr>
+                    <th rowspan="2">
+                        Indicador
+                    </th>
+
+                    <th colspan="3">
+                        Condição adequada
+                    </th>
+
+                    <th colspan="3">
+                        Ponto de atenção
+                    </th>
+                </tr>
+
+                <tr>
+                    <th>
+                        Situação
+                    </th>
+
+                    <th class="radar-header-numero">
+                        Clientes
+                    </th>
+
+                    <th class="radar-header-numero">
+                        %
+                    </th>
+
+                    <th>
+                        Situação
+                    </th>
+
+                    <th class="radar-header-numero">
+                        Clientes
+                    </th>
+
+                    <th class="radar-header-numero">
+                        %
+                    </th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {linhas_html}
+            </tbody>
+
+        </table>
+
+    </div>
+
+    <div class="radar-secao-resultado">
+
+        <div class="radar-resultado-titulo">
+            Resultado final do Radar
+        </div>
+
+        <div class="radar-cards">
+
+            <div class="
+                radar-card
+                radar-card-participa
+            ">
+                <div class="radar-card-label">
+                    Participa do Radar
+                </div>
+
+                <div class="radar-card-valor">
+                    {formatar_inteiro_br(radar_sim)}
+                </div>
+
+                <div class="radar-card-percentual">
+                    {
+                        formatar_percentual_br(
+                            calcular_percentual(
+                                radar_sim,
+                                total_clientes,
+                            )
+                        )
+                    }
+                </div>
+            </div>
+
+            <div class="
+                radar-card
+                radar-card-nao-participa
+            ">
+                <div class="radar-card-label">
+                    Não participa do Radar
+                </div>
+
+                <div class="radar-card-valor">
+                    {formatar_inteiro_br(radar_nao)}
+                </div>
+
+                <div class="radar-card-percentual">
+                    {
+                        formatar_percentual_br(
+                            calcular_percentual(
+                                radar_nao,
+                                total_clientes,
+                            )
+                        )
+                    }
+                </div>
+            </div>
+
+        </div>
+
+    </div>
+
+    <div class="radar-observacao">
+        A classificação de perfil considera como não
+        classificado apenas o valor
+        <strong>A CLASSIFICAR</strong>.
+        Os nomes técnicos das variáveis foram retirados
+        para facilitar a leitura executiva.
+    </div>
+
+</div>
+"""
+
+
+# ============================================================
+# PUBLICAÇÃO
+# ============================================================
+
+publicar_tabela_html(
+    nome=NOME_PUBLICACAO,
+    html=html_slide_01,
+)
+
+
+# ============================================================
+# VALIDAÇÃO
+# ============================================================
+
+print("\n" + "=" * 120)
+print("PRIMEIRA ANÁLISE — VISÃO GERAL DO RADAR")
+print("=" * 120)
+
+print(
+    f"Tabela de origem: {TABELA}"
+)
+
+print(
+    f"Execução considerada: {dt_exea_max}"
+)
+
+print(
+    f"Clientes analisados: "
+    f"{formatar_inteiro_br(total_clientes)}"
+)
+
+print(
+    f"Participam: "
+    f"{formatar_inteiro_br(radar_sim)} "
+    f"("
+    f"{formatar_percentual_br(calcular_percentual(radar_sim, total_clientes))}"
+    f")"
+)
+
+print(
+    f"Não participam: "
+    f"{formatar_inteiro_br(radar_nao)} "
+    f"("
+    f"{formatar_percentual_br(calcular_percentual(radar_nao, total_clientes))}"
+    f")"
+)
+
+print(
+    "\n✅ View criada: "
+    "VW_SLIDE_01_VISAO_GERAL_RADAR"
+)
+
+print(
+    "✅ HTML publicado: "
+    f"{NOME_PUBLICACAO}"
+)
+
+print(
+    "\nTabelas disponíveis:"
+)
+
+print(
+    tabelas_html.itens.keys()
+)
+
+
+
+
+
+
+
+
+----------------------------
+
+
+from IPython.display import (
+    HTML,
+    display,
+)
+
+
+def exibir_tabela_html_spark(
+    nomes,
+    sessao=None,
+    mostrar_cabecalho=False,
+):
+
+    """
+    Exibe uma ou várias tabelas HTML
+    publicadas no ambiente Spark.
+    """
+
+    if sessao is None:
+
+        if "gerenciador_spark" not in globals():
+
+            raise NameError(
+                "A variável 'gerenciador_spark' "
+                "não está definida no notebook local."
+            )
+
+        sessao = gerenciador_spark.spark
+
+    if isinstance(
+        nomes,
+        str,
+    ):
+        nomes = [nomes]
+
+    catalogo = sessao.get_from_spark(
+        "tabelas_html.itens"
+    )
+
+    if catalogo is None:
+
+        raise RuntimeError(
+            "O Spark retornou None para "
+            "'tabelas_html.itens'."
+        )
+
+    if not catalogo:
+
+        raise RuntimeError(
+            "O catálogo de tabelas HTML está vazio. "
+            "Execute novamente o código Spark."
+        )
+
+    resultados = {}
+
+    for i, nome in enumerate(
+        nomes,
+        start=1,
+    ):
+
+        if mostrar_cabecalho:
+
+            print("\n" + "=" * 100)
+            print(f"📋 {i:02d} | {nome}")
+            print("=" * 100)
+
+        if nome not in catalogo:
+
+            print(
+                f"⚠️ Tabela não encontrada: {nome}"
+            )
+
+            print(
+                "Disponíveis:",
+                sorted(catalogo.keys()),
+            )
+
+            continue
+
+        conteudo_html = catalogo[nome]
+
+        if conteudo_html is None:
+
+            print(
+                f"⚠️ Conteúdo vazio: {nome}"
+            )
+
+            continue
+
+        conteudo_html = str(
+            conteudo_html
+        )
+
+        if not conteudo_html.strip():
+
+            print(
+                f"⚠️ Conteúdo HTML vazio: {nome}"
+            )
+
+            continue
+
+        resultados[nome] = conteudo_html
+
+        display(
+            HTML(
+                conteudo_html
+            )
+        )
+
+    return resultados
+
+
+def listar_tabelas_html_locais(
+    sessao=None,
+):
+
+    if sessao is None:
+
+        if "gerenciador_spark" not in globals():
+
+            raise NameError(
+                "A variável 'gerenciador_spark' "
+                "não está definida."
+            )
+
+        sessao = gerenciador_spark.spark
+
+    catalogo = sessao.get_from_spark(
+        "tabelas_html.itens"
+    )
+
+    if not catalogo:
+
+        print(
+            "⚠️ Nenhuma tabela HTML disponível"
+        )
+
+        return []
+
+    nomes = sorted(
+        catalogo.keys()
+    )
+
+    print("\n" + "=" * 100)
+    print("TABELAS HTML DISPONÍVEIS")
+    print("=" * 100)
+
+    for i, nome in enumerate(
+        nomes,
+        start=1,
+    ):
+
+        print(
+            f"{i:02d} -> {nome}"
+        )
+
+    return nomes
+
+
+def obter_tabela_html_spark(
+    nome,
+    sessao=None,
+):
+
+    if sessao is None:
+
+        if "gerenciador_spark" not in globals():
+
+            raise NameError(
+                "A variável 'gerenciador_spark' "
+                "não está definida."
+            )
+
+        sessao = gerenciador_spark.spark
+
+    catalogo = sessao.get_from_spark(
+        "tabelas_html.itens"
+    )
+
+    if not catalogo:
+
+        raise RuntimeError(
+            "Nenhuma tabela HTML disponível."
+        )
+
+    if nome not in catalogo:
+
+        raise KeyError(
+            f"Tabela não encontrada: {nome}"
+        )
+
+    return str(
+        catalogo[nome]
+    )
