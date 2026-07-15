@@ -1,0 +1,7165 @@
+A ordem ficará assim:
+
+Criar df_base_transacoes, já classificado.
+Executar o estudo transacional, que cria:
+df_transacoes_cliente_estudo;
+VW_ESTUDO_TRANSACOES_CLIENTE.
+Executar a query de personas, que cria:
+df_persona_final;
+VW_ANA_EDU_FIN_CLI_PERSONA.
+Executar o código abaixo, que junta as personas à sumarização transacional e cria:
+df_persona_classificacao_final;
+VW_ANA_EDU_FIN_CLI_PERSONA_CLS.
+
+-----------------------------------
+
+
+
+
+%%spark
+
+# ============================================================
+# EXPORTAÇÃO DA BASE FINAL EM UM ÚNICO CSV
+# ============================================================
+
+CAMINHO_FINAL = (
+    "/user/seu_usuario/"
+    "ana_edu_fin_cli_persona_completa.csv"
+)
+
+CAMINHO_TEMPORARIO = (
+    CAMINHO_FINAL
+    + "_temporario"
+)
+
+
+# ============================================================
+# LEITURA DA VIEW FINAL
+# ============================================================
+
+df_csv_final = spark.table(
+    "VW_ANA_EDU_FIN_CLI_PERSONA_CLS"
+)
+
+
+# ============================================================
+# GRAVAÇÃO TEMPORÁRIA
+#
+# coalesce(1) força a geração de um único arquivo CSV.
+# ============================================================
+
+(
+    df_csv_final
+    .coalesce(1)
+    .write
+    .mode("overwrite")
+    .option("header", True)
+    .option("sep", ";")
+    .option("encoding", "UTF-8")
+    .option("nullValue", "")
+    .option("dateFormat", "dd/MM/yyyy")
+    .option("timestampFormat", "dd/MM/yyyy HH:mm:ss")
+    .csv(
+        CAMINHO_TEMPORARIO
+    )
+)
+
+
+# ============================================================
+# RENOMEIA O ARQUIVO PART PARA O NOME FINAL
+# ============================================================
+
+jvm = spark._jvm
+
+configuracao_hadoop = (
+    spark
+    ._jsc
+    .hadoopConfiguration()
+)
+
+sistema_arquivos = (
+    jvm
+    .org
+    .apache
+    .hadoop
+    .fs
+    .FileSystem
+    .get(
+        configuracao_hadoop
+    )
+)
+
+caminho_temporario_hdfs = (
+    jvm
+    .org
+    .apache
+    .hadoop
+    .fs
+    .Path(
+        CAMINHO_TEMPORARIO
+    )
+)
+
+caminho_final_hdfs = (
+    jvm
+    .org
+    .apache
+    .hadoop
+    .fs
+    .Path(
+        CAMINHO_FINAL
+    )
+)
+
+
+arquivos_part = [
+    arquivo.getPath()
+    for arquivo
+    in sistema_arquivos.listStatus(
+        caminho_temporario_hdfs
+    )
+    if arquivo
+    .getPath()
+    .getName()
+    .startswith("part-")
+]
+
+
+if len(arquivos_part) != 1:
+
+    raise RuntimeError(
+        "Era esperado exatamente um arquivo part, "
+        f"mas foram encontrados {len(arquivos_part)}."
+    )
+
+
+if sistema_arquivos.exists(
+    caminho_final_hdfs
+):
+
+    sistema_arquivos.delete(
+        caminho_final_hdfs,
+        True,
+    )
+
+
+renomeado = sistema_arquivos.rename(
+    arquivos_part[0],
+    caminho_final_hdfs,
+)
+
+
+if not renomeado:
+
+    raise RuntimeError(
+        "Não foi possível renomear "
+        "o arquivo CSV final."
+    )
+
+
+sistema_arquivos.delete(
+    caminho_temporario_hdfs,
+    True,
+)
+
+
+# ============================================================
+# RESULTADO
+# ============================================================
+
+print(
+    "✅ CSV único criado com sucesso"
+)
+
+print(
+    f"📁 Caminho: {CAMINHO_FINAL}"
+)
+
+print(
+    f"📊 Colunas: {len(df_csv_final.columns)}"
+)
+
+
+-------------------
+
+
+%%spark
+
+# ============================================================
+# BASE FINAL DE PERSONAS
+# ============================================================
+
+from functools import reduce
+
+from pyspark.sql import functions as F
+
+
+# ============================================================
+# CONFIGURAÇÃO
+# ============================================================
+
+TABELA_ORIGEM = (
+    "sbx_t2i2016."
+    "v1_ana_edu_fin_cli"
+)
+
+COLUNAS_PONTUACAO = [
+    "NR_PONT_CONC_ESS",
+    "NR_PONT_CONC_FLEX",
+    "NR_PONT_CONC_RES",
+    "NR_PONT_CONC_CRED",
+]
+
+
+# ============================================================
+# LEITURA DA TABELA ORIGINAL
+# ============================================================
+
+df_origem = spark.table(
+    TABELA_ORIGEM
+)
+
+COLUNAS_ORIGINAIS = (
+    df_origem.columns
+)
+
+
+# ============================================================
+# VALIDAÇÃO DAS COLUNAS OBRIGATÓRIAS
+# ============================================================
+
+COLUNAS_OBRIGATORIAS = [
+    "CD_CLI",
+    "NR_PONT_CONC_GEN",
+    "NR_PONT_CONC_ESS",
+    "NR_PONT_CONC_FLEX",
+    "NR_PONT_CONC_RES",
+    "NR_PONT_CONC_CRED",
+]
+
+
+colunas_ausentes = [
+    coluna
+    for coluna in COLUNAS_OBRIGATORIAS
+    if coluna not in df_origem.columns
+]
+
+
+if colunas_ausentes:
+
+    raise ValueError(
+        "Colunas obrigatórias não encontradas: "
+        + ", ".join(colunas_ausentes)
+    )
+
+
+# ============================================================
+# FUNÇÕES AUXILIARES
+# ============================================================
+
+def classificar_pontuacao(
+    coluna,
+    texto_ponto_0,
+    texto_ponto_1,
+    texto_ponto_2,
+):
+
+    return (
+        F.when(
+            F.col(coluna) == 0,
+            F.lit(texto_ponto_0),
+        )
+        .when(
+            F.col(coluna) == 1,
+            F.lit(texto_ponto_1),
+        )
+        .when(
+            F.col(coluna) == 2,
+            F.lit(texto_ponto_2),
+        )
+        .otherwise(
+            F.lit("Não classificado")
+        )
+    )
+
+
+def contar_dimensoes_com_ponto(
+    ponto,
+):
+
+    expressoes = [
+        F.when(
+            F.col(coluna) == ponto,
+            F.lit(1),
+        ).otherwise(
+            F.lit(0)
+        )
+        for coluna in COLUNAS_PONTUACAO
+    ]
+
+    return reduce(
+        lambda acumulado, expressao:
+            acumulado + expressao,
+        expressoes,
+        F.lit(0),
+    )
+
+
+# ============================================================
+# VALIDAÇÃO DA PONTUAÇÃO
+# ============================================================
+
+CONDICAO_PONTUACAO_VALIDA = reduce(
+    lambda condicao_atual, nova_condicao:
+        condicao_atual & nova_condicao,
+
+    [
+        F.col(coluna).isin(
+            0,
+            1,
+            2,
+        )
+        for coluna in COLUNAS_PONTUACAO
+    ],
+)
+
+
+CONDICAO_CATEGORIZACAO_VALIDA = (
+    F.col("NR_PONT_CONC_GEN")
+    .isin(
+        0,
+        99,
+    )
+)
+
+
+# ============================================================
+# CONSTRUÇÃO DO DATAFRAME ENRIQUECIDO
+# ============================================================
+
+df_persona_enriquecido = (
+    df_origem
+
+    # ========================================================
+    # ARRAY ORIGINAL DAS QUATRO PONTUAÇÕES
+    # ========================================================
+
+    .withColumn(
+        "AR_PONT_PERSONA",
+
+        F.array(
+            F.col(
+                "NR_PONT_CONC_ESS"
+            ).cast("int"),
+
+            F.col(
+                "NR_PONT_CONC_FLEX"
+            ).cast("int"),
+
+            F.col(
+                "NR_PONT_CONC_RES"
+            ).cast("int"),
+
+            F.col(
+                "NR_PONT_CONC_CRED"
+            ).cast("int"),
+        ),
+    )
+
+    # ========================================================
+    # VALIDADE DA PERSONA
+    # ========================================================
+
+    .withColumn(
+        "FL_PONT_PERSONA_VALIDA",
+
+        F.when(
+            CONDICAO_PONTUACAO_VALIDA,
+            F.lit("S"),
+        ).otherwise(
+            F.lit("N")
+        ),
+    )
+
+    # ========================================================
+    # VARIÁVEIS TEXTUAIS INDIVIDUAIS
+    # ========================================================
+
+    .withColumn(
+        "TX_CONC_ESS",
+
+        classificar_pontuacao(
+            coluna="NR_PONT_CONC_ESS",
+            texto_ponto_0="Essencial baixo",
+            texto_ponto_1="Essencial médio",
+            texto_ponto_2="Essencial alto",
+        ),
+    )
+
+    .withColumn(
+        "TX_CONC_FLEX",
+
+        classificar_pontuacao(
+            coluna="NR_PONT_CONC_FLEX",
+            texto_ponto_0="Flexível baixo",
+            texto_ponto_1="Flexível médio",
+            texto_ponto_2="Flexível alto",
+        ),
+    )
+
+    .withColumn(
+        "TX_CONC_RES",
+
+        classificar_pontuacao(
+            coluna="NR_PONT_CONC_RES",
+            texto_ponto_0="Reserva alta",
+            texto_ponto_1="Reserva média",
+            texto_ponto_2="Reserva baixa",
+        ),
+    )
+
+    .withColumn(
+        "TX_CONC_CRED",
+
+        classificar_pontuacao(
+            coluna="NR_PONT_CONC_CRED",
+            texto_ponto_0="Crédito baixo",
+            texto_ponto_1="Crédito médio",
+            texto_ponto_2="Crédito alto",
+        ),
+    )
+
+    # ========================================================
+    # QUALIDADE DA CATEGORIZAÇÃO
+    # ========================================================
+
+    .withColumn(
+        "TX_CATEGORIZACAO",
+
+        F.when(
+            F.col("NR_PONT_CONC_GEN") == 0,
+            F.lit("Categorização alta"),
+        )
+        .when(
+            F.col("NR_PONT_CONC_GEN") == 99,
+            F.lit("Categorização baixa"),
+        )
+        .otherwise(
+            F.lit(
+                "Categorização não definida"
+            )
+        ),
+    )
+
+    .withColumn(
+        "FL_CATEGORIZACAO_VALIDA",
+
+        F.when(
+            CONDICAO_CATEGORIZACAO_VALIDA,
+            F.lit("S"),
+        ).otherwise(
+            F.lit("N")
+        ),
+    )
+
+    .withColumn(
+        "FL_CATEGORIZACAO_ALTA",
+
+        F.when(
+            F.col("NR_PONT_CONC_GEN") == 0,
+            F.lit("S"),
+        )
+        .when(
+            F.col("NR_PONT_CONC_GEN") == 99,
+            F.lit("N"),
+        ),
+    )
+
+    # ========================================================
+    # SOMA CONSOLIDADA DE 0 A 8
+    # ========================================================
+
+    .withColumn(
+        "NR_PONT_PERSONA",
+
+        F.when(
+            CONDICAO_PONTUACAO_VALIDA,
+
+            F.col("NR_PONT_CONC_ESS")
+            + F.col("NR_PONT_CONC_FLEX")
+            + F.col("NR_PONT_CONC_RES")
+            + F.col("NR_PONT_CONC_CRED"),
+        ),
+    )
+
+    # ========================================================
+    # FAIXA DA PONTUAÇÃO
+    # ========================================================
+
+    .withColumn(
+        "TX_FAIXA_PONT_PERSONA",
+
+        F.when(
+            F.col("NR_PONT_PERSONA")
+            .between(0, 1),
+
+            F.lit("0 a 1"),
+        )
+        .when(
+            F.col("NR_PONT_PERSONA")
+            .between(2, 3),
+
+            F.lit("2 a 3"),
+        )
+        .when(
+            F.col("NR_PONT_PERSONA")
+            .between(4, 5),
+
+            F.lit("4 a 5"),
+        )
+        .when(
+            F.col("NR_PONT_PERSONA")
+            .between(6, 7),
+
+            F.lit("6 a 7"),
+        )
+        .when(
+            F.col("NR_PONT_PERSONA") == 8,
+
+            F.lit("8"),
+        )
+        .otherwise(
+            F.lit("Não classificado")
+        ),
+    )
+
+    # ========================================================
+    # CÓDIGO ORDENADO DA PERSONA
+    # ========================================================
+
+    .withColumn(
+        "CD_PERSONA",
+
+        F.when(
+            F.col("NR_PONT_PERSONA")
+            .between(0, 1),
+            F.lit(1),
+        )
+        .when(
+            F.col("NR_PONT_PERSONA")
+            .between(2, 3),
+            F.lit(2),
+        )
+        .when(
+            F.col("NR_PONT_PERSONA")
+            .between(4, 5),
+            F.lit(3),
+        )
+        .when(
+            F.col("NR_PONT_PERSONA")
+            .between(6, 7),
+            F.lit(4),
+        )
+        .when(
+            F.col("NR_PONT_PERSONA") == 8,
+            F.lit(5),
+        ),
+    )
+
+    # ========================================================
+    # PERSONA EXECUTIVA
+    # ========================================================
+
+    .withColumn(
+        "NM_PERSONA",
+
+        F.when(
+            F.col("NR_PONT_PERSONA")
+            .between(0, 1),
+
+            F.lit("Planejador"),
+        )
+        .when(
+            F.col("NR_PONT_PERSONA")
+            .between(2, 3),
+
+            F.lit("Em atenção"),
+        )
+        .when(
+            F.col("NR_PONT_PERSONA")
+            .between(4, 5),
+
+            F.lit("Pressionado"),
+        )
+        .when(
+            F.col("NR_PONT_PERSONA")
+            .between(6, 7),
+
+            F.lit("Vulnerável"),
+        )
+        .when(
+            F.col("NR_PONT_PERSONA") == 8,
+
+            F.lit("Crítico"),
+        )
+        .otherwise(
+            F.lit("Não classificado")
+        ),
+    )
+
+    # ========================================================
+    # DESCRIÇÃO EXECUTIVA DA PERSONA
+    # ========================================================
+
+    .withColumn(
+        "TX_DESC_PERSONA",
+
+        F.when(
+            F.col("NM_PERSONA") == "Planejador",
+
+            F.lit(
+                "Baixa criticidade nas quatro dimensões"
+            ),
+        )
+        .when(
+            F.col("NM_PERSONA") == "Em atenção",
+
+            F.lit(
+                "Possui pontos que requerem acompanhamento"
+            ),
+        )
+        .when(
+            F.col("NM_PERSONA") == "Pressionado",
+
+            F.lit(
+                "Apresenta desequilíbrios financeiros relevantes"
+            ),
+        )
+        .when(
+            F.col("NM_PERSONA") == "Vulnerável",
+
+            F.lit(
+                "Concentra criticidade em várias dimensões"
+            ),
+        )
+        .when(
+            F.col("NM_PERSONA") == "Crítico",
+
+            F.lit(
+                "Apresenta criticidade máxima nas quatro dimensões"
+            ),
+        )
+        .otherwise(
+            F.lit("Não classificado")
+        ),
+    )
+
+    # ========================================================
+    # QUANTIDADE DE DIMENSÕES EM CADA NÍVEL
+    # ========================================================
+
+    .withColumn(
+        "QT_DIM_PONTO_0",
+
+        F.when(
+            CONDICAO_PONTUACAO_VALIDA,
+            contar_dimensoes_com_ponto(0),
+        ),
+    )
+
+    .withColumn(
+        "QT_DIM_PONTO_1",
+
+        F.when(
+            CONDICAO_PONTUACAO_VALIDA,
+            contar_dimensoes_com_ponto(1),
+        ),
+    )
+
+    .withColumn(
+        "QT_DIM_PONTO_2",
+
+        F.when(
+            CONDICAO_PONTUACAO_VALIDA,
+            contar_dimensoes_com_ponto(2),
+        ),
+    )
+
+    # ========================================================
+    # COMPOSIÇÃO RESUMIDA DOS PONTOS
+    # ========================================================
+
+    .withColumn(
+        "TX_COMPOSICAO_PONTOS",
+
+        F.when(
+            CONDICAO_PONTUACAO_VALIDA,
+
+            F.format_string(
+                "%d dimensão(ões) em 0 | "
+                "%d dimensão(ões) em 1 | "
+                "%d dimensão(ões) em 2",
+
+                F.col("QT_DIM_PONTO_0"),
+                F.col("QT_DIM_PONTO_1"),
+                F.col("QT_DIM_PONTO_2"),
+            ),
+        )
+        .otherwise(
+            F.lit("Não classificado")
+        ),
+    )
+
+    # ========================================================
+    # MAIOR E MENOR PONTUAÇÃO INDIVIDUAL
+    # ========================================================
+
+    .withColumn(
+        "NR_PONT_MAX_DIMENSAO",
+
+        F.when(
+            CONDICAO_PONTUACAO_VALIDA,
+
+            F.greatest(
+                F.col("NR_PONT_CONC_ESS"),
+                F.col("NR_PONT_CONC_FLEX"),
+                F.col("NR_PONT_CONC_RES"),
+                F.col("NR_PONT_CONC_CRED"),
+            ),
+        ),
+    )
+
+    .withColumn(
+        "NR_PONT_MIN_DIMENSAO",
+
+        F.when(
+            CONDICAO_PONTUACAO_VALIDA,
+
+            F.least(
+                F.col("NR_PONT_CONC_ESS"),
+                F.col("NR_PONT_CONC_FLEX"),
+                F.col("NR_PONT_CONC_RES"),
+                F.col("NR_PONT_CONC_CRED"),
+            ),
+        ),
+    )
+
+    # ========================================================
+    # TEMAS COM MAIOR PONTUAÇÃO
+    # ========================================================
+
+    .withColumn(
+        "TX_TEMAS_PRIORITARIOS",
+
+        F.when(
+            ~CONDICAO_PONTUACAO_VALIDA,
+
+            F.lit("Não classificado"),
+        )
+        .when(
+            F.col("NR_PONT_MAX_DIMENSAO") == 0,
+
+            F.lit("Nenhum tema prioritário"),
+        )
+        .otherwise(
+            F.concat_ws(
+                " | ",
+
+                F.when(
+                    F.col("NR_PONT_CONC_ESS")
+                    == F.col("NR_PONT_MAX_DIMENSAO"),
+
+                    F.lit("Essencial"),
+                ),
+
+                F.when(
+                    F.col("NR_PONT_CONC_FLEX")
+                    == F.col("NR_PONT_MAX_DIMENSAO"),
+
+                    F.lit("Flexível"),
+                ),
+
+                F.when(
+                    F.col("NR_PONT_CONC_RES")
+                    == F.col("NR_PONT_MAX_DIMENSAO"),
+
+                    F.lit("Reserva"),
+                ),
+
+                F.when(
+                    F.col("NR_PONT_CONC_CRED")
+                    == F.col("NR_PONT_MAX_DIMENSAO"),
+
+                    F.lit("Crédito"),
+                ),
+            )
+        ),
+    )
+
+    # ========================================================
+    # CÓDIGO TEXTUAL DA ASSINATURA
+    # ========================================================
+
+    .withColumn(
+        "CD_ASSINATURA_PERSONA",
+
+        F.when(
+            CONDICAO_PONTUACAO_VALIDA,
+
+            F.concat(
+                F.lit("E"),
+                F.col(
+                    "NR_PONT_CONC_ESS"
+                ).cast("string"),
+
+                F.lit("-F"),
+                F.col(
+                    "NR_PONT_CONC_FLEX"
+                ).cast("string"),
+
+                F.lit("-R"),
+                F.col(
+                    "NR_PONT_CONC_RES"
+                ).cast("string"),
+
+                F.lit("-C"),
+                F.col(
+                    "NR_PONT_CONC_CRED"
+                ).cast("string"),
+            ),
+        )
+        .otherwise(
+            F.lit("NÃO_CLASSIFICADO")
+        ),
+    )
+
+    # ========================================================
+    # ID NUMÉRICO ÚNICO DAS 81 COMBINAÇÕES
+    #
+    # ESS  * 27
+    # FLEX *  9
+    # RES  *  3
+    # CRED *  1
+    #
+    # Resultado: 1 até 81
+    # ========================================================
+
+    .withColumn(
+        "NR_ID_ASSINATURA_PERSONA",
+
+        F.when(
+            CONDICAO_PONTUACAO_VALIDA,
+
+            (
+                F.col("NR_PONT_CONC_ESS") * 27
+                + F.col("NR_PONT_CONC_FLEX") * 9
+                + F.col("NR_PONT_CONC_RES") * 3
+                + F.col("NR_PONT_CONC_CRED")
+                + 1
+            ).cast("int"),
+        ),
+    )
+
+    # ========================================================
+    # ASSINATURA COMPORTAMENTAL COMPLETA
+    # ========================================================
+
+    .withColumn(
+        "TX_ASSINATURA_COMPORTAMENTAL",
+
+        F.when(
+            CONDICAO_PONTUACAO_VALIDA,
+
+            F.concat_ws(
+                " | ",
+                F.col("TX_CONC_ESS"),
+                F.col("TX_CONC_FLEX"),
+                F.col("TX_CONC_RES"),
+                F.col("TX_CONC_CRED"),
+            ),
+        )
+        .otherwise(
+            F.lit("Não classificado")
+        ),
+    )
+
+    # ========================================================
+    # PERSONA + CATEGORIZAÇÃO PARA TODOS OS CLIENTES
+    # ========================================================
+
+    .withColumn(
+        "NM_PERSONA_CATEGORIZACAO",
+
+        F.when(
+            CONDICAO_PONTUACAO_VALIDA,
+
+            F.concat_ws(
+                " | ",
+                F.col("NM_PERSONA"),
+                F.col("TX_CATEGORIZACAO"),
+            ),
+        )
+        .otherwise(
+            F.lit("Não classificado")
+        ),
+    )
+
+    # ========================================================
+    # PERSONA FINAL
+    #
+    # Somente a pontuação 8 é subdividida pela categorização.
+    # As demais pontuações mantêm a persona executiva.
+    # ========================================================
+
+    .withColumn(
+        "NM_PERSONA_FINAL",
+
+        F.when(
+            ~CONDICAO_PONTUACAO_VALIDA,
+
+            F.lit("Não classificado"),
+        )
+        .when(
+            (
+                F.col("NR_PONT_PERSONA") == 8
+            )
+            & (
+                F.col("NR_PONT_CONC_GEN") == 0
+            ),
+
+            F.lit("Crítico categorizado"),
+        )
+        .when(
+            (
+                F.col("NR_PONT_PERSONA") == 8
+            )
+            & (
+                F.col("NR_PONT_CONC_GEN") == 99
+            ),
+
+            F.lit(
+                "Crítico com baixa categorização"
+            ),
+        )
+        .when(
+            F.col("NR_PONT_PERSONA") == 8,
+
+            F.lit(
+                "Crítico com categorização não definida"
+            ),
+        )
+        .otherwise(
+            F.col("NM_PERSONA")
+        ),
+    )
+
+    # ========================================================
+    # FLAGS EXECUTIVAS
+    # ========================================================
+
+    .withColumn(
+        "FL_PERSONA_CRITICA",
+
+        F.when(
+            F.col("NR_PONT_PERSONA") == 8,
+            F.lit("S"),
+        )
+        .when(
+            F.col("NR_PONT_PERSONA").isNotNull(),
+            F.lit("N"),
+        ),
+    )
+
+    .withColumn(
+        "FL_PERSONA_VULNERAVEL_OU_CRITICA",
+
+        F.when(
+            F.col("NR_PONT_PERSONA")
+            .between(6, 8),
+
+            F.lit("S"),
+        )
+        .when(
+            F.col("NR_PONT_PERSONA").isNotNull(),
+            F.lit("N"),
+        ),
+    )
+)
+
+
+# ============================================================
+# ORDEM FINAL DAS COLUNAS DERIVADAS
+# ============================================================
+
+COLUNAS_DERIVADAS_PERSONA = [
+    "AR_PONT_PERSONA",
+
+    "FL_PONT_PERSONA_VALIDA",
+
+    "TX_CONC_ESS",
+    "TX_CONC_FLEX",
+    "TX_CONC_RES",
+    "TX_CONC_CRED",
+
+    "TX_CATEGORIZACAO",
+    "FL_CATEGORIZACAO_VALIDA",
+    "FL_CATEGORIZACAO_ALTA",
+
+    "NR_PONT_PERSONA",
+    "TX_FAIXA_PONT_PERSONA",
+
+    "CD_PERSONA",
+    "NM_PERSONA",
+    "TX_DESC_PERSONA",
+
+    "QT_DIM_PONTO_0",
+    "QT_DIM_PONTO_1",
+    "QT_DIM_PONTO_2",
+    "TX_COMPOSICAO_PONTOS",
+
+    "NR_PONT_MAX_DIMENSAO",
+    "NR_PONT_MIN_DIMENSAO",
+    "TX_TEMAS_PRIORITARIOS",
+
+    "CD_ASSINATURA_PERSONA",
+    "NR_ID_ASSINATURA_PERSONA",
+    "TX_ASSINATURA_COMPORTAMENTAL",
+
+    "NM_PERSONA_CATEGORIZACAO",
+    "NM_PERSONA_FINAL",
+
+    "FL_PERSONA_CRITICA",
+    "FL_PERSONA_VULNERAVEL_OU_CRITICA",
+]
+
+
+# ============================================================
+# DATAFRAME FINAL
+# ============================================================
+
+df_persona_final = (
+    df_persona_enriquecido
+    .select(
+        *COLUNAS_ORIGINAIS,
+        *COLUNAS_DERIVADAS_PERSONA,
+    )
+)
+
+
+# ============================================================
+# VIEW TEMPORÁRIA
+# ============================================================
+
+df_persona_final.createOrReplaceTempView(
+    "VW_ANA_EDU_FIN_CLI_PERSONA"
+)
+
+
+# ============================================================
+# RESULTADO
+# ============================================================
+
+print("\n" + "=" * 120)
+print("DATAFRAME FINAL DE PERSONAS CRIADO")
+print("=" * 120)
+
+print(
+    f"Tabela de origem: "
+    f"{TABELA_ORIGEM}"
+)
+
+print(
+    f"Quantidade de colunas originais: "
+    f"{len(COLUNAS_ORIGINAIS)}"
+)
+
+print(
+    f"Quantidade de colunas derivadas: "
+    f"{len(COLUNAS_DERIVADAS_PERSONA)}"
+)
+
+print(
+    f"Quantidade total de colunas: "
+    f"{len(df_persona_final.columns)}"
+)
+
+print(
+    "\nDataFrame disponível:"
+)
+
+print(
+    "df_persona_final"
+)
+
+print(
+    "\nView temporária disponível:"
+)
+
+print(
+    "VW_ANA_EDU_FIN_CLI_PERSONA"
+)
+
+
+-----------------------------------------------
+
+
+
+
+%%spark
+
+# ============================================================
+# ESTUDO COMPLETO DA BASE TRANSACIONAL CLASSIFICADA
+#
+# Entrada:
+#   df_base_transacoes
+#
+# Saídas principais:
+#   df_estudo_transacoes
+#   df_transacoes_cliente_estudo
+#
+# Views:
+#   VW_ESTUDO_TRANSACOES
+#   VW_ESTUDO_TRANSACOES_CLIENTE
+#
+# Não cria personas.
+# Não acessa a tabela sumarizada física.
+# ============================================================
+
+import io
+import base64
+import textwrap
+
+from datetime import date, datetime
+from decimal import Decimal
+from functools import reduce
+from html import escape
+
+import matplotlib
+matplotlib.use("Agg")
+
+import matplotlib.pyplot as plt
+
+from matplotlib.ticker import FuncFormatter
+
+from pyspark import StorageLevel
+from pyspark.sql import functions as F
+from pyspark.sql.window import Window
+from pyspark.sql.types import (
+    DateType,
+    TimestampType,
+)
+
+
+# ============================================================
+# 1. VALIDAÇÃO DA BASE
+# ============================================================
+
+if "df_base_transacoes" not in globals():
+
+    raise NameError(
+        "O DataFrame 'df_base_transacoes' não está definido. "
+        "Execute primeiro o código que classifica as transações."
+    )
+
+
+COLUNAS_OBRIGATORIAS = [
+    "CD_CLI",
+    "VL_TRAN",
+    "CD_NTZ_CTB_TRAN",
+    "CD_CTGR_TRAN_OGNL",
+    "CD_CLASSIFICACAO_CATEGORIA",
+    "NM_CLASSIFICACAO_CATEGORIA",
+    "FL_AGRO_CATEGORIA",
+]
+
+
+colunas_ausentes = [
+    coluna
+    for coluna in COLUNAS_OBRIGATORIAS
+    if coluna not in df_base_transacoes.columns
+]
+
+
+if colunas_ausentes:
+
+    raise ValueError(
+        "Colunas obrigatórias não encontradas em "
+        "'df_base_transacoes': "
+        + ", ".join(colunas_ausentes)
+    )
+
+
+# ============================================================
+# 2. REPOSITÓRIOS
+# ============================================================
+
+class _RepositorioSimples:
+
+    def __init__(self):
+        self.itens = {}
+
+
+if (
+    "tabelas_html" not in globals()
+    or not hasattr(tabelas_html, "itens")
+):
+
+    tabelas_html = _RepositorioSimples()
+
+
+if (
+    "graficos" not in globals()
+    or not hasattr(graficos, "itens")
+):
+
+    graficos = _RepositorioSimples()
+
+
+# ============================================================
+# 3. DICIONÁRIOS DA CLASSIFICAÇÃO
+# ============================================================
+
+CLASSIFICACOES_ENTRADA = {
+    0: {
+        "sufixo": "IND",
+        "nome": "Transferência / entrada indefinida",
+    },
+    1: {
+        "sufixo": "REC",
+        "nome": "Receita / rendimento / benefício",
+    },
+    2: {
+        "sufixo": "REEMB",
+        "nome": "Restituição / estorno / reembolso / ajuste",
+    },
+    3: {
+        "sufixo": "RESG",
+        "nome": "Resgate de investimento",
+    },
+    4: {
+        "sufixo": "EMPR",
+        "nome": "Crédito tomado / liberação de crédito",
+    },
+}
+
+
+CLASSIFICACOES_SAIDA = {
+    5: {
+        "sufixo": "GEN",
+        "nome": "Neutro / não classificado",
+    },
+    6: {
+        "sufixo": "ESS",
+        "nome": "Essenciais",
+    },
+    7: {
+        "sufixo": "FLEX",
+        "nome": "Flexíveis",
+    },
+    8: {
+        "sufixo": "RES",
+        "nome": "Futuro / reserva",
+    },
+    9: {
+        "sufixo": "CRED",
+        "nome": "Dívidas / crédito / custo financeiro",
+    },
+}
+
+
+# ============================================================
+# 4. FUNÇÕES DE FORMATAÇÃO
+# ============================================================
+
+def formatar_numero_br(
+    valor,
+    casas=2,
+):
+
+    if valor is None:
+        return "-"
+
+    texto = f"{float(valor):,.{casas}f}"
+
+    return (
+        texto
+        .replace(",", "__MILHAR__")
+        .replace(".", ",")
+        .replace("__MILHAR__", ".")
+    )
+
+
+def formatar_inteiro_br(
+    valor,
+):
+
+    if valor is None:
+        return "-"
+
+    return (
+        f"{int(valor):,}"
+        .replace(",", ".")
+    )
+
+
+def formatar_valor_tabela(
+    nome_coluna,
+    valor,
+):
+
+    if valor is None:
+        return "-"
+
+    if isinstance(
+        valor,
+        datetime,
+    ):
+        return valor.strftime(
+            "%d/%m/%Y %H:%M:%S"
+        )
+
+    if isinstance(
+        valor,
+        date,
+    ):
+        return valor.strftime(
+            "%d/%m/%Y"
+        )
+
+    if nome_coluna.startswith("PC_"):
+
+        return (
+            formatar_numero_br(
+                valor,
+                2,
+            )
+            + "%"
+        )
+
+    if nome_coluna.startswith("VL_"):
+
+        return (
+            "R$ "
+            + formatar_numero_br(
+                valor,
+                2,
+            )
+        )
+
+    if nome_coluna.startswith("QT_"):
+
+        return formatar_inteiro_br(
+            valor
+        )
+
+    if nome_coluna.startswith("CD_"):
+
+        try:
+            return str(
+                int(valor)
+            )
+        except Exception:
+            return str(valor)
+
+    if isinstance(
+        valor,
+        (
+            int,
+            Decimal,
+        ),
+    ):
+        return str(valor)
+
+    if isinstance(
+        valor,
+        float,
+    ):
+        return formatar_numero_br(
+            valor,
+            4,
+        )
+
+    return str(valor)
+
+
+# ============================================================
+# 5. PUBLICAÇÃO DE TABELAS HTML
+# ============================================================
+
+def publicar_tabela_html_df(
+    nome,
+    dataframe,
+    titulo,
+    limite=50,
+    subtitulo=None,
+):
+
+    registros = (
+        dataframe
+        .limit(limite + 1)
+        .collect()
+    )
+
+    truncada = (
+        len(registros) > limite
+    )
+
+    registros = registros[
+        :limite
+    ]
+
+    colunas = dataframe.columns
+
+    cabecalho = "".join([
+        (
+            "<th>"
+            + escape(
+                coluna
+                .replace("_", " ")
+                .title()
+            )
+            + "</th>"
+        )
+        for coluna in colunas
+    ])
+
+    linhas = []
+
+    for registro in registros:
+
+        celulas = []
+
+        for coluna in colunas:
+
+            valor = formatar_valor_tabela(
+                coluna,
+                registro[coluna],
+            )
+
+            classe = (
+                "numero"
+                if coluna.startswith(
+                    (
+                        "QT_",
+                        "VL_",
+                        "PC_",
+                        "NR_",
+                    )
+                )
+                else "texto"
+            )
+
+            celulas.append(
+                f'<td class="{classe}">'
+                f"{escape(valor)}"
+                f"</td>"
+            )
+
+        linhas.append(
+            "<tr>"
+            + "".join(celulas)
+            + "</tr>"
+        )
+
+    texto_subtitulo = (
+        f'<div class="subtitulo">{escape(subtitulo)}</div>'
+        if subtitulo
+        else ""
+    )
+
+    texto_truncado = (
+        f"""
+        <div class="observacao">
+            Exibindo as primeiras {limite} linhas.
+        </div>
+        """
+        if truncada
+        else ""
+    )
+
+    html = f"""
+    <style>
+
+    .estudo-tabela-container {{
+        width: 100%;
+        max-width: 1300px;
+        margin: 18px auto;
+        padding: 22px;
+        box-sizing: border-box;
+        background: #ffffff;
+        border: 1px solid #e1e6ed;
+        border-radius: 14px;
+        font-family:
+            -apple-system,
+            BlinkMacSystemFont,
+            "Segoe UI",
+            Arial,
+            sans-serif;
+    }}
+
+    .estudo-tabela-container h3 {{
+        margin: 0;
+        color: #17233c;
+        font-size: 22px;
+    }}
+
+    .estudo-tabela-container .subtitulo {{
+        margin-top: 6px;
+        margin-bottom: 16px;
+        color: #64748b;
+        font-size: 13px;
+    }}
+
+    .estudo-tabela-scroll {{
+        overflow-x: auto;
+    }}
+
+    .estudo-tabela {{
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+    }}
+
+    .estudo-tabela th {{
+        padding: 11px 10px;
+        background: #17233c;
+        color: #ffffff;
+        border: 1px solid #273553;
+        text-align: left;
+        white-space: nowrap;
+    }}
+
+    .estudo-tabela td {{
+        padding: 10px;
+        border-bottom: 1px solid #e6ebf1;
+        vertical-align: top;
+    }}
+
+    .estudo-tabela tr:nth-child(even) {{
+        background: #f8fafc;
+    }}
+
+    .estudo-tabela td.numero {{
+        text-align: right;
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+    }}
+
+    .estudo-tabela td.texto {{
+        text-align: left;
+    }}
+
+    .observacao {{
+        margin-top: 12px;
+        font-size: 12px;
+        color: #64748b;
+    }}
+
+    </style>
+
+    <div class="estudo-tabela-container">
+
+        <h3>{escape(titulo)}</h3>
+
+        {texto_subtitulo}
+
+        <div class="estudo-tabela-scroll">
+
+            <table class="estudo-tabela">
+
+                <thead>
+                    <tr>
+                        {cabecalho}
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {''.join(linhas)}
+                </tbody>
+
+            </table>
+
+        </div>
+
+        {texto_truncado}
+
+    </div>
+    """
+
+    tabelas_html.itens[
+        nome
+    ] = html
+
+    print(
+        f"✅ Tabela publicada: {nome}"
+    )
+
+
+# ============================================================
+# 6. PUBLICAÇÃO DE GRÁFICOS
+# ============================================================
+
+def _formatador_inteiro_eixo(
+    valor,
+    _,
+):
+
+    return (
+        f"{valor:,.0f}"
+        .replace(",", ".")
+    )
+
+
+def _formatador_moeda_eixo(
+    valor,
+    _,
+):
+
+    if abs(valor) >= 1_000_000_000:
+
+        return (
+            "R$ "
+            + formatar_numero_br(
+                valor / 1_000_000_000,
+                1,
+            )
+            + " bi"
+        )
+
+    if abs(valor) >= 1_000_000:
+
+        return (
+            "R$ "
+            + formatar_numero_br(
+                valor / 1_000_000,
+                1,
+            )
+            + " mi"
+        )
+
+    if abs(valor) >= 1_000:
+
+        return (
+            "R$ "
+            + formatar_numero_br(
+                valor / 1_000,
+                1,
+            )
+            + " mil"
+        )
+
+    return (
+        "R$ "
+        + formatar_numero_br(
+            valor,
+            0,
+        )
+    )
+
+
+def publicar_grafico_barras(
+    nome,
+    dataframe,
+    coluna_categoria,
+    coluna_valor,
+    titulo,
+    limite=20,
+    horizontal=True,
+    formato="inteiro",
+):
+
+    registros = (
+        dataframe
+        .select(
+            coluna_categoria,
+            coluna_valor,
+        )
+        .limit(limite)
+        .collect()
+    )
+
+    if not registros:
+
+        print(
+            f"⚠️ Sem dados para o gráfico: {nome}"
+        )
+        return
+
+    categorias = [
+        textwrap.fill(
+            str(
+                registro[
+                    coluna_categoria
+                ]
+            ),
+            width=28,
+        )
+        for registro in registros
+    ]
+
+    valores = [
+        float(
+            registro[
+                coluna_valor
+            ] or 0
+        )
+        for registro in registros
+    ]
+
+    figura, eixo = plt.subplots(
+        figsize=(
+            11,
+            max(
+                4.5,
+                len(categorias) * 0.45,
+            )
+            if horizontal
+            else 6,
+        )
+    )
+
+    if horizontal:
+
+        eixo.barh(
+            categorias,
+            valores,
+        )
+
+        eixo.invert_yaxis()
+
+        if formato == "moeda":
+            eixo.xaxis.set_major_formatter(
+                FuncFormatter(
+                    _formatador_moeda_eixo
+                )
+            )
+        else:
+            eixo.xaxis.set_major_formatter(
+                FuncFormatter(
+                    _formatador_inteiro_eixo
+                )
+            )
+
+    else:
+
+        eixo.bar(
+            categorias,
+            valores,
+        )
+
+        eixo.tick_params(
+            axis="x",
+            rotation=35,
+        )
+
+        if formato == "moeda":
+            eixo.yaxis.set_major_formatter(
+                FuncFormatter(
+                    _formatador_moeda_eixo
+                )
+            )
+        else:
+            eixo.yaxis.set_major_formatter(
+                FuncFormatter(
+                    _formatador_inteiro_eixo
+                )
+            )
+
+    eixo.set_title(
+        titulo,
+        pad=14,
+        fontsize=14,
+        fontweight="bold",
+    )
+
+    eixo.set_xlabel("")
+    eixo.set_ylabel("")
+
+    figura.tight_layout()
+
+    buffer = io.BytesIO()
+
+    figura.savefig(
+        buffer,
+        format="png",
+        dpi=160,
+        bbox_inches="tight",
+    )
+
+    plt.close(
+        figura
+    )
+
+    graficos.itens[
+        nome
+    ] = (
+        base64
+        .b64encode(
+            buffer.getvalue()
+        )
+        .decode("ascii")
+    )
+
+    print(
+        f"✅ Gráfico publicado: {nome}"
+    )
+
+
+# ============================================================
+# 7. NORMALIZAÇÃO DA BASE
+# ============================================================
+
+df_estudo_transacoes = (
+    df_base_transacoes
+
+    .withColumn(
+        "CD_NTZ_CTB_TRAN_STD",
+
+        F.upper(
+            F.trim(
+                F.col(
+                    "CD_NTZ_CTB_TRAN"
+                )
+            )
+        ),
+    )
+
+    .withColumn(
+        "VL_TRAN_ABS",
+
+        F.abs(
+            F.coalesce(
+                F.col(
+                    "VL_TRAN"
+                ).cast("decimal(38,2)"),
+
+                F.lit(0).cast(
+                    "decimal(38,2)"
+                ),
+            )
+        ),
+    )
+
+    .withColumn(
+        "NM_CLASSIFICACAO_CATEGORIA_STD",
+
+        F.coalesce(
+            F.trim(
+                F.col(
+                    "NM_CLASSIFICACAO_CATEGORIA"
+                )
+            ),
+            F.lit(
+                "Não informado"
+            ),
+        ),
+    )
+
+    .withColumn(
+        "FL_AGRO_CATEGORIA_STD",
+
+        F.when(
+            F.upper(
+                F.trim(
+                    F.col(
+                        "FL_AGRO_CATEGORIA"
+                    )
+                )
+            ) == "S",
+
+            F.lit("S"),
+        )
+        .otherwise(
+            F.lit("N")
+        ),
+    )
+
+    .persist(
+        StorageLevel.MEMORY_AND_DISK
+    )
+)
+
+
+df_estudo_transacoes.createOrReplaceTempView(
+    "VW_ESTUDO_TRANSACOES"
+)
+
+
+# ============================================================
+# 8. RESUMO GERAL
+# ============================================================
+
+tb_resumo_geral = (
+    df_estudo_transacoes
+
+    .agg(
+        F.count("*").alias(
+            "QT_TRANSACOES"
+        ),
+
+        F.countDistinct(
+            "CD_CLI"
+        ).alias(
+            "QT_CLIENTES"
+        ),
+
+        F.sum(
+            "VL_TRAN_ABS"
+        ).alias(
+            "VL_MOVIMENTADO_ABS"
+        ),
+
+        F.avg(
+            "VL_TRAN_ABS"
+        ).alias(
+            "VL_TICKET_MEDIO"
+        ),
+
+        F.percentile_approx(
+            "VL_TRAN_ABS",
+            0.50,
+            10000,
+        ).alias(
+            "VL_TICKET_MEDIANO"
+        ),
+
+        F.sum(
+            F.when(
+                F.col(
+                    "CD_NTZ_CTB_TRAN_STD"
+                ) == "C",
+                1,
+            ).otherwise(0)
+        ).alias(
+            "QT_CREDITOS"
+        ),
+
+        F.sum(
+            F.when(
+                F.col(
+                    "CD_NTZ_CTB_TRAN_STD"
+                ) == "D",
+                1,
+            ).otherwise(0)
+        ).alias(
+            "QT_DEBITOS"
+        ),
+
+        F.sum(
+            F.when(
+                F.col(
+                    "CD_NTZ_CTB_TRAN_STD"
+                ) == "C",
+
+                F.col(
+                    "VL_TRAN_ABS"
+                ),
+            ).otherwise(
+                F.lit(0)
+            )
+        ).alias(
+            "VL_CREDITOS_ABS"
+        ),
+
+        F.sum(
+            F.when(
+                F.col(
+                    "CD_NTZ_CTB_TRAN_STD"
+                ) == "D",
+
+                F.col(
+                    "VL_TRAN_ABS"
+                ),
+            ).otherwise(
+                F.lit(0)
+            )
+        ).alias(
+            "VL_DEBITOS_ABS"
+        ),
+
+        F.sum(
+            F.when(
+                ~F.col(
+                    "CD_NTZ_CTB_TRAN_STD"
+                ).isin(
+                    "C",
+                    "D",
+                )
+                |
+                F.col(
+                    "CD_NTZ_CTB_TRAN_STD"
+                ).isNull(),
+
+                1,
+            ).otherwise(0)
+        ).alias(
+            "QT_NATUREZA_INVALIDA"
+        ),
+
+        F.countDistinct(
+            "CD_CLASSIFICACAO_CATEGORIA"
+        ).alias(
+            "QT_CLASSIFICACOES"
+        ),
+
+        F.countDistinct(
+            "CD_CTGR_TRAN_OGNL"
+        ).alias(
+            "QT_CATEGORIAS_ORIGINAIS"
+        ),
+    )
+
+    .withColumn(
+        "QT_TRANSACOES_POR_CLIENTE",
+
+        F.round(
+            F.col("QT_TRANSACOES")
+            /
+            F.col("QT_CLIENTES"),
+            2,
+        ),
+    )
+
+    .withColumn(
+        "VL_MOVIMENTADO_POR_CLIENTE",
+
+        F.round(
+            F.col("VL_MOVIMENTADO_ABS")
+            /
+            F.col("QT_CLIENTES"),
+            2,
+        ),
+    )
+
+    .withColumn(
+        "PC_QT_CREDITOS",
+
+        F.round(
+            F.col("QT_CREDITOS")
+            /
+            F.col("QT_TRANSACOES")
+            * 100,
+            2,
+        ),
+    )
+
+    .withColumn(
+        "PC_QT_DEBITOS",
+
+        F.round(
+            F.col("QT_DEBITOS")
+            /
+            F.col("QT_TRANSACOES")
+            * 100,
+            2,
+        ),
+    )
+)
+
+
+# ============================================================
+# 9. INVENTÁRIO DOS CAMPOS PRINCIPAIS
+# ============================================================
+
+campos_inventario = [
+    "CD_CLI",
+    "VL_TRAN",
+    "CD_NTZ_CTB_TRAN",
+    "CD_CTGR_TRAN_OGNL",
+    "CD_CLASSIFICACAO_CATEGORIA",
+    "NM_CLASSIFICACAO_CATEGORIA",
+    "FL_AGRO_CATEGORIA",
+]
+
+
+for coluna_opcional in [
+    "CD_PRD",
+    "NM_PRD",
+    "NM_TP_LANCAMENTO",
+    "FL_MAPEAMENTO_ENCONTRADO",
+    "TX_ORIGEM_CLASSIFICACAO",
+    "FL_CLASSIFICACAO_VALIDA",
+]:
+
+    if coluna_opcional in df_estudo_transacoes.columns:
+
+        campos_inventario.append(
+            coluna_opcional
+        )
+
+
+expressoes_inventario = [
+    F.count("*").alias(
+        "QT_TOTAL"
+    )
+]
+
+
+for coluna in campos_inventario:
+
+    expressoes_inventario.extend([
+        F.sum(
+            F.when(
+                F.col(coluna).isNull(),
+                1,
+            ).otherwise(0)
+        ).alias(
+            f"{coluna}__NULOS"
+        ),
+
+        F.countDistinct(
+            coluna
+        ).alias(
+            f"{coluna}__DISTINTOS"
+        ),
+    ])
+
+
+resultado_inventario = (
+    df_estudo_transacoes
+    .agg(
+        *expressoes_inventario
+    )
+    .first()
+)
+
+
+total_inventario = int(
+    resultado_inventario[
+        "QT_TOTAL"
+    ]
+)
+
+
+tipos_colunas = dict(
+    df_estudo_transacoes.dtypes
+)
+
+
+linhas_inventario = []
+
+
+for coluna in campos_inventario:
+
+    qt_nulos = int(
+        resultado_inventario[
+            f"{coluna}__NULOS"
+        ] or 0
+    )
+
+    linhas_inventario.append((
+        coluna,
+        tipos_colunas.get(
+            coluna,
+            "",
+        ),
+        qt_nulos,
+        round(
+            qt_nulos
+            / total_inventario
+            * 100,
+            4,
+        )
+        if total_inventario
+        else 0.0,
+        int(
+            resultado_inventario[
+                f"{coluna}__DISTINTOS"
+            ] or 0
+        ),
+    ))
+
+
+tb_inventario_campos = (
+    spark.createDataFrame(
+        linhas_inventario,
+        """
+            VARIAVEL STRING,
+            TIPO STRING,
+            QT_NULOS LONG,
+            PC_NULOS DOUBLE,
+            QT_DISTINTOS LONG
+        """,
+    )
+)
+
+
+# ============================================================
+# 10. INCONSISTÊNCIAS
+# ============================================================
+
+expressoes_inconsistencias = [
+    (
+        "Cliente nulo",
+        F.col("CD_CLI").isNull(),
+    ),
+    (
+        "Valor da transação nulo",
+        F.col("VL_TRAN").isNull(),
+    ),
+    (
+        "Valor da transação igual a zero",
+        F.col("VL_TRAN_ABS") == 0,
+    ),
+    (
+        "Natureza diferente de C ou D",
+        (
+            ~F.col(
+                "CD_NTZ_CTB_TRAN_STD"
+            ).isin(
+                "C",
+                "D",
+            )
+        )
+        |
+        F.col(
+            "CD_NTZ_CTB_TRAN_STD"
+        ).isNull(),
+    ),
+    (
+        "Categoria original nula",
+        F.col(
+            "CD_CTGR_TRAN_OGNL"
+        ).isNull(),
+    ),
+    (
+        "Código de classificação nulo",
+        F.col(
+            "CD_CLASSIFICACAO_CATEGORIA"
+        ).isNull(),
+    ),
+    (
+        "Nome de classificação nulo",
+        F.col(
+            "NM_CLASSIFICACAO_CATEGORIA"
+        ).isNull(),
+    ),
+    (
+        "Flag Agro diferente de S ou N",
+        (
+            ~F.upper(
+                F.trim(
+                    F.col(
+                        "FL_AGRO_CATEGORIA"
+                    )
+                )
+            ).isin(
+                "S",
+                "N",
+            )
+        )
+        |
+        F.col(
+            "FL_AGRO_CATEGORIA"
+        ).isNull(),
+    ),
+]
+
+
+resultado_inconsistencias = (
+    df_estudo_transacoes
+
+    .agg(
+        *[
+            F.sum(
+                F.when(
+                    condicao,
+                    1,
+                ).otherwise(0)
+            ).alias(
+                f"ERRO_{indice}"
+            )
+            for indice, (
+                _,
+                condicao,
+            ) in enumerate(
+                expressoes_inconsistencias
+            )
+        ]
+    )
+
+    .first()
+)
+
+
+linhas_inconsistencias = []
+
+
+for indice, (
+    descricao,
+    _,
+) in enumerate(
+    expressoes_inconsistencias
+):
+
+    quantidade = int(
+        resultado_inconsistencias[
+            f"ERRO_{indice}"
+        ] or 0
+    )
+
+    linhas_inconsistencias.append((
+        descricao,
+        quantidade,
+        round(
+            quantidade
+            / total_inventario
+            * 100,
+            4,
+        )
+        if total_inventario
+        else 0.0,
+    ))
+
+
+tb_inconsistencias = (
+    spark.createDataFrame(
+        linhas_inconsistencias,
+        """
+            INCONSISTENCIA STRING,
+            QT_TRANSACOES LONG,
+            PC_TRANSACOES DOUBLE
+        """,
+    )
+
+    .orderBy(
+        F.col(
+            "QT_TRANSACOES"
+        ).desc()
+    )
+)
+
+
+# ============================================================
+# 11. ANÁLISE POR NATUREZA
+# ============================================================
+
+janela_total = Window.partitionBy()
+
+
+tb_natureza = (
+    df_estudo_transacoes
+
+    .groupBy(
+        "CD_NTZ_CTB_TRAN_STD"
+    )
+
+    .agg(
+        F.count("*").alias(
+            "QT_TRANSACOES"
+        ),
+
+        F.countDistinct(
+            "CD_CLI"
+        ).alias(
+            "QT_CLIENTES"
+        ),
+
+        F.sum(
+            "VL_TRAN_ABS"
+        ).alias(
+            "VL_TOTAL_ABS"
+        ),
+
+        F.avg(
+            "VL_TRAN_ABS"
+        ).alias(
+            "VL_TICKET_MEDIO"
+        ),
+
+        F.percentile_approx(
+            "VL_TRAN_ABS",
+            0.50,
+            10000,
+        ).alias(
+            "VL_TICKET_MEDIANO"
+        ),
+    )
+
+    .withColumn(
+        "NM_NATUREZA",
+
+        F.when(
+            F.col(
+                "CD_NTZ_CTB_TRAN_STD"
+            ) == "C",
+
+            F.lit("Crédito"),
+        )
+        .when(
+            F.col(
+                "CD_NTZ_CTB_TRAN_STD"
+            ) == "D",
+
+            F.lit("Débito"),
+        )
+        .otherwise(
+            F.lit("Inválida")
+        ),
+    )
+
+    .withColumn(
+        "PC_TRANSACOES",
+
+        F.round(
+            F.col("QT_TRANSACOES")
+            /
+            F.sum(
+                "QT_TRANSACOES"
+            ).over(
+                janela_total
+            )
+            * 100,
+            2,
+        ),
+    )
+
+    .withColumn(
+        "PC_VALOR",
+
+        F.round(
+            F.col("VL_TOTAL_ABS")
+            /
+            F.sum(
+                "VL_TOTAL_ABS"
+            ).over(
+                janela_total
+            )
+            * 100,
+            2,
+        ),
+    )
+
+    .select(
+        "CD_NTZ_CTB_TRAN_STD",
+        "NM_NATUREZA",
+        "QT_TRANSACOES",
+        "PC_TRANSACOES",
+        "QT_CLIENTES",
+        "VL_TOTAL_ABS",
+        "PC_VALOR",
+        "VL_TICKET_MEDIO",
+        "VL_TICKET_MEDIANO",
+    )
+
+    .orderBy(
+        "CD_NTZ_CTB_TRAN_STD"
+    )
+)
+
+
+# ============================================================
+# 12. ANÁLISE POR CLASSIFICAÇÃO
+# ============================================================
+
+janela_natureza = Window.partitionBy(
+    "CD_NTZ_CTB_TRAN_STD"
+)
+
+
+tb_classificacoes = (
+    df_estudo_transacoes
+
+    .groupBy(
+        "CD_NTZ_CTB_TRAN_STD",
+        "CD_CLASSIFICACAO_CATEGORIA",
+        "NM_CLASSIFICACAO_CATEGORIA_STD",
+    )
+
+    .agg(
+        F.count("*").alias(
+            "QT_TRANSACOES"
+        ),
+
+        F.countDistinct(
+            "CD_CLI"
+        ).alias(
+            "QT_CLIENTES"
+        ),
+
+        F.sum(
+            "VL_TRAN_ABS"
+        ).alias(
+            "VL_TOTAL_ABS"
+        ),
+
+        F.avg(
+            "VL_TRAN_ABS"
+        ).alias(
+            "VL_TICKET_MEDIO"
+        ),
+
+        F.percentile_approx(
+            "VL_TRAN_ABS",
+            0.50,
+            10000,
+        ).alias(
+            "VL_TICKET_MEDIANO"
+        ),
+    )
+
+    .withColumn(
+        "PC_QT_NATUREZA",
+
+        F.round(
+            F.col("QT_TRANSACOES")
+            /
+            F.sum(
+                "QT_TRANSACOES"
+            ).over(
+                janela_natureza
+            )
+            * 100,
+            2,
+        ),
+    )
+
+    .withColumn(
+        "PC_VL_NATUREZA",
+
+        F.round(
+            F.col("VL_TOTAL_ABS")
+            /
+            F.sum(
+                "VL_TOTAL_ABS"
+            ).over(
+                janela_natureza
+            )
+            * 100,
+            2,
+        ),
+    )
+
+    .withColumn(
+        "PC_QT_TOTAL",
+
+        F.round(
+            F.col("QT_TRANSACOES")
+            /
+            F.sum(
+                "QT_TRANSACOES"
+            ).over(
+                janela_total
+            )
+            * 100,
+            2,
+        ),
+    )
+
+    .withColumn(
+        "PC_VL_TOTAL",
+
+        F.round(
+            F.col("VL_TOTAL_ABS")
+            /
+            F.sum(
+                "VL_TOTAL_ABS"
+            ).over(
+                janela_total
+            )
+            * 100,
+            2,
+        ),
+    )
+
+    .withColumnRenamed(
+        "NM_CLASSIFICACAO_CATEGORIA_STD",
+        "NM_CLASSIFICACAO_CATEGORIA",
+    )
+
+    .orderBy(
+        "CD_NTZ_CTB_TRAN_STD",
+        "CD_CLASSIFICACAO_CATEGORIA",
+    )
+)
+
+
+# ============================================================
+# 13. ANÁLISE AGRO
+# ============================================================
+
+tb_agro = (
+    df_estudo_transacoes
+
+    .groupBy(
+        "FL_AGRO_CATEGORIA_STD"
+    )
+
+    .agg(
+        F.count("*").alias(
+            "QT_TRANSACOES"
+        ),
+
+        F.countDistinct(
+            "CD_CLI"
+        ).alias(
+            "QT_CLIENTES"
+        ),
+
+        F.sum(
+            "VL_TRAN_ABS"
+        ).alias(
+            "VL_TOTAL_ABS"
+        ),
+
+        F.avg(
+            "VL_TRAN_ABS"
+        ).alias(
+            "VL_TICKET_MEDIO"
+        ),
+    )
+
+    .withColumn(
+        "PC_TRANSACOES",
+
+        F.round(
+            F.col("QT_TRANSACOES")
+            /
+            F.sum(
+                "QT_TRANSACOES"
+            ).over(
+                janela_total
+            )
+            * 100,
+            2,
+        ),
+    )
+
+    .withColumn(
+        "PC_VALOR",
+
+        F.round(
+            F.col("VL_TOTAL_ABS")
+            /
+            F.sum(
+                "VL_TOTAL_ABS"
+            ).over(
+                janela_total
+            )
+            * 100,
+            2,
+        ),
+    )
+
+    .orderBy(
+        "FL_AGRO_CATEGORIA_STD"
+    )
+)
+
+
+# ============================================================
+# 14. CATEGORIAS ORIGINAIS
+# ============================================================
+
+colunas_categoria_original = [
+    "CD_CTGR_TRAN_OGNL",
+    "CD_NTZ_CTB_TRAN_STD",
+    "CD_CLASSIFICACAO_CATEGORIA",
+    "NM_CLASSIFICACAO_CATEGORIA_STD",
+]
+
+
+if (
+    "NM_TP_LANCAMENTO"
+    in df_estudo_transacoes.columns
+):
+
+    colunas_categoria_original.insert(
+        1,
+        "NM_TP_LANCAMENTO",
+    )
+
+
+tb_categorias_originais = (
+    df_estudo_transacoes
+
+    .groupBy(
+        *colunas_categoria_original
+    )
+
+    .agg(
+        F.count("*").alias(
+            "QT_TRANSACOES"
+        ),
+
+        F.countDistinct(
+            "CD_CLI"
+        ).alias(
+            "QT_CLIENTES"
+        ),
+
+        F.sum(
+            "VL_TRAN_ABS"
+        ).alias(
+            "VL_TOTAL_ABS"
+        ),
+
+        F.avg(
+            "VL_TRAN_ABS"
+        ).alias(
+            "VL_TICKET_MEDIO"
+        ),
+    )
+
+    .withColumn(
+        "PC_TRANSACOES",
+
+        F.round(
+            F.col("QT_TRANSACOES")
+            /
+            F.sum(
+                "QT_TRANSACOES"
+            ).over(
+                janela_total
+            )
+            * 100,
+            4,
+        ),
+    )
+
+    .withColumn(
+        "PC_VALOR",
+
+        F.round(
+            F.col("VL_TOTAL_ABS")
+            /
+            F.sum(
+                "VL_TOTAL_ABS"
+            ).over(
+                janela_total
+            )
+            * 100,
+            4,
+        ),
+    )
+
+    .withColumnRenamed(
+        "NM_CLASSIFICACAO_CATEGORIA_STD",
+        "NM_CLASSIFICACAO_CATEGORIA",
+    )
+
+    .orderBy(
+        F.col(
+            "VL_TOTAL_ABS"
+        ).desc()
+    )
+)
+
+
+# ============================================================
+# 15. PRODUTOS
+# ============================================================
+
+tb_produtos = None
+
+
+if "CD_PRD" in df_estudo_transacoes.columns:
+
+    colunas_produto = [
+        "CD_PRD",
+    ]
+
+    if "NM_PRD" in df_estudo_transacoes.columns:
+
+        colunas_produto.append(
+            "NM_PRD"
+        )
+
+    tb_produtos = (
+        df_estudo_transacoes
+
+        .groupBy(
+            *colunas_produto
+        )
+
+        .agg(
+            F.count("*").alias(
+                "QT_TRANSACOES"
+            ),
+
+            F.countDistinct(
+                "CD_CLI"
+            ).alias(
+                "QT_CLIENTES"
+            ),
+
+            F.sum(
+                "VL_TRAN_ABS"
+            ).alias(
+                "VL_TOTAL_ABS"
+            ),
+
+            F.avg(
+                "VL_TRAN_ABS"
+            ).alias(
+                "VL_TICKET_MEDIO"
+            ),
+        )
+
+        .withColumn(
+            "PC_TRANSACOES",
+
+            F.round(
+                F.col("QT_TRANSACOES")
+                /
+                F.sum(
+                    "QT_TRANSACOES"
+                ).over(
+                    janela_total
+                )
+                * 100,
+                4,
+            ),
+        )
+
+        .withColumn(
+            "PC_VALOR",
+
+            F.round(
+                F.col("VL_TOTAL_ABS")
+                /
+                F.sum(
+                    "VL_TOTAL_ABS"
+                ).over(
+                    janela_total
+                )
+                * 100,
+                4,
+            ),
+        )
+
+        .orderBy(
+            F.col(
+                "VL_TOTAL_ABS"
+            ).desc()
+        )
+    )
+
+
+# ============================================================
+# 16. AUDITORIA DO MAPEAMENTO
+# ============================================================
+
+tb_origem_classificacao = None
+tb_categorias_fallback = None
+
+
+if (
+    "TX_ORIGEM_CLASSIFICACAO"
+    in df_estudo_transacoes.columns
+):
+
+    tb_origem_classificacao = (
+        df_estudo_transacoes
+
+        .groupBy(
+            "TX_ORIGEM_CLASSIFICACAO"
+        )
+
+        .agg(
+            F.count("*").alias(
+                "QT_TRANSACOES"
+            ),
+
+            F.countDistinct(
+                "CD_CLI"
+            ).alias(
+                "QT_CLIENTES"
+            ),
+
+            F.sum(
+                "VL_TRAN_ABS"
+            ).alias(
+                "VL_TOTAL_ABS"
+            ),
+        )
+
+        .withColumn(
+            "PC_TRANSACOES",
+
+            F.round(
+                F.col("QT_TRANSACOES")
+                /
+                F.sum(
+                    "QT_TRANSACOES"
+                ).over(
+                    janela_total
+                )
+                * 100,
+                2,
+            ),
+        )
+
+        .withColumn(
+            "PC_VALOR",
+
+            F.round(
+                F.col("VL_TOTAL_ABS")
+                /
+                F.sum(
+                    "VL_TOTAL_ABS"
+                ).over(
+                    janela_total
+                )
+                * 100,
+                2,
+            ),
+        )
+
+        .orderBy(
+            F.col(
+                "QT_TRANSACOES"
+            ).desc()
+        )
+    )
+
+
+if (
+    "FL_MAPEAMENTO_ENCONTRADO"
+    in df_estudo_transacoes.columns
+):
+
+    colunas_fallback = [
+        "CD_CTGR_TRAN_OGNL",
+        "CD_NTZ_CTB_TRAN_STD",
+    ]
+
+    if (
+        "NM_TP_LANCAMENTO"
+        in df_estudo_transacoes.columns
+    ):
+
+        colunas_fallback.append(
+            "NM_TP_LANCAMENTO"
+        )
+
+    tb_categorias_fallback = (
+        df_estudo_transacoes
+
+        .filter(
+            F.col(
+                "FL_MAPEAMENTO_ENCONTRADO"
+            ) == "N"
+        )
+
+        .groupBy(
+            *colunas_fallback
+        )
+
+        .agg(
+            F.count("*").alias(
+                "QT_TRANSACOES"
+            ),
+
+            F.countDistinct(
+                "CD_CLI"
+            ).alias(
+                "QT_CLIENTES"
+            ),
+
+            F.sum(
+                "VL_TRAN_ABS"
+            ).alias(
+                "VL_TOTAL_ABS"
+            ),
+
+            F.avg(
+                "VL_TRAN_ABS"
+            ).alias(
+                "VL_TICKET_MEDIO"
+            ),
+        )
+
+        .orderBy(
+            F.col(
+                "VL_TOTAL_ABS"
+            ).desc()
+        )
+    )
+
+
+# ============================================================
+# 17. SUMARIZAÇÃO POR CLIENTE
+# ============================================================
+
+expressoes_cliente = [
+    F.count("*").alias(
+        "QT_TRANS_TOTAL_ESTUDO"
+    ),
+
+    F.sum(
+        "VL_TRAN_ABS"
+    ).alias(
+        "VL_MOV_TOTAL_ESTUDO"
+    ),
+
+    F.sum(
+        F.when(
+            F.col(
+                "CD_NTZ_CTB_TRAN_STD"
+            ) == "C",
+            1,
+        ).otherwise(0)
+    ).alias(
+        "QT_TRANS_ENT_ESTUDO"
+    ),
+
+    F.sum(
+        F.when(
+            F.col(
+                "CD_NTZ_CTB_TRAN_STD"
+            ) == "D",
+            1,
+        ).otherwise(0)
+    ).alias(
+        "QT_TRANS_SAI_ESTUDO"
+    ),
+
+    F.sum(
+        F.when(
+            F.col(
+                "CD_NTZ_CTB_TRAN_STD"
+            ) == "C",
+
+            F.col(
+                "VL_TRAN_ABS"
+            ),
+        ).otherwise(
+            F.lit(0)
+        )
+    ).alias(
+        "VL_ENT_TOTAL_ESTUDO"
+    ),
+
+    F.sum(
+        F.when(
+            F.col(
+                "CD_NTZ_CTB_TRAN_STD"
+            ) == "D",
+
+            F.col(
+                "VL_TRAN_ABS"
+            ),
+        ).otherwise(
+            F.lit(0)
+        )
+    ).alias(
+        "VL_SAI_TOTAL_ESTUDO"
+    ),
+
+    F.countDistinct(
+        "CD_CLASSIFICACAO_CATEGORIA"
+    ).alias(
+        "QT_CLASSIFICACOES_ATIVAS"
+    ),
+
+    F.countDistinct(
+        "CD_CTGR_TRAN_OGNL"
+    ).alias(
+        "QT_CATEGORIAS_OGNL_DISTINTAS"
+    ),
+
+    F.max(
+        F.when(
+            F.col(
+                "FL_AGRO_CATEGORIA_STD"
+            ) == "S",
+            1,
+        ).otherwise(0)
+    ).alias(
+        "NR_TEM_MOV_AGRO_TRANS"
+    ),
+
+    F.sum(
+        F.when(
+            F.col(
+                "FL_AGRO_CATEGORIA_STD"
+            ) == "S",
+            1,
+        ).otherwise(0)
+    ).alias(
+        "QT_TRANS_AGRO"
+    ),
+
+    F.sum(
+        F.when(
+            F.col(
+                "FL_AGRO_CATEGORIA_STD"
+            ) == "S",
+
+            F.col(
+                "VL_TRAN_ABS"
+            ),
+        ).otherwise(
+            F.lit(0)
+        )
+    ).alias(
+        "VL_TRANS_AGRO_ABS"
+    ),
+]
+
+
+if "CD_PRD" in df_estudo_transacoes.columns:
+
+    expressoes_cliente.append(
+        F.countDistinct(
+            "CD_PRD"
+        ).alias(
+            "QT_PRODUTOS_DISTINTOS"
+        )
+    )
+
+
+for codigo, configuracao in (
+    CLASSIFICACOES_ENTRADA.items()
+):
+
+    sufixo = configuracao[
+        "sufixo"
+    ]
+
+    condicao = (
+        (
+            F.col(
+                "CD_NTZ_CTB_TRAN_STD"
+            ) == "C"
+        )
+        &
+        (
+            F.col(
+                "CD_CLASSIFICACAO_CATEGORIA"
+            ) == codigo
+        )
+    )
+
+    expressoes_cliente.extend([
+        F.sum(
+            F.when(
+                condicao,
+                1,
+            ).otherwise(0)
+        ).alias(
+            f"QT_CLS_ENT_{sufixo}"
+        ),
+
+        F.sum(
+            F.when(
+                condicao,
+
+                F.col(
+                    "VL_TRAN_ABS"
+                ),
+            ).otherwise(
+                F.lit(0)
+            )
+        ).alias(
+            f"VL_CLS_ENT_{sufixo}"
+        ),
+    ])
+
+
+for codigo, configuracao in (
+    CLASSIFICACOES_SAIDA.items()
+):
+
+    sufixo = configuracao[
+        "sufixo"
+    ]
+
+    condicao = (
+        (
+            F.col(
+                "CD_NTZ_CTB_TRAN_STD"
+            ) == "D"
+        )
+        &
+        (
+            F.col(
+                "CD_CLASSIFICACAO_CATEGORIA"
+            ) == codigo
+        )
+    )
+
+    expressoes_cliente.extend([
+        F.sum(
+            F.when(
+                condicao,
+                1,
+            ).otherwise(0)
+        ).alias(
+            f"QT_CLS_SAI_{sufixo}"
+        ),
+
+        F.sum(
+            F.when(
+                condicao,
+
+                F.col(
+                    "VL_TRAN_ABS"
+                ),
+            ).otherwise(
+                F.lit(0)
+            )
+        ).alias(
+            f"VL_CLS_SAI_{sufixo}"
+        ),
+    ])
+
+
+if (
+    "FL_MAPEAMENTO_ENCONTRADO"
+    in df_estudo_transacoes.columns
+):
+
+    expressoes_cliente.extend([
+        F.sum(
+            F.when(
+                F.col(
+                    "FL_MAPEAMENTO_ENCONTRADO"
+                ) == "S",
+                1,
+            ).otherwise(0)
+        ).alias(
+            "QT_TRANS_MAPEADAS"
+        ),
+
+        F.sum(
+            F.when(
+                F.col(
+                    "FL_MAPEAMENTO_ENCONTRADO"
+                ) == "N",
+                1,
+            ).otherwise(0)
+        ).alias(
+            "QT_TRANS_FALLBACK"
+        ),
+
+        F.sum(
+            F.when(
+                F.col(
+                    "FL_MAPEAMENTO_ENCONTRADO"
+                ) == "N",
+
+                F.col(
+                    "VL_TRAN_ABS"
+                ),
+            ).otherwise(
+                F.lit(0)
+            )
+        ).alias(
+            "VL_TRANS_FALLBACK_ABS"
+        ),
+    ])
+
+
+df_transacoes_cliente_estudo = (
+    df_estudo_transacoes
+
+    .groupBy(
+        "CD_CLI"
+    )
+
+    .agg(
+        *expressoes_cliente
+    )
+)
+
+
+# ============================================================
+# 18. PERCENTUAIS POR CLASSIFICAÇÃO
+# ============================================================
+
+for configuracao in (
+    CLASSIFICACOES_ENTRADA.values()
+):
+
+    sufixo = configuracao[
+        "sufixo"
+    ]
+
+    df_transacoes_cliente_estudo = (
+        df_transacoes_cliente_estudo
+
+        .withColumn(
+            f"PC_CLS_ENT_{sufixo}",
+
+            F.when(
+                F.col(
+                    "VL_ENT_TOTAL_ESTUDO"
+                ) > 0,
+
+                F.round(
+                    F.col(
+                        f"VL_CLS_ENT_{sufixo}"
+                    )
+                    /
+                    F.col(
+                        "VL_ENT_TOTAL_ESTUDO"
+                    )
+                    * 100,
+                    4,
+                ),
+            )
+            .otherwise(
+                F.lit(0.0)
+            ),
+        )
+    )
+
+
+for configuracao in (
+    CLASSIFICACOES_SAIDA.values()
+):
+
+    sufixo = configuracao[
+        "sufixo"
+    ]
+
+    df_transacoes_cliente_estudo = (
+        df_transacoes_cliente_estudo
+
+        .withColumn(
+            f"PC_CLS_SAI_{sufixo}",
+
+            F.when(
+                F.col(
+                    "VL_SAI_TOTAL_ESTUDO"
+                ) > 0,
+
+                F.round(
+                    F.col(
+                        f"VL_CLS_SAI_{sufixo}"
+                    )
+                    /
+                    F.col(
+                        "VL_SAI_TOTAL_ESTUDO"
+                    )
+                    * 100,
+                    4,
+                ),
+            )
+            .otherwise(
+                F.lit(0.0)
+            ),
+        )
+    )
+
+
+# ============================================================
+# 19. DIVERSIDADE DE CLASSIFICAÇÕES
+# ============================================================
+
+colunas_valor_entrada = [
+    f"VL_CLS_ENT_{configuracao['sufixo']}"
+    for configuracao
+    in CLASSIFICACOES_ENTRADA.values()
+]
+
+
+colunas_valor_saida = [
+    f"VL_CLS_SAI_{configuracao['sufixo']}"
+    for configuracao
+    in CLASSIFICACOES_SAIDA.values()
+]
+
+
+df_transacoes_cliente_estudo = (
+    df_transacoes_cliente_estudo
+
+    .withColumn(
+        "QT_CLS_ENT_ATIVAS",
+
+        reduce(
+            lambda acumulado, coluna:
+                acumulado
+                + F.when(
+                    F.col(coluna) > 0,
+                    1,
+                ).otherwise(0),
+
+            colunas_valor_entrada,
+            F.lit(0),
+        ),
+    )
+
+    .withColumn(
+        "QT_CLS_SAI_ATIVAS",
+
+        reduce(
+            lambda acumulado, coluna:
+                acumulado
+                + F.when(
+                    F.col(coluna) > 0,
+                    1,
+                ).otherwise(0),
+
+            colunas_valor_saida,
+            F.lit(0),
+        ),
+    )
+
+    .withColumn(
+        "FL_TEM_MOV_AGRO_TRANS",
+
+        F.when(
+            F.col(
+                "NR_TEM_MOV_AGRO_TRANS"
+            ) == 1,
+            F.lit("S"),
+        )
+        .otherwise(
+            F.lit("N")
+        ),
+    )
+)
+
+
+# ============================================================
+# 20. CLASSIFICAÇÃO DOMINANTE DE ENTRADA
+# ============================================================
+
+df_transacoes_cliente_estudo = (
+    df_transacoes_cliente_estudo
+
+    .withColumn(
+        "VL_CLS_ENT_DOMINANTE",
+
+        F.greatest(
+            *[
+                F.col(coluna)
+                for coluna
+                in colunas_valor_entrada
+            ]
+        ),
+    )
+)
+
+
+expressao_codigo_entrada = None
+expressao_nome_entrada = None
+
+
+for codigo, configuracao in (
+    CLASSIFICACOES_ENTRADA.items()
+):
+
+    sufixo = configuracao[
+        "sufixo"
+    ]
+
+    condicao = (
+        (
+            F.col(
+                "VL_ENT_TOTAL_ESTUDO"
+            ) > 0
+        )
+        &
+        (
+            F.col(
+                f"VL_CLS_ENT_{sufixo}"
+            )
+            ==
+            F.col(
+                "VL_CLS_ENT_DOMINANTE"
+            )
+        )
+    )
+
+    if expressao_codigo_entrada is None:
+
+        expressao_codigo_entrada = (
+            F.when(
+                condicao,
+                F.lit(codigo),
+            )
+        )
+
+        expressao_nome_entrada = (
+            F.when(
+                condicao,
+                F.lit(
+                    configuracao[
+                        "nome"
+                    ]
+                ),
+            )
+        )
+
+    else:
+
+        expressao_codigo_entrada = (
+            expressao_codigo_entrada
+            .when(
+                condicao,
+                F.lit(codigo),
+            )
+        )
+
+        expressao_nome_entrada = (
+            expressao_nome_entrada
+            .when(
+                condicao,
+                F.lit(
+                    configuracao[
+                        "nome"
+                    ]
+                ),
+            )
+        )
+
+
+df_transacoes_cliente_estudo = (
+    df_transacoes_cliente_estudo
+
+    .withColumn(
+        "CD_CLS_ENT_DOMINANTE",
+
+        expressao_codigo_entrada
+        .otherwise(
+            F.lit(None).cast(
+                "int"
+            )
+        ),
+    )
+
+    .withColumn(
+        "NM_CLS_ENT_DOMINANTE",
+
+        expressao_nome_entrada
+        .otherwise(
+            F.lit(
+                "Sem entrada"
+            )
+        ),
+    )
+
+    .withColumn(
+        "PC_CLS_ENT_DOMINANTE",
+
+        F.when(
+            F.col(
+                "VL_ENT_TOTAL_ESTUDO"
+            ) > 0,
+
+            F.round(
+                F.col(
+                    "VL_CLS_ENT_DOMINANTE"
+                )
+                /
+                F.col(
+                    "VL_ENT_TOTAL_ESTUDO"
+                )
+                * 100,
+                4,
+            ),
+        )
+        .otherwise(
+            F.lit(0.0)
+        ),
+    )
+
+    .withColumn(
+        "QT_CLS_ENT_EMPATE_DOMINANCIA",
+
+        reduce(
+            lambda acumulado, coluna:
+                acumulado
+                + F.when(
+                    (
+                        F.col(
+                            "VL_CLS_ENT_DOMINANTE"
+                        ) > 0
+                    )
+                    &
+                    (
+                        F.col(coluna)
+                        ==
+                        F.col(
+                            "VL_CLS_ENT_DOMINANTE"
+                        )
+                    ),
+                    1,
+                ).otherwise(0),
+
+            colunas_valor_entrada,
+            F.lit(0),
+        ),
+    )
+)
+
+
+# ============================================================
+# 21. CLASSIFICAÇÃO DOMINANTE DE SAÍDA
+# ============================================================
+
+df_transacoes_cliente_estudo = (
+    df_transacoes_cliente_estudo
+
+    .withColumn(
+        "VL_CLS_SAI_DOMINANTE",
+
+        F.greatest(
+            *[
+                F.col(coluna)
+                for coluna
+                in colunas_valor_saida
+            ]
+        ),
+    )
+)
+
+
+expressao_codigo_saida = None
+expressao_nome_saida = None
+
+
+for codigo, configuracao in (
+    CLASSIFICACOES_SAIDA.items()
+):
+
+    sufixo = configuracao[
+        "sufixo"
+    ]
+
+    condicao = (
+        (
+            F.col(
+                "VL_SAI_TOTAL_ESTUDO"
+            ) > 0
+        )
+        &
+        (
+            F.col(
+                f"VL_CLS_SAI_{sufixo}"
+            )
+            ==
+            F.col(
+                "VL_CLS_SAI_DOMINANTE"
+            )
+        )
+    )
+
+    if expressao_codigo_saida is None:
+
+        expressao_codigo_saida = (
+            F.when(
+                condicao,
+                F.lit(codigo),
+            )
+        )
+
+        expressao_nome_saida = (
+            F.when(
+                condicao,
+                F.lit(
+                    configuracao[
+                        "nome"
+                    ]
+                ),
+            )
+        )
+
+    else:
+
+        expressao_codigo_saida = (
+            expressao_codigo_saida
+            .when(
+                condicao,
+                F.lit(codigo),
+            )
+        )
+
+        expressao_nome_saida = (
+            expressao_nome_saida
+            .when(
+                condicao,
+                F.lit(
+                    configuracao[
+                        "nome"
+                    ]
+                ),
+            )
+        )
+
+
+df_transacoes_cliente_estudo = (
+    df_transacoes_cliente_estudo
+
+    .withColumn(
+        "CD_CLS_SAI_DOMINANTE",
+
+        expressao_codigo_saida
+        .otherwise(
+            F.lit(None).cast(
+                "int"
+            )
+        ),
+    )
+
+    .withColumn(
+        "NM_CLS_SAI_DOMINANTE",
+
+        expressao_nome_saida
+        .otherwise(
+            F.lit(
+                "Sem saída"
+            )
+        ),
+    )
+
+    .withColumn(
+        "PC_CLS_SAI_DOMINANTE",
+
+        F.when(
+            F.col(
+                "VL_SAI_TOTAL_ESTUDO"
+            ) > 0,
+
+            F.round(
+                F.col(
+                    "VL_CLS_SAI_DOMINANTE"
+                )
+                /
+                F.col(
+                    "VL_SAI_TOTAL_ESTUDO"
+                )
+                * 100,
+                4,
+            ),
+        )
+        .otherwise(
+            F.lit(0.0)
+        ),
+    )
+
+    .withColumn(
+        "QT_CLS_SAI_EMPATE_DOMINANCIA",
+
+        reduce(
+            lambda acumulado, coluna:
+                acumulado
+                + F.when(
+                    (
+                        F.col(
+                            "VL_CLS_SAI_DOMINANTE"
+                        ) > 0
+                    )
+                    &
+                    (
+                        F.col(coluna)
+                        ==
+                        F.col(
+                            "VL_CLS_SAI_DOMINANTE"
+                        )
+                    ),
+                    1,
+                ).otherwise(0),
+
+            colunas_valor_saida,
+            F.lit(0),
+        ),
+    )
+)
+
+
+# ============================================================
+# 22. ASSINATURA DE FLUXO
+# ============================================================
+
+df_transacoes_cliente_estudo = (
+    df_transacoes_cliente_estudo
+
+    .withColumn(
+        "TX_ASSINATURA_FLUXO",
+
+        F.concat(
+            F.lit("Entrada: "),
+            F.col(
+                "NM_CLS_ENT_DOMINANTE"
+            ),
+            F.lit(" | Saída: "),
+            F.col(
+                "NM_CLS_SAI_DOMINANTE"
+            ),
+        ),
+    )
+
+    .withColumn(
+        "TX_FAIXA_QT_TRANS",
+
+        F.when(
+            F.col(
+                "QT_TRANS_TOTAL_ESTUDO"
+            ) == 1,
+            F.lit("01 | 1"),
+        )
+        .when(
+            F.col(
+                "QT_TRANS_TOTAL_ESTUDO"
+            ).between(
+                2,
+                5,
+            ),
+            F.lit("02 | 2 a 5"),
+        )
+        .when(
+            F.col(
+                "QT_TRANS_TOTAL_ESTUDO"
+            ).between(
+                6,
+                10,
+            ),
+            F.lit("03 | 6 a 10"),
+        )
+        .when(
+            F.col(
+                "QT_TRANS_TOTAL_ESTUDO"
+            ).between(
+                11,
+                20,
+            ),
+            F.lit("04 | 11 a 20"),
+        )
+        .when(
+            F.col(
+                "QT_TRANS_TOTAL_ESTUDO"
+            ).between(
+                21,
+                50,
+            ),
+            F.lit("05 | 21 a 50"),
+        )
+        .when(
+            F.col(
+                "QT_TRANS_TOTAL_ESTUDO"
+            ).between(
+                51,
+                100,
+            ),
+            F.lit("06 | 51 a 100"),
+        )
+        .when(
+            F.col(
+                "QT_TRANS_TOTAL_ESTUDO"
+            ).between(
+                101,
+                200,
+            ),
+            F.lit("07 | 101 a 200"),
+        )
+        .otherwise(
+            F.lit("08 | Mais de 200")
+        ),
+    )
+)
+
+
+# ============================================================
+# 23. QUALIDADE DO FALLBACK POR CLIENTE
+# ============================================================
+
+if (
+    "FL_MAPEAMENTO_ENCONTRADO"
+    in df_estudo_transacoes.columns
+):
+
+    df_transacoes_cliente_estudo = (
+        df_transacoes_cliente_estudo
+
+        .withColumn(
+            "PC_QT_TRANS_FALLBACK",
+
+            F.when(
+                F.col(
+                    "QT_TRANS_TOTAL_ESTUDO"
+                ) > 0,
+
+                F.round(
+                    F.col(
+                        "QT_TRANS_FALLBACK"
+                    )
+                    /
+                    F.col(
+                        "QT_TRANS_TOTAL_ESTUDO"
+                    )
+                    * 100,
+                    4,
+                ),
+            )
+            .otherwise(
+                F.lit(0.0)
+            ),
+        )
+
+        .withColumn(
+            "PC_VL_TRANS_FALLBACK",
+
+            F.when(
+                F.col(
+                    "VL_MOV_TOTAL_ESTUDO"
+                ) > 0,
+
+                F.round(
+                    F.col(
+                        "VL_TRANS_FALLBACK_ABS"
+                    )
+                    /
+                    F.col(
+                        "VL_MOV_TOTAL_ESTUDO"
+                    )
+                    * 100,
+                    4,
+                ),
+            )
+            .otherwise(
+                F.lit(0.0)
+            ),
+        )
+
+        .withColumn(
+            "TX_FAIXA_PC_VL_FALLBACK",
+
+            F.when(
+                F.col(
+                    "PC_VL_TRANS_FALLBACK"
+                ) == 0,
+                F.lit("00 | Sem fallback"),
+            )
+            .when(
+                F.col(
+                    "PC_VL_TRANS_FALLBACK"
+                ) < 10,
+                F.lit("01 | Maior que 0% e menor que 10%"),
+            )
+            .when(
+                F.col(
+                    "PC_VL_TRANS_FALLBACK"
+                ) < 25,
+                F.lit("02 | De 10% a menos de 25%"),
+            )
+            .when(
+                F.col(
+                    "PC_VL_TRANS_FALLBACK"
+                ) < 50,
+                F.lit("03 | De 25% a menos de 50%"),
+            )
+            .otherwise(
+                F.lit("04 | 50% ou mais"),
+            ),
+        )
+    )
+
+
+df_transacoes_cliente_estudo = (
+    df_transacoes_cliente_estudo
+
+    .persist(
+        StorageLevel.MEMORY_AND_DISK
+    )
+)
+
+
+df_transacoes_cliente_estudo.createOrReplaceTempView(
+    "VW_ESTUDO_TRANSACOES_CLIENTE"
+)
+
+
+# ============================================================
+# 24. ESTATÍSTICAS DOS CLIENTES
+# ============================================================
+
+metricas_clientes = [
+    (
+        "QT_TRANS_TOTAL_ESTUDO",
+        "Quantidade total de transações",
+    ),
+    (
+        "VL_MOV_TOTAL_ESTUDO",
+        "Valor movimentado",
+    ),
+    (
+        "VL_ENT_TOTAL_ESTUDO",
+        "Valor total de entradas",
+    ),
+    (
+        "VL_SAI_TOTAL_ESTUDO",
+        "Valor total de saídas",
+    ),
+    (
+        "QT_CLASSIFICACOES_ATIVAS",
+        "Classificações distintas",
+    ),
+    (
+        "QT_CATEGORIAS_OGNL_DISTINTAS",
+        "Categorias originais distintas",
+    ),
+    (
+        "QT_CLS_ENT_ATIVAS",
+        "Classificações de entrada ativas",
+    ),
+    (
+        "QT_CLS_SAI_ATIVAS",
+        "Classificações de saída ativas",
+    ),
+    (
+        "PC_CLS_ENT_DOMINANTE",
+        "% da entrada na classificação dominante",
+    ),
+    (
+        "PC_CLS_SAI_DOMINANTE",
+        "% da saída na classificação dominante",
+    ),
+]
+
+
+expressoes_estatisticas = []
+
+
+for coluna, _ in metricas_clientes:
+
+    expressoes_estatisticas.extend([
+        F.count(
+            F.col(coluna)
+        ).alias(
+            f"{coluna}__N"
+        ),
+
+        F.avg(
+            F.col(coluna)
+        ).alias(
+            f"{coluna}__MEDIA"
+        ),
+
+        F.stddev(
+            F.col(coluna)
+        ).alias(
+            f"{coluna}__DESVIO"
+        ),
+
+        F.min(
+            F.col(coluna)
+        ).alias(
+            f"{coluna}__MIN"
+        ),
+
+        F.percentile_approx(
+            F.col(coluna),
+            [
+                0.25,
+                0.50,
+                0.75,
+                0.95,
+            ],
+            10000,
+        ).alias(
+            f"{coluna}__PERCENTIS"
+        ),
+
+        F.max(
+            F.col(coluna)
+        ).alias(
+            f"{coluna}__MAX"
+        ),
+    ])
+
+
+resultado_estatisticas = (
+    df_transacoes_cliente_estudo
+    .agg(
+        *expressoes_estatisticas
+    )
+    .first()
+)
+
+
+def converter_float(
+    valor,
+):
+
+    if valor is None:
+        return None
+
+    return float(valor)
+
+
+linhas_estatisticas = []
+
+
+for coluna, descricao in metricas_clientes:
+
+    percentis = (
+        resultado_estatisticas[
+            f"{coluna}__PERCENTIS"
+        ]
+        or [
+            None,
+            None,
+            None,
+            None,
+        ]
+    )
+
+    linhas_estatisticas.append((
+        descricao,
+        int(
+            resultado_estatisticas[
+                f"{coluna}__N"
+            ] or 0
+        ),
+        converter_float(
+            resultado_estatisticas[
+                f"{coluna}__MEDIA"
+            ]
+        ),
+        converter_float(
+            resultado_estatisticas[
+                f"{coluna}__DESVIO"
+            ]
+        ),
+        converter_float(
+            resultado_estatisticas[
+                f"{coluna}__MIN"
+            ]
+        ),
+        converter_float(
+            percentis[0]
+        ),
+        converter_float(
+            percentis[1]
+        ),
+        converter_float(
+            percentis[2]
+        ),
+        converter_float(
+            percentis[3]
+        ),
+        converter_float(
+            resultado_estatisticas[
+                f"{coluna}__MAX"
+            ]
+        ),
+    ))
+
+
+tb_estatisticas_clientes = (
+    spark.createDataFrame(
+        linhas_estatisticas,
+        """
+            METRICA STRING,
+            QT_CLIENTES LONG,
+            MEDIA DOUBLE,
+            DESVIO_PADRAO DOUBLE,
+            MINIMO DOUBLE,
+            P25 DOUBLE,
+            MEDIANA DOUBLE,
+            P75 DOUBLE,
+            P95 DOUBLE,
+            MAXIMO DOUBLE
+        """,
+    )
+)
+
+
+# ============================================================
+# 25. FAIXAS DE TRANSAÇÕES POR CLIENTE
+# ============================================================
+
+tb_faixas_transacoes_cliente = (
+    df_transacoes_cliente_estudo
+
+    .groupBy(
+        "TX_FAIXA_QT_TRANS"
+    )
+
+    .agg(
+        F.count("*").alias(
+            "QT_CLIENTES"
+        ),
+
+        F.sum(
+            "VL_MOV_TOTAL_ESTUDO"
+        ).alias(
+            "VL_MOV_TOTAL_ESTUDO"
+        ),
+
+        F.avg(
+            "QT_TRANS_TOTAL_ESTUDO"
+        ).alias(
+            "QT_MEDIA_TRANSACOES"
+        ),
+
+        F.avg(
+            "VL_MOV_TOTAL_ESTUDO"
+        ).alias(
+            "VL_MEDIO_CLIENTE"
+        ),
+    )
+
+    .withColumn(
+        "PC_CLIENTES",
+
+        F.round(
+            F.col("QT_CLIENTES")
+            /
+            F.sum(
+                "QT_CLIENTES"
+            ).over(
+                janela_total
+            )
+            * 100,
+            2,
+        ),
+    )
+
+    .orderBy(
+        "TX_FAIXA_QT_TRANS"
+    )
+)
+
+
+# ============================================================
+# 26. DOMINÂNCIA DE ENTRADA
+# ============================================================
+
+tb_dominancia_entrada = (
+    df_transacoes_cliente_estudo
+
+    .groupBy(
+        "CD_CLS_ENT_DOMINANTE",
+        "NM_CLS_ENT_DOMINANTE",
+    )
+
+    .agg(
+        F.count("*").alias(
+            "QT_CLIENTES"
+        ),
+
+        F.sum(
+            "VL_ENT_TOTAL_ESTUDO"
+        ).alias(
+            "VL_ENT_TOTAL_ESTUDO"
+        ),
+
+        F.avg(
+            "PC_CLS_ENT_DOMINANTE"
+        ).alias(
+            "PC_MEDIO_DOMINANCIA"
+        ),
+
+        F.percentile_approx(
+            "PC_CLS_ENT_DOMINANTE",
+            0.50,
+            10000,
+        ).alias(
+            "PC_MEDIANO_DOMINANCIA"
+        ),
+    )
+
+    .withColumn(
+        "PC_CLIENTES",
+
+        F.round(
+            F.col("QT_CLIENTES")
+            /
+            F.sum(
+                "QT_CLIENTES"
+            ).over(
+                janela_total
+            )
+            * 100,
+            2,
+        ),
+    )
+
+    .orderBy(
+        F.col(
+            "QT_CLIENTES"
+        ).desc()
+    )
+)
+
+
+# ============================================================
+# 27. DOMINÂNCIA DE SAÍDA
+# ============================================================
+
+tb_dominancia_saida = (
+    df_transacoes_cliente_estudo
+
+    .groupBy(
+        "CD_CLS_SAI_DOMINANTE",
+        "NM_CLS_SAI_DOMINANTE",
+    )
+
+    .agg(
+        F.count("*").alias(
+            "QT_CLIENTES"
+        ),
+
+        F.sum(
+            "VL_SAI_TOTAL_ESTUDO"
+        ).alias(
+            "VL_SAI_TOTAL_ESTUDO"
+        ),
+
+        F.avg(
+            "PC_CLS_SAI_DOMINANTE"
+        ).alias(
+            "PC_MEDIO_DOMINANCIA"
+        ),
+
+        F.percentile_approx(
+            "PC_CLS_SAI_DOMINANTE",
+            0.50,
+            10000,
+        ).alias(
+            "PC_MEDIANO_DOMINANCIA"
+        ),
+    )
+
+    .withColumn(
+        "PC_CLIENTES",
+
+        F.round(
+            F.col("QT_CLIENTES")
+            /
+            F.sum(
+                "QT_CLIENTES"
+            ).over(
+                janela_total
+            )
+            * 100,
+            2,
+        ),
+    )
+
+    .orderBy(
+        F.col(
+            "QT_CLIENTES"
+        ).desc()
+    )
+)
+
+
+# ============================================================
+# 28. ASSINATURAS DE FLUXO
+# ============================================================
+
+tb_assinaturas_fluxo = (
+    df_transacoes_cliente_estudo
+
+    .groupBy(
+        "CD_CLS_ENT_DOMINANTE",
+        "NM_CLS_ENT_DOMINANTE",
+        "CD_CLS_SAI_DOMINANTE",
+        "NM_CLS_SAI_DOMINANTE",
+        "TX_ASSINATURA_FLUXO",
+    )
+
+    .agg(
+        F.count("*").alias(
+            "QT_CLIENTES"
+        ),
+
+        F.sum(
+            "VL_MOV_TOTAL_ESTUDO"
+        ).alias(
+            "VL_MOV_TOTAL_ESTUDO"
+        ),
+
+        F.avg(
+            "QT_TRANS_TOTAL_ESTUDO"
+        ).alias(
+            "QT_MEDIA_TRANSACOES"
+        ),
+
+        F.avg(
+            "VL_MOV_TOTAL_ESTUDO"
+        ).alias(
+            "VL_MEDIO_CLIENTE"
+        ),
+    )
+
+    .withColumn(
+        "PC_CLIENTES",
+
+        F.round(
+            F.col("QT_CLIENTES")
+            /
+            F.sum(
+                "QT_CLIENTES"
+            ).over(
+                janela_total
+            )
+            * 100,
+            2,
+        ),
+    )
+
+    .orderBy(
+        F.col(
+            "QT_CLIENTES"
+        ).desc()
+    )
+)
+
+
+# ============================================================
+# 29. CLIENTES EXTREMOS PARA VALIDAÇÃO
+# ============================================================
+
+tb_clientes_extremos = (
+    df_transacoes_cliente_estudo
+
+    .select(
+        "CD_CLI",
+        "QT_TRANS_TOTAL_ESTUDO",
+        "VL_MOV_TOTAL_ESTUDO",
+        "VL_ENT_TOTAL_ESTUDO",
+        "VL_SAI_TOTAL_ESTUDO",
+        "QT_CLASSIFICACOES_ATIVAS",
+        "QT_CATEGORIAS_OGNL_DISTINTAS",
+        "NM_CLS_ENT_DOMINANTE",
+        "PC_CLS_ENT_DOMINANTE",
+        "NM_CLS_SAI_DOMINANTE",
+        "PC_CLS_SAI_DOMINANTE",
+        "TX_ASSINATURA_FLUXO",
+        "FL_TEM_MOV_AGRO_TRANS",
+    )
+
+    .orderBy(
+        F.col(
+            "VL_MOV_TOTAL_ESTUDO"
+        ).desc()
+    )
+)
+
+
+# ============================================================
+# 30. ANÁLISE DE DATAS, QUANDO EXISTIREM
+# ============================================================
+
+colunas_temporais = [
+    campo.name
+    for campo
+    in df_estudo_transacoes.schema.fields
+    if isinstance(
+        campo.dataType,
+        (
+            DateType,
+            TimestampType,
+        ),
+    )
+]
+
+
+tb_datas = None
+
+
+if colunas_temporais:
+
+    expressoes_datas = []
+
+    for coluna in colunas_temporais:
+
+        expressoes_datas.extend([
+            F.min(
+                coluna
+            ).alias(
+                f"{coluna}__MIN"
+            ),
+
+            F.max(
+                coluna
+            ).alias(
+                f"{coluna}__MAX"
+            ),
+
+            F.countDistinct(
+                coluna
+            ).alias(
+                f"{coluna}__DISTINTOS"
+            ),
+        ])
+
+    resultado_datas = (
+        df_estudo_transacoes
+
+        .agg(
+            *expressoes_datas
+        )
+
+        .first()
+    )
+
+    linhas_datas = []
+
+    for coluna in colunas_temporais:
+
+        linhas_datas.append((
+            coluna,
+            resultado_datas[
+                f"{coluna}__MIN"
+            ],
+            resultado_datas[
+                f"{coluna}__MAX"
+            ],
+            int(
+                resultado_datas[
+                    f"{coluna}__DISTINTOS"
+                ] or 0
+            ),
+        ))
+
+    tb_datas = (
+        spark.createDataFrame(
+            linhas_datas,
+            """
+                VARIAVEL STRING,
+                DT_MIN STRING,
+                DT_MAX STRING,
+                QT_DISTINTOS LONG
+            """,
+        )
+    )
+
+
+# ============================================================
+# 31. PUBLICAÇÃO DAS TABELAS
+# ============================================================
+
+NOMES_TABELAS_ESTUDO = []
+
+
+def registrar_tabela(
+    nome,
+    dataframe,
+    titulo,
+    limite=50,
+    subtitulo=None,
+):
+
+    publicar_tabela_html_df(
+        nome=nome,
+        dataframe=dataframe,
+        titulo=titulo,
+        limite=limite,
+        subtitulo=subtitulo,
+    )
+
+    NOMES_TABELAS_ESTUDO.append(
+        nome
+    )
+
+
+registrar_tabela(
+    "ESTUDO_TRANS_00_RESUMO_GERAL",
+    tb_resumo_geral,
+    "Resumo geral da base transacional",
+    limite=10,
+)
+
+registrar_tabela(
+    "ESTUDO_TRANS_01_INVENTARIO",
+    tb_inventario_campos,
+    "Inventário dos campos principais",
+    limite=50,
+)
+
+registrar_tabela(
+    "ESTUDO_TRANS_02_INCONSISTENCIAS",
+    tb_inconsistencias,
+    "Inconsistências e pontos de atenção",
+    limite=50,
+)
+
+registrar_tabela(
+    "ESTUDO_TRANS_03_NATUREZA",
+    tb_natureza,
+    "Distribuição por natureza contábil",
+    limite=20,
+)
+
+registrar_tabela(
+    "ESTUDO_TRANS_04_CLASSIFICACOES",
+    tb_classificacoes,
+    "Distribuição das classificações transacionais",
+    limite=50,
+)
+
+registrar_tabela(
+    "ESTUDO_TRANS_05_AGRO",
+    tb_agro,
+    "Movimentação Agro",
+    limite=20,
+)
+
+registrar_tabela(
+    "ESTUDO_TRANS_06_CATEGORIAS_ORIGINAIS",
+    tb_categorias_originais,
+    "Principais categorias originais",
+    limite=40,
+    subtitulo=(
+        "Ordenação pelo maior valor absoluto movimentado."
+    ),
+)
+
+if tb_produtos is not None:
+
+    registrar_tabela(
+        "ESTUDO_TRANS_07_PRODUTOS",
+        tb_produtos,
+        "Principais produtos",
+        limite=30,
+    )
+
+
+registrar_tabela(
+    "ESTUDO_TRANS_08_ESTATISTICAS_CLIENTES",
+    tb_estatisticas_clientes,
+    "Estatísticas da movimentação por cliente",
+    limite=50,
+)
+
+registrar_tabela(
+    "ESTUDO_TRANS_09_FAIXAS_TRANSACOES",
+    tb_faixas_transacoes_cliente,
+    "Clientes por faixa de quantidade de transações",
+    limite=20,
+)
+
+registrar_tabela(
+    "ESTUDO_TRANS_10_DOMINANCIA_ENTRADA",
+    tb_dominancia_entrada,
+    "Classificação dominante das entradas",
+    limite=20,
+)
+
+registrar_tabela(
+    "ESTUDO_TRANS_11_DOMINANCIA_SAIDA",
+    tb_dominancia_saida,
+    "Classificação dominante das saídas",
+    limite=20,
+)
+
+registrar_tabela(
+    "ESTUDO_TRANS_12_ASSINATURAS_FLUXO",
+    tb_assinaturas_fluxo,
+    "Principais assinaturas de fluxo",
+    limite=30,
+)
+
+registrar_tabela(
+    "ESTUDO_TRANS_13_CLIENTES_EXTREMOS",
+    tb_clientes_extremos,
+    "Clientes com maior valor movimentado",
+    limite=20,
+    subtitulo=(
+        "Tabela de validação para identificação de valores extremos."
+    ),
+)
+
+
+if tb_origem_classificacao is not None:
+
+    registrar_tabela(
+        "ESTUDO_TRANS_14_ORIGEM_CLASSIFICACAO",
+        tb_origem_classificacao,
+        "Origem da classificação transacional",
+        limite=20,
+    )
+
+
+if tb_categorias_fallback is not None:
+
+    registrar_tabela(
+        "ESTUDO_TRANS_15_FALLBACK",
+        tb_categorias_fallback,
+        "Categorias que utilizaram fallback",
+        limite=50,
+    )
+
+
+if tb_datas is not None:
+
+    registrar_tabela(
+        "ESTUDO_TRANS_16_DATAS",
+        tb_datas,
+        "Cobertura temporal",
+        limite=50,
+    )
+
+
+# ============================================================
+# 32. PUBLICAÇÃO DOS GRÁFICOS
+# ============================================================
+
+NOMES_GRAFICOS_ESTUDO = []
+
+
+def registrar_grafico(
+    nome,
+    dataframe,
+    coluna_categoria,
+    coluna_valor,
+    titulo,
+    limite=20,
+    horizontal=True,
+    formato="inteiro",
+):
+
+    publicar_grafico_barras(
+        nome=nome,
+        dataframe=dataframe,
+        coluna_categoria=coluna_categoria,
+        coluna_valor=coluna_valor,
+        titulo=titulo,
+        limite=limite,
+        horizontal=horizontal,
+        formato=formato,
+    )
+
+    NOMES_GRAFICOS_ESTUDO.append(
+        nome
+    )
+
+
+registrar_grafico(
+    "ESTUDO_TRANS_GRAF_01_QT_CLASSIFICACAO",
+    tb_classificacoes.orderBy(
+        F.col(
+            "QT_TRANSACOES"
+        ).desc()
+    ),
+    "NM_CLASSIFICACAO_CATEGORIA",
+    "QT_TRANSACOES",
+    "Quantidade de transações por classificação",
+    limite=15,
+)
+
+registrar_grafico(
+    "ESTUDO_TRANS_GRAF_02_VL_CLASSIFICACAO",
+    tb_classificacoes.orderBy(
+        F.col(
+            "VL_TOTAL_ABS"
+        ).desc()
+    ),
+    "NM_CLASSIFICACAO_CATEGORIA",
+    "VL_TOTAL_ABS",
+    "Valor movimentado por classificação",
+    limite=15,
+    formato="moeda",
+)
+
+registrar_grafico(
+    "ESTUDO_TRANS_GRAF_03_NATUREZA",
+    tb_natureza.orderBy(
+        F.col(
+            "QT_TRANSACOES"
+        ).desc()
+    ),
+    "NM_NATUREZA",
+    "QT_TRANSACOES",
+    "Transações de crédito e débito",
+    limite=10,
+    horizontal=False,
+)
+
+registrar_grafico(
+    "ESTUDO_TRANS_GRAF_04_AGRO",
+    tb_agro.orderBy(
+        F.col(
+            "QT_TRANSACOES"
+        ).desc()
+    ),
+    "FL_AGRO_CATEGORIA_STD",
+    "QT_TRANSACOES",
+    "Transações em categorias Agro",
+    limite=10,
+    horizontal=False,
+)
+
+registrar_grafico(
+    "ESTUDO_TRANS_GRAF_05_FAIXAS_CLIENTES",
+    tb_faixas_transacoes_cliente,
+    "TX_FAIXA_QT_TRANS",
+    "QT_CLIENTES",
+    "Clientes por faixa de transações",
+    limite=20,
+    horizontal=False,
+)
+
+registrar_grafico(
+    "ESTUDO_TRANS_GRAF_06_DOMINANCIA_ENTRADA",
+    tb_dominancia_entrada,
+    "NM_CLS_ENT_DOMINANTE",
+    "QT_CLIENTES",
+    "Origem dominante das entradas por cliente",
+    limite=10,
+)
+
+registrar_grafico(
+    "ESTUDO_TRANS_GRAF_07_DOMINANCIA_SAIDA",
+    tb_dominancia_saida,
+    "NM_CLS_SAI_DOMINANTE",
+    "QT_CLIENTES",
+    "Destino dominante das saídas por cliente",
+    limite=10,
+)
+
+registrar_grafico(
+    "ESTUDO_TRANS_GRAF_08_ASSINATURAS_FLUXO",
+    tb_assinaturas_fluxo,
+    "TX_ASSINATURA_FLUXO",
+    "QT_CLIENTES",
+    "Principais assinaturas de fluxo financeiro",
+    limite=15,
+)
+
+
+if tb_origem_classificacao is not None:
+
+    registrar_grafico(
+        "ESTUDO_TRANS_GRAF_09_ORIGEM_CLASSIFICACAO",
+        tb_origem_classificacao,
+        "TX_ORIGEM_CLASSIFICACAO",
+        "QT_TRANSACOES",
+        "Origem da classificação das transações",
+        limite=10,
+        horizontal=False,
+    )
+
+
+# ============================================================
+# 33. VIEWS DAS PRINCIPAIS TABELAS
+# ============================================================
+
+tb_resumo_geral.createOrReplaceTempView(
+    "VW_ESTUDO_TRANS_RESUMO_GERAL"
+)
+
+tb_natureza.createOrReplaceTempView(
+    "VW_ESTUDO_TRANS_NATUREZA"
+)
+
+tb_classificacoes.createOrReplaceTempView(
+    "VW_ESTUDO_TRANS_CLASSIFICACOES"
+)
+
+tb_agro.createOrReplaceTempView(
+    "VW_ESTUDO_TRANS_AGRO"
+)
+
+tb_categorias_originais.createOrReplaceTempView(
+    "VW_ESTUDO_TRANS_CATEGORIAS_ORIGINAIS"
+)
+
+tb_estatisticas_clientes.createOrReplaceTempView(
+    "VW_ESTUDO_TRANS_ESTATISTICAS_CLIENTES"
+)
+
+tb_dominancia_entrada.createOrReplaceTempView(
+    "VW_ESTUDO_TRANS_DOMINANCIA_ENTRADA"
+)
+
+tb_dominancia_saida.createOrReplaceTempView(
+    "VW_ESTUDO_TRANS_DOMINANCIA_SAIDA"
+)
+
+tb_assinaturas_fluxo.createOrReplaceTempView(
+    "VW_ESTUDO_TRANS_ASSINATURAS_FLUXO"
+)
+
+
+# ============================================================
+# 34. CATÁLOGO PARA O AMBIENTE LOCAL
+# ============================================================
+
+catalogo_estudo_transacoes = {
+    "tabelas": NOMES_TABELAS_ESTUDO,
+    "graficos": NOMES_GRAFICOS_ESTUDO,
+}
+
+
+# ============================================================
+# 35. RESULTADO FINAL
+# ============================================================
+
+print("\n" + "=" * 120)
+print("ESTUDO TRANSACIONAL CONCLUÍDO")
+print("=" * 120)
+
+print("\nDataFrame transacional normalizado:")
+print("df_estudo_transacoes")
+
+print("\nDataFrame sumarizado por cliente:")
+print("df_transacoes_cliente_estudo")
+
+print("\nViews principais:")
+print("VW_ESTUDO_TRANSACOES")
+print("VW_ESTUDO_TRANSACOES_CLIENTE")
+
+print("\nTabelas publicadas:")
+
+for nome in NOMES_TABELAS_ESTUDO:
+    print(f"  - {nome}")
+
+print("\nGráficos publicados:")
+
+for nome in NOMES_GRAFICOS_ESTUDO:
+    print(f"  - {nome}")
+
+
+
+
+-------------------------------------------------------------------
+
+
+%%spark
+
+# ============================================================
+# ENRIQUECIMENTO FINAL:
+# PERSONAS + CLASSIFICAÇÕES TRANSACIONAIS POR CLIENTE
+#
+# Entradas:
+#   VW_ANA_EDU_FIN_CLI_PERSONA
+#   VW_ESTUDO_TRANSACOES_CLIENTE
+#
+# Saídas:
+#   df_persona_classificacao_final
+#   VW_ANA_EDU_FIN_CLI_PERSONA_CLS
+#   VW_VALIDACAO_ANA_EDU_FIN_CLI_PERSONA_CLS
+# ============================================================
+
+from functools import reduce
+
+from pyspark.sql import functions as F
+
+
+# ============================================================
+# 1. CONFIGURAÇÃO
+# ============================================================
+
+VIEW_PERSONA = (
+    "VW_ANA_EDU_FIN_CLI_PERSONA"
+)
+
+VIEW_TRANSACOES_CLIENTE = (
+    "VW_ESTUDO_TRANSACOES_CLIENTE"
+)
+
+VIEW_FINAL = (
+    "VW_ANA_EDU_FIN_CLI_PERSONA_CLS"
+)
+
+VIEW_VALIDACAO = (
+    "VW_VALIDACAO_ANA_EDU_FIN_CLI_PERSONA_CLS"
+)
+
+
+CLASSIFICACOES_ENTRADA = {
+    "IND": {
+        "codigo": 0,
+        "nome": (
+            "Transferência / entrada indefinida"
+        ),
+    },
+    "REC": {
+        "codigo": 1,
+        "nome": (
+            "Receita / rendimento / benefício"
+        ),
+    },
+    "REEMB": {
+        "codigo": 2,
+        "nome": (
+            "Restituição / estorno / "
+            "reembolso / ajuste"
+        ),
+    },
+    "RESG": {
+        "codigo": 3,
+        "nome": (
+            "Resgate de investimento"
+        ),
+    },
+    "EMPR": {
+        "codigo": 4,
+        "nome": (
+            "Crédito tomado / "
+            "liberação de crédito"
+        ),
+    },
+}
+
+
+CLASSIFICACOES_SAIDA = {
+    "GEN": {
+        "codigo": 5,
+        "nome": (
+            "Neutro / não classificado"
+        ),
+    },
+    "ESS": {
+        "codigo": 6,
+        "nome": "Essenciais",
+    },
+    "FLEX": {
+        "codigo": 7,
+        "nome": "Flexíveis",
+    },
+    "RES": {
+        "codigo": 8,
+        "nome": "Futuro / reserva",
+    },
+    "CRED": {
+        "codigo": 9,
+        "nome": (
+            "Dívidas / crédito / "
+            "custo financeiro"
+        ),
+    },
+}
+
+
+# ============================================================
+# 2. LEITURA DAS FONTES
+# ============================================================
+
+if not spark.catalog.tableExists(
+    VIEW_PERSONA
+):
+
+    raise ValueError(
+        f"A view '{VIEW_PERSONA}' não existe. "
+        "Execute primeiro a query de personas."
+    )
+
+
+df_persona_origem = spark.table(
+    VIEW_PERSONA
+)
+
+
+if (
+    "df_transacoes_cliente_estudo"
+    in globals()
+):
+
+    df_transacoes_cliente_origem = (
+        df_transacoes_cliente_estudo
+    )
+
+elif spark.catalog.tableExists(
+    VIEW_TRANSACOES_CLIENTE
+):
+
+    df_transacoes_cliente_origem = (
+        spark.table(
+            VIEW_TRANSACOES_CLIENTE
+        )
+    )
+
+else:
+
+    raise ValueError(
+        "A sumarização transacional por cliente "
+        "não foi encontrada. Execute primeiro o "
+        "estudo que cria "
+        "'df_transacoes_cliente_estudo' ou "
+        "'VW_ESTUDO_TRANSACOES_CLIENTE'."
+    )
+
+
+COLUNAS_PERSONA_ORIGINAIS = (
+    df_persona_origem.columns
+)
+
+
+# ============================================================
+# 3. VALIDAÇÃO DAS COLUNAS DA PERSONA
+# ============================================================
+
+COLUNAS_PERSONA_OBRIGATORIAS = [
+    "CD_CLI",
+
+    "QT_TRANS_TOTAL",
+    "QT_TRANS_ENT",
+    "QT_TRANS_SAI",
+
+    "VL_ENT_TOTAL",
+    "VL_SAI_TOTAL",
+
+    "VL_ENT_IND",
+    "VL_ENT_REC",
+    "VL_ENT_REEMB",
+    "VL_ENT_RESG",
+    "VL_ENT_EMPR",
+
+    "VL_SAI_GEN",
+    "VL_SAI_ESS",
+    "VL_SAI_FLEX",
+    "VL_SAI_RES",
+    "VL_SAI_DIV",
+
+    "NM_PERSONA",
+    "NM_PERSONA_FINAL",
+]
+
+
+colunas_persona_ausentes = [
+    coluna
+    for coluna
+    in COLUNAS_PERSONA_OBRIGATORIAS
+    if coluna
+    not in df_persona_origem.columns
+]
+
+
+if colunas_persona_ausentes:
+
+    raise ValueError(
+        "Colunas obrigatórias ausentes na "
+        "view de personas: "
+        + ", ".join(
+            colunas_persona_ausentes
+        )
+    )
+
+
+# ============================================================
+# 4. VALIDAÇÃO DAS COLUNAS DA SUMARIZAÇÃO
+# ============================================================
+
+COLUNAS_TRANSACOES_OBRIGATORIAS = [
+    "CD_CLI",
+
+    "QT_TRANS_TOTAL_ESTUDO",
+    "VL_MOV_TOTAL_ESTUDO",
+
+    "QT_TRANS_ENT_ESTUDO",
+    "VL_ENT_TOTAL_ESTUDO",
+
+    "QT_TRANS_SAI_ESTUDO",
+    "VL_SAI_TOTAL_ESTUDO",
+
+    "QT_CLASSIFICACOES_ATIVAS",
+    "QT_CATEGORIAS_OGNL_DISTINTAS",
+
+    "QT_CLS_ENT_ATIVAS",
+    "QT_CLS_SAI_ATIVAS",
+
+    "CD_CLS_ENT_DOMINANTE",
+    "NM_CLS_ENT_DOMINANTE",
+    "VL_CLS_ENT_DOMINANTE",
+    "PC_CLS_ENT_DOMINANTE",
+    "QT_CLS_ENT_EMPATE_DOMINANCIA",
+
+    "CD_CLS_SAI_DOMINANTE",
+    "NM_CLS_SAI_DOMINANTE",
+    "VL_CLS_SAI_DOMINANTE",
+    "PC_CLS_SAI_DOMINANTE",
+    "QT_CLS_SAI_EMPATE_DOMINANCIA",
+
+    "TX_ASSINATURA_FLUXO",
+    "TX_FAIXA_QT_TRANS",
+    "FL_TEM_MOV_AGRO_TRANS",
+]
+
+
+for sufixo in CLASSIFICACOES_ENTRADA:
+
+    COLUNAS_TRANSACOES_OBRIGATORIAS.extend([
+        f"QT_CLS_ENT_{sufixo}",
+        f"VL_CLS_ENT_{sufixo}",
+        f"PC_CLS_ENT_{sufixo}",
+    ])
+
+
+for sufixo in CLASSIFICACOES_SAIDA:
+
+    COLUNAS_TRANSACOES_OBRIGATORIAS.extend([
+        f"QT_CLS_SAI_{sufixo}",
+        f"VL_CLS_SAI_{sufixo}",
+        f"PC_CLS_SAI_{sufixo}",
+    ])
+
+
+colunas_transacoes_ausentes = [
+    coluna
+    for coluna
+    in COLUNAS_TRANSACOES_OBRIGATORIAS
+    if coluna
+    not in df_transacoes_cliente_origem.columns
+]
+
+
+if colunas_transacoes_ausentes:
+
+    raise ValueError(
+        "Colunas obrigatórias ausentes na "
+        "sumarização transacional: "
+        + ", ".join(
+            colunas_transacoes_ausentes
+        )
+    )
+
+
+# ============================================================
+# 5. VERIFICAÇÃO DA GRANULARIDADE
+# ============================================================
+
+cliente_duplicado = (
+    df_transacoes_cliente_origem
+
+    .groupBy(
+        "CD_CLI"
+    )
+
+    .count()
+
+    .filter(
+        F.col("count") > 1
+    )
+
+    .limit(1)
+
+    .count()
+)
+
+
+if cliente_duplicado > 0:
+
+    raise ValueError(
+        "A sumarização transacional contém "
+        "mais de uma linha para o mesmo CD_CLI."
+    )
+
+
+# ============================================================
+# 6. PADRONIZAÇÃO DOS NOMES DA SUMARIZAÇÃO
+# ============================================================
+
+MAPEAMENTO_COLUNAS = {
+    "QT_TRANS_TOTAL_ESTUDO":
+        "QT_TRANS_TOTAL_CLS",
+
+    "VL_MOV_TOTAL_ESTUDO":
+        "VL_MOV_TOTAL_CLS",
+
+    "QT_TRANS_ENT_ESTUDO":
+        "QT_TRANS_ENT_CLS",
+
+    "VL_ENT_TOTAL_ESTUDO":
+        "VL_ENT_TOTAL_CLS",
+
+    "QT_TRANS_SAI_ESTUDO":
+        "QT_TRANS_SAI_CLS",
+
+    "VL_SAI_TOTAL_ESTUDO":
+        "VL_SAI_TOTAL_CLS",
+
+    "QT_CLASSIFICACOES_ATIVAS":
+        "QT_CLASSIFICACOES_ATIVAS_CLS",
+
+    "QT_CATEGORIAS_OGNL_DISTINTAS":
+        "QT_CATEGORIAS_OGNL_DISTINTAS_CLS",
+
+    "NR_TEM_MOV_AGRO_TRANS":
+        "NR_TEM_MOV_AGRO_CLS",
+
+    "QT_TRANS_AGRO":
+        "QT_TRANS_AGRO_CLS",
+
+    "VL_TRANS_AGRO_ABS":
+        "VL_TRANS_AGRO_CLS",
+
+    "FL_TEM_MOV_AGRO_TRANS":
+        "FL_TEM_MOV_AGRO_CLS",
+
+    "TX_FAIXA_QT_TRANS":
+        "TX_FAIXA_QT_TRANS_CLS",
+}
+
+
+# ============================================================
+# 7. COLUNAS OPCIONAIS DE AUDITORIA
+# ============================================================
+
+COLUNAS_OPCIONAIS = {
+    "QT_PRODUTOS_DISTINTOS":
+        "QT_PRODUTOS_DISTINTOS_CLS",
+
+    "QT_TRANS_MAPEADAS":
+        "QT_TRANS_MAPEADAS_CLS",
+
+    "QT_TRANS_FALLBACK":
+        "QT_TRANS_FALLBACK_CLS",
+
+    "VL_TRANS_FALLBACK_ABS":
+        "VL_TRANS_FALLBACK_CLS",
+
+    "PC_QT_TRANS_FALLBACK":
+        "PC_QT_TRANS_FALLBACK_CLS",
+
+    "PC_VL_TRANS_FALLBACK":
+        "PC_VL_TRANS_FALLBACK_CLS",
+
+    "TX_FAIXA_PC_VL_FALLBACK":
+        "TX_FAIXA_PC_VL_FALLBACK_CLS",
+}
+
+
+for origem, destino in (
+    COLUNAS_OPCIONAIS.items()
+):
+
+    if (
+        origem
+        in df_transacoes_cliente_origem.columns
+    ):
+
+        MAPEAMENTO_COLUNAS[
+            origem
+        ] = destino
+
+
+# ============================================================
+# 8. COLUNAS QUE MANTÊM O NOME ORIGINAL
+# ============================================================
+
+COLUNAS_MANTIDAS = [
+    "QT_CLS_ENT_ATIVAS",
+    "QT_CLS_SAI_ATIVAS",
+
+    "CD_CLS_ENT_DOMINANTE",
+    "NM_CLS_ENT_DOMINANTE",
+    "VL_CLS_ENT_DOMINANTE",
+    "PC_CLS_ENT_DOMINANTE",
+    "QT_CLS_ENT_EMPATE_DOMINANCIA",
+
+    "CD_CLS_SAI_DOMINANTE",
+    "NM_CLS_SAI_DOMINANTE",
+    "VL_CLS_SAI_DOMINANTE",
+    "PC_CLS_SAI_DOMINANTE",
+    "QT_CLS_SAI_EMPATE_DOMINANCIA",
+
+    "TX_ASSINATURA_FLUXO",
+]
+
+
+for sufixo in CLASSIFICACOES_ENTRADA:
+
+    COLUNAS_MANTIDAS.extend([
+        f"QT_CLS_ENT_{sufixo}",
+        f"VL_CLS_ENT_{sufixo}",
+        f"PC_CLS_ENT_{sufixo}",
+    ])
+
+
+for sufixo in CLASSIFICACOES_SAIDA:
+
+    COLUNAS_MANTIDAS.extend([
+        f"QT_CLS_SAI_{sufixo}",
+        f"VL_CLS_SAI_{sufixo}",
+        f"PC_CLS_SAI_{sufixo}",
+    ])
+
+
+# ============================================================
+# 9. SELEÇÃO DA SUMARIZAÇÃO TRANSACIONAL
+# ============================================================
+
+tipo_cd_cli = (
+    df_persona_origem
+    .schema["CD_CLI"]
+    .dataType
+    .simpleString()
+)
+
+
+expressoes_transacoes = [
+    F.col("CD_CLI")
+    .cast(tipo_cd_cli)
+    .alias("CD_CLI")
+]
+
+
+for origem, destino in (
+    MAPEAMENTO_COLUNAS.items()
+):
+
+    expressoes_transacoes.append(
+        F.col(origem).alias(
+            destino
+        )
+    )
+
+
+for coluna in COLUNAS_MANTIDAS:
+
+    expressoes_transacoes.append(
+        F.col(coluna)
+    )
+
+
+df_classificacao_cliente = (
+    df_transacoes_cliente_origem
+
+    .select(
+        *expressoes_transacoes
+    )
+)
+
+
+COLUNAS_CLASSIFICACAO_BASE = [
+    coluna
+    for coluna
+    in df_classificacao_cliente.columns
+    if coluna != "CD_CLI"
+]
+
+
+# ============================================================
+# 10. JUNÇÃO COM A VIEW DE PERSONAS
+# ============================================================
+
+df_persona_classificacao = (
+    df_persona_origem.alias("p")
+
+    .join(
+        df_classificacao_cliente.alias("c"),
+
+        F.col("p.CD_CLI")
+        ==
+        F.col("c.CD_CLI"),
+
+        "left",
+    )
+
+    .select(
+        *[
+            F.col(
+                f"p.{coluna}"
+            ).alias(
+                coluna
+            )
+            for coluna
+            in COLUNAS_PERSONA_ORIGINAIS
+        ],
+
+        F.col(
+            "c.CD_CLI"
+        ).alias(
+            "_CD_CLI_CLASSIFICACAO"
+        ),
+
+        *[
+            F.col(
+                f"c.{coluna}"
+            ).alias(
+                coluna
+            )
+            for coluna
+            in COLUNAS_CLASSIFICACAO_BASE
+        ],
+    )
+
+    .withColumn(
+        "FL_BASE_TRANSACIONAL_ENCONTRADA",
+
+        F.when(
+            F.col(
+                "_CD_CLI_CLASSIFICACAO"
+            ).isNotNull(),
+
+            F.lit("S"),
+        )
+        .otherwise(
+            F.lit("N")
+        ),
+    )
+
+    .drop(
+        "_CD_CLI_CLASSIFICACAO"
+    )
+)
+
+
+# ============================================================
+# 11. NORMALIZAÇÃO DOS CAMPOS NUMÉRICOS
+#
+# Clientes sem correspondência permanecem nulos.
+# Clientes encontrados recebem zero quando a métrica
+# não possui movimentação.
+# ============================================================
+
+for campo in (
+    df_persona_classificacao.schema.fields
+):
+
+    coluna = campo.name
+
+    if (
+        coluna
+        not in COLUNAS_CLASSIFICACAO_BASE
+    ):
+        continue
+
+    if coluna.startswith(
+        (
+            "QT_",
+            "VL_",
+            "NR_",
+        )
+    ):
+
+        tipo = (
+            campo.dataType
+            .simpleString()
+        )
+
+        df_persona_classificacao = (
+            df_persona_classificacao
+
+            .withColumn(
+                coluna,
+
+                F.when(
+                    F.col(
+                        "FL_BASE_TRANSACIONAL_ENCONTRADA"
+                    ) == "S",
+
+                    F.coalesce(
+                        F.col(coluna),
+                        F.lit(0).cast(
+                            tipo
+                        ),
+                    ),
+                )
+                .otherwise(
+                    F.lit(None).cast(
+                        tipo
+                    )
+                ),
+            )
+        )
+
+
+# ============================================================
+# 12. PADRONIZAÇÃO DOS CAMPOS TEXTUAIS
+# ============================================================
+
+df_persona_classificacao = (
+    df_persona_classificacao
+
+    .withColumn(
+        "NM_CLS_ENT_DOMINANTE",
+
+        F.when(
+            F.col(
+                "FL_BASE_TRANSACIONAL_ENCONTRADA"
+            ) == "N",
+
+            F.lit("Não disponível"),
+        )
+        .otherwise(
+            F.coalesce(
+                F.col(
+                    "NM_CLS_ENT_DOMINANTE"
+                ),
+                F.lit("Sem entrada"),
+            )
+        ),
+    )
+
+    .withColumn(
+        "NM_CLS_SAI_DOMINANTE",
+
+        F.when(
+            F.col(
+                "FL_BASE_TRANSACIONAL_ENCONTRADA"
+            ) == "N",
+
+            F.lit("Não disponível"),
+        )
+        .otherwise(
+            F.coalesce(
+                F.col(
+                    "NM_CLS_SAI_DOMINANTE"
+                ),
+                F.lit("Sem saída"),
+            )
+        ),
+    )
+
+    .withColumn(
+        "TX_ASSINATURA_FLUXO",
+
+        F.when(
+            F.col(
+                "FL_BASE_TRANSACIONAL_ENCONTRADA"
+            ) == "N",
+
+            F.lit("Não disponível"),
+        )
+        .otherwise(
+            F.coalesce(
+                F.col(
+                    "TX_ASSINATURA_FLUXO"
+                ),
+                F.lit(
+                    "Entrada: Sem entrada | "
+                    "Saída: Sem saída"
+                ),
+            )
+        ),
+    )
+
+    .withColumn(
+        "TX_FAIXA_QT_TRANS_CLS",
+
+        F.when(
+            F.col(
+                "FL_BASE_TRANSACIONAL_ENCONTRADA"
+            ) == "N",
+
+            F.lit("Não disponível"),
+        )
+        .otherwise(
+            F.coalesce(
+                F.col(
+                    "TX_FAIXA_QT_TRANS_CLS"
+                ),
+                F.lit("Sem informação"),
+            )
+        ),
+    )
+
+    .withColumn(
+        "FL_TEM_MOV_AGRO_CLS",
+
+        F.when(
+            F.col(
+                "FL_BASE_TRANSACIONAL_ENCONTRADA"
+            ) == "N",
+
+            F.lit(None).cast(
+                "string"
+            ),
+        )
+        .otherwise(
+            F.coalesce(
+                F.col(
+                    "FL_TEM_MOV_AGRO_CLS"
+                ),
+                F.lit("N"),
+            )
+        ),
+    )
+)
+
+
+# ============================================================
+# 13. PERCENTUAL DA QUANTIDADE POR CLASSIFICAÇÃO
+# ============================================================
+
+COLUNAS_DERIVADAS_CLASSIFICACAO = []
+
+
+for sufixo in CLASSIFICACOES_ENTRADA:
+
+    nome_pc_qt = (
+        f"PC_QT_CLS_ENT_{sufixo}"
+    )
+
+    nome_flag = (
+        f"FL_TEM_CLS_ENT_{sufixo}"
+    )
+
+    df_persona_classificacao = (
+        df_persona_classificacao
+
+        .withColumn(
+            nome_pc_qt,
+
+            F.when(
+                F.col(
+                    "FL_BASE_TRANSACIONAL_ENCONTRADA"
+                ) == "N",
+
+                F.lit(None).cast(
+                    "double"
+                ),
+            )
+            .when(
+                F.col(
+                    "QT_TRANS_ENT_CLS"
+                ) > 0,
+
+                F.round(
+                    F.col(
+                        f"QT_CLS_ENT_{sufixo}"
+                    )
+                    /
+                    F.col(
+                        "QT_TRANS_ENT_CLS"
+                    )
+                    * 100,
+                    4,
+                ),
+            )
+            .otherwise(
+                F.lit(0.0)
+            ),
+        )
+
+        .withColumn(
+            nome_flag,
+
+            F.when(
+                F.col(
+                    "FL_BASE_TRANSACIONAL_ENCONTRADA"
+                ) == "N",
+
+                F.lit(None).cast(
+                    "string"
+                ),
+            )
+            .when(
+                F.col(
+                    f"QT_CLS_ENT_{sufixo}"
+                ) > 0,
+
+                F.lit("S"),
+            )
+            .otherwise(
+                F.lit("N")
+            ),
+        )
+    )
+
+    COLUNAS_DERIVADAS_CLASSIFICACAO.extend([
+        nome_pc_qt,
+        nome_flag,
+    ])
+
+
+for sufixo in CLASSIFICACOES_SAIDA:
+
+    nome_pc_qt = (
+        f"PC_QT_CLS_SAI_{sufixo}"
+    )
+
+    nome_flag = (
+        f"FL_TEM_CLS_SAI_{sufixo}"
+    )
+
+    df_persona_classificacao = (
+        df_persona_classificacao
+
+        .withColumn(
+            nome_pc_qt,
+
+            F.when(
+                F.col(
+                    "FL_BASE_TRANSACIONAL_ENCONTRADA"
+                ) == "N",
+
+                F.lit(None).cast(
+                    "double"
+                ),
+            )
+            .when(
+                F.col(
+                    "QT_TRANS_SAI_CLS"
+                ) > 0,
+
+                F.round(
+                    F.col(
+                        f"QT_CLS_SAI_{sufixo}"
+                    )
+                    /
+                    F.col(
+                        "QT_TRANS_SAI_CLS"
+                    )
+                    * 100,
+                    4,
+                ),
+            )
+            .otherwise(
+                F.lit(0.0)
+            ),
+        )
+
+        .withColumn(
+            nome_flag,
+
+            F.when(
+                F.col(
+                    "FL_BASE_TRANSACIONAL_ENCONTRADA"
+                ) == "N",
+
+                F.lit(None).cast(
+                    "string"
+                ),
+            )
+            .when(
+                F.col(
+                    f"QT_CLS_SAI_{sufixo}"
+                ) > 0,
+
+                F.lit("S"),
+            )
+            .otherwise(
+                F.lit("N")
+            ),
+        )
+    )
+
+    COLUNAS_DERIVADAS_CLASSIFICACAO.extend([
+        nome_pc_qt,
+        nome_flag,
+    ])
+
+
+# ============================================================
+# 14. FLAGS DE EXISTÊNCIA DE ENTRADA E SAÍDA
+# ============================================================
+
+df_persona_classificacao = (
+    df_persona_classificacao
+
+    .withColumn(
+        "FL_TEM_ENTRADA_CLS",
+
+        F.when(
+            F.col(
+                "FL_BASE_TRANSACIONAL_ENCONTRADA"
+            ) == "N",
+
+            F.lit(None).cast(
+                "string"
+            ),
+        )
+        .when(
+            F.col(
+                "QT_TRANS_ENT_CLS"
+            ) > 0,
+
+            F.lit("S"),
+        )
+        .otherwise(
+            F.lit("N")
+        ),
+    )
+
+    .withColumn(
+        "FL_TEM_SAIDA_CLS",
+
+        F.when(
+            F.col(
+                "FL_BASE_TRANSACIONAL_ENCONTRADA"
+            ) == "N",
+
+            F.lit(None).cast(
+                "string"
+            ),
+        )
+        .when(
+            F.col(
+                "QT_TRANS_SAI_CLS"
+            ) > 0,
+
+            F.lit("S"),
+        )
+        .otherwise(
+            F.lit("N")
+        ),
+    )
+)
+
+
+COLUNAS_DERIVADAS_CLASSIFICACAO.extend([
+    "FL_TEM_ENTRADA_CLS",
+    "FL_TEM_SAIDA_CLS",
+])
+
+
+# ============================================================
+# 15. DIVERSIFICAÇÃO DAS ENTRADAS E SAÍDAS
+# ============================================================
+
+df_persona_classificacao = (
+    df_persona_classificacao
+
+    .withColumn(
+        "TX_DIVERSIFICACAO_ENT_CLS",
+
+        F.when(
+            F.col(
+                "FL_BASE_TRANSACIONAL_ENCONTRADA"
+            ) == "N",
+
+            F.lit("Não disponível"),
+        )
+        .when(
+            F.col(
+                "QT_TRANS_ENT_CLS"
+            ) == 0,
+
+            F.lit("Sem entrada"),
+        )
+        .when(
+            F.col(
+                "QT_CLS_ENT_ATIVAS"
+            ) == 1,
+
+            F.lit(
+                "Concentrada em 1 classificação"
+            ),
+        )
+        .when(
+            F.col(
+                "QT_CLS_ENT_ATIVAS"
+            ) == 2,
+
+            F.lit(
+                "Distribuída em 2 classificações"
+            ),
+        )
+        .otherwise(
+            F.lit(
+                "Diversificada em 3 ou mais "
+                "classificações"
+            )
+        ),
+    )
+
+    .withColumn(
+        "TX_DIVERSIFICACAO_SAI_CLS",
+
+        F.when(
+            F.col(
+                "FL_BASE_TRANSACIONAL_ENCONTRADA"
+            ) == "N",
+
+            F.lit("Não disponível"),
+        )
+        .when(
+            F.col(
+                "QT_TRANS_SAI_CLS"
+            ) == 0,
+
+            F.lit("Sem saída"),
+        )
+        .when(
+            F.col(
+                "QT_CLS_SAI_ATIVAS"
+            ) == 1,
+
+            F.lit(
+                "Concentrada em 1 classificação"
+            ),
+        )
+        .when(
+            F.col(
+                "QT_CLS_SAI_ATIVAS"
+            ) == 2,
+
+            F.lit(
+                "Distribuída em 2 classificações"
+            ),
+        )
+        .otherwise(
+            F.lit(
+                "Diversificada em 3 ou mais "
+                "classificações"
+            )
+        ),
+    )
+)
+
+
+COLUNAS_DERIVADAS_CLASSIFICACAO.extend([
+    "TX_DIVERSIFICACAO_ENT_CLS",
+    "TX_DIVERSIFICACAO_SAI_CLS",
+])
+
+
+# ============================================================
+# 16. NÍVEL DE CONCENTRAÇÃO DA CLASSIFICAÇÃO DOMINANTE
+# ============================================================
+
+df_persona_classificacao = (
+    df_persona_classificacao
+
+    .withColumn(
+        "TX_CONCENTRACAO_ENT_CLS",
+
+        F.when(
+            F.col(
+                "FL_BASE_TRANSACIONAL_ENCONTRADA"
+            ) == "N",
+
+            F.lit("Não disponível"),
+        )
+        .when(
+            F.col(
+                "QT_TRANS_ENT_CLS"
+            ) == 0,
+
+            F.lit("Sem entrada"),
+        )
+        .when(
+            F.col(
+                "PC_CLS_ENT_DOMINANTE"
+            ) >= 75,
+
+            F.lit("Muito concentrada"),
+        )
+        .when(
+            F.col(
+                "PC_CLS_ENT_DOMINANTE"
+            ) >= 50,
+
+            F.lit("Concentrada"),
+        )
+        .otherwise(
+            F.lit("Diversificada")
+        ),
+    )
+
+    .withColumn(
+        "TX_CONCENTRACAO_SAI_CLS",
+
+        F.when(
+            F.col(
+                "FL_BASE_TRANSACIONAL_ENCONTRADA"
+            ) == "N",
+
+            F.lit("Não disponível"),
+        )
+        .when(
+            F.col(
+                "QT_TRANS_SAI_CLS"
+            ) == 0,
+
+            F.lit("Sem saída"),
+        )
+        .when(
+            F.col(
+                "PC_CLS_SAI_DOMINANTE"
+            ) >= 75,
+
+            F.lit("Muito concentrada"),
+        )
+        .when(
+            F.col(
+                "PC_CLS_SAI_DOMINANTE"
+            ) >= 50,
+
+            F.lit("Concentrada"),
+        )
+        .otherwise(
+            F.lit("Diversificada")
+        ),
+    )
+)
+
+
+COLUNAS_DERIVADAS_CLASSIFICACAO.extend([
+    "TX_CONCENTRACAO_ENT_CLS",
+    "TX_CONCENTRACAO_SAI_CLS",
+])
+
+
+# ============================================================
+# 17. EMPATE NA CLASSIFICAÇÃO DOMINANTE
+# ============================================================
+
+df_persona_classificacao = (
+    df_persona_classificacao
+
+    .withColumn(
+        "FL_EMPATE_CLS_ENT_DOMINANTE",
+
+        F.when(
+            F.col(
+                "FL_BASE_TRANSACIONAL_ENCONTRADA"
+            ) == "N",
+
+            F.lit(None).cast(
+                "string"
+            ),
+        )
+        .when(
+            F.col(
+                "QT_CLS_ENT_EMPATE_DOMINANCIA"
+            ) > 1,
+
+            F.lit("S"),
+        )
+        .otherwise(
+            F.lit("N")
+        ),
+    )
+
+    .withColumn(
+        "FL_EMPATE_CLS_SAI_DOMINANTE",
+
+        F.when(
+            F.col(
+                "FL_BASE_TRANSACIONAL_ENCONTRADA"
+            ) == "N",
+
+            F.lit(None).cast(
+                "string"
+            ),
+        )
+        .when(
+            F.col(
+                "QT_CLS_SAI_EMPATE_DOMINANCIA"
+            ) > 1,
+
+            F.lit("S"),
+        )
+        .otherwise(
+            F.lit("N")
+        ),
+    )
+)
+
+
+COLUNAS_DERIVADAS_CLASSIFICACAO.extend([
+    "FL_EMPATE_CLS_ENT_DOMINANTE",
+    "FL_EMPATE_CLS_SAI_DOMINANTE",
+])
+
+
+# ============================================================
+# 18. CÓDIGO E ID DA ASSINATURA DE FLUXO
+# ============================================================
+
+df_persona_classificacao = (
+    df_persona_classificacao
+
+    .withColumn(
+        "CD_ASSINATURA_FLUXO",
+
+        F.when(
+            F.col(
+                "FL_BASE_TRANSACIONAL_ENCONTRADA"
+            ) == "N",
+
+            F.lit(None).cast(
+                "string"
+            ),
+        )
+        .otherwise(
+            F.concat(
+                F.lit("E"),
+                F.coalesce(
+                    F.col(
+                        "CD_CLS_ENT_DOMINANTE"
+                    ).cast("string"),
+                    F.lit("X"),
+                ),
+
+                F.lit("-S"),
+                F.coalesce(
+                    F.col(
+                        "CD_CLS_SAI_DOMINANTE"
+                    ).cast("string"),
+                    F.lit("X"),
+                ),
+            )
+        ),
+    )
+
+    .withColumn(
+        "NR_ID_ASSINATURA_FLUXO",
+
+        F.when(
+            F.col(
+                "CD_CLS_ENT_DOMINANTE"
+            ).between(0, 4)
+            &
+            F.col(
+                "CD_CLS_SAI_DOMINANTE"
+            ).between(5, 9),
+
+            (
+                F.col(
+                    "CD_CLS_ENT_DOMINANTE"
+                )
+                * 5
+
+                + (
+                    F.col(
+                        "CD_CLS_SAI_DOMINANTE"
+                    )
+                    - 5
+                )
+
+                + 1
+            ).cast("int"),
+        ),
+    )
+)
+
+
+COLUNAS_DERIVADAS_CLASSIFICACAO.extend([
+    "CD_ASSINATURA_FLUXO",
+    "NR_ID_ASSINATURA_FLUXO",
+])
+
+
+# ============================================================
+# 19. QUALIDADE DO MAPEAMENTO, QUANDO DISPONÍVEL
+# ============================================================
+
+if (
+    "QT_TRANS_FALLBACK_CLS"
+    in df_persona_classificacao.columns
+):
+
+    df_persona_classificacao = (
+        df_persona_classificacao
+
+        .withColumn(
+            "VL_TRANS_MAPEADAS_CLS",
+
+            F.when(
+                F.col(
+                    "FL_BASE_TRANSACIONAL_ENCONTRADA"
+                ) == "S",
+
+                F.col(
+                    "VL_MOV_TOTAL_CLS"
+                )
+                -
+                F.coalesce(
+                    F.col(
+                        "VL_TRANS_FALLBACK_CLS"
+                    ),
+                    F.lit(0),
+                ),
+            ),
+        )
+
+        .withColumn(
+            "FL_TEM_FALLBACK_CLS",
+
+            F.when(
+                F.col(
+                    "FL_BASE_TRANSACIONAL_ENCONTRADA"
+                ) == "N",
+
+                F.lit(None).cast(
+                    "string"
+                ),
+            )
+            .when(
+                F.col(
+                    "QT_TRANS_FALLBACK_CLS"
+                ) > 0,
+
+                F.lit("S"),
+            )
+            .otherwise(
+                F.lit("N")
+            ),
+        )
+
+        .withColumn(
+            "TX_QUALIDADE_CLASSIFICACAO_CLS",
+
+            F.when(
+                F.col(
+                    "FL_BASE_TRANSACIONAL_ENCONTRADA"
+                ) == "N",
+
+                F.lit("Não disponível"),
+            )
+            .when(
+                F.coalesce(
+                    F.col(
+                        "PC_VL_TRANS_FALLBACK_CLS"
+                    ),
+                    F.lit(0.0),
+                ) == 0,
+
+                F.lit("Sem fallback"),
+            )
+            .when(
+                F.col(
+                    "PC_VL_TRANS_FALLBACK_CLS"
+                ) < 10,
+
+                F.lit("Alta"),
+            )
+            .when(
+                F.col(
+                    "PC_VL_TRANS_FALLBACK_CLS"
+                ) < 25,
+
+                F.lit("Média"),
+            )
+            .otherwise(
+                F.lit("Baixa")
+            ),
+        )
+    )
+
+else:
+
+    df_persona_classificacao = (
+        df_persona_classificacao
+
+        .withColumn(
+            "VL_TRANS_MAPEADAS_CLS",
+
+            F.lit(None).cast(
+                "decimal(38,2)"
+            ),
+        )
+
+        .withColumn(
+            "FL_TEM_FALLBACK_CLS",
+
+            F.lit(None).cast(
+                "string"
+            ),
+        )
+
+        .withColumn(
+            "TX_QUALIDADE_CLASSIFICACAO_CLS",
+
+            F.lit("Não disponível"),
+        )
+    )
+
+
+COLUNAS_DERIVADAS_CLASSIFICACAO.extend([
+    "VL_TRANS_MAPEADAS_CLS",
+    "FL_TEM_FALLBACK_CLS",
+    "TX_QUALIDADE_CLASSIFICACAO_CLS",
+])
+
+
+# ============================================================
+# 20. RECONCILIAÇÃO COM A TABELA SUMARIZADA FÍSICA
+# ============================================================
+
+df_persona_classificacao = (
+    df_persona_classificacao
+
+    .withColumn(
+        "DIF_QT_TRANS_TOTAL_CLS",
+
+        F.when(
+            F.col(
+                "FL_BASE_TRANSACIONAL_ENCONTRADA"
+            ) == "S",
+
+            F.col(
+                "QT_TRANS_TOTAL_CLS"
+            )
+            -
+            F.col(
+                "QT_TRANS_TOTAL"
+            ),
+        ),
+    )
+
+    .withColumn(
+        "DIF_QT_TRANS_ENT_CLS",
+
+        F.when(
+            F.col(
+                "FL_BASE_TRANSACIONAL_ENCONTRADA"
+            ) == "S",
+
+            F.col(
+                "QT_TRANS_ENT_CLS"
+            )
+            -
+            F.col(
+                "QT_TRANS_ENT"
+            ),
+        ),
+    )
+
+    .withColumn(
+        "DIF_QT_TRANS_SAI_CLS",
+
+        F.when(
+            F.col(
+                "FL_BASE_TRANSACIONAL_ENCONTRADA"
+            ) == "S",
+
+            F.col(
+                "QT_TRANS_SAI_CLS"
+            )
+            -
+            F.col(
+                "QT_TRANS_SAI"
+            ),
+        ),
+    )
+
+    .withColumn(
+        "DIF_VL_ENT_TOTAL_CLS",
+
+        F.when(
+            F.col(
+                "FL_BASE_TRANSACIONAL_ENCONTRADA"
+            ) == "S",
+
+            F.round(
+                F.col(
+                    "VL_ENT_TOTAL_CLS"
+                ).cast(
+                    "decimal(38,2)"
+                )
+                -
+                F.col(
+                    "VL_ENT_TOTAL"
+                ).cast(
+                    "decimal(38,2)"
+                ),
+                2,
+            ),
+        ),
+    )
+
+    .withColumn(
+        "DIF_VL_SAI_TOTAL_CLS",
+
+        F.when(
+            F.col(
+                "FL_BASE_TRANSACIONAL_ENCONTRADA"
+            ) == "S",
+
+            F.round(
+                F.col(
+                    "VL_SAI_TOTAL_CLS"
+                ).cast(
+                    "decimal(38,2)"
+                )
+                -
+                F.col(
+                    "VL_SAI_TOTAL"
+                ).cast(
+                    "decimal(38,2)"
+                ),
+                2,
+            ),
+        ),
+    )
+)
+
+
+COLUNAS_RECONCILIACAO = [
+    "DIF_QT_TRANS_TOTAL_CLS",
+    "DIF_QT_TRANS_ENT_CLS",
+    "DIF_QT_TRANS_SAI_CLS",
+
+    "DIF_VL_ENT_TOTAL_CLS",
+    "DIF_VL_SAI_TOTAL_CLS",
+]
+
+
+# ============================================================
+# 21. RECONCILIAÇÃO DOS VALORES DETALHADOS
+# ============================================================
+
+MAPA_RECONCILIACAO_VALORES = {
+    "ENT_IND": (
+        "VL_CLS_ENT_IND",
+        "VL_ENT_IND",
+    ),
+    "ENT_REC": (
+        "VL_CLS_ENT_REC",
+        "VL_ENT_REC",
+    ),
+    "ENT_REEMB": (
+        "VL_CLS_ENT_REEMB",
+        "VL_ENT_REEMB",
+    ),
+    "ENT_RESG": (
+        "VL_CLS_ENT_RESG",
+        "VL_ENT_RESG",
+    ),
+    "ENT_EMPR": (
+        "VL_CLS_ENT_EMPR",
+        "VL_ENT_EMPR",
+    ),
+
+    "SAI_GEN": (
+        "VL_CLS_SAI_GEN",
+        "VL_SAI_GEN",
+    ),
+    "SAI_ESS": (
+        "VL_CLS_SAI_ESS",
+        "VL_SAI_ESS",
+    ),
+    "SAI_FLEX": (
+        "VL_CLS_SAI_FLEX",
+        "VL_SAI_FLEX",
+    ),
+    "SAI_RES": (
+        "VL_CLS_SAI_RES",
+        "VL_SAI_RES",
+    ),
+    "SAI_CRED": (
+        "VL_CLS_SAI_CRED",
+        "VL_SAI_DIV",
+    ),
+}
+
+
+COLUNAS_DIFERENCA_DETALHE = []
+
+
+for sufixo, (
+    coluna_classificada,
+    coluna_fisica,
+) in MAPA_RECONCILIACAO_VALORES.items():
+
+    nome_diferenca = (
+        f"DIF_VL_{sufixo}_CLS"
+    )
+
+    df_persona_classificacao = (
+        df_persona_classificacao
+
+        .withColumn(
+            nome_diferenca,
+
+            F.when(
+                F.col(
+                    "FL_BASE_TRANSACIONAL_ENCONTRADA"
+                ) == "S",
+
+                F.round(
+                    F.col(
+                        coluna_classificada
+                    ).cast(
+                        "decimal(38,2)"
+                    )
+                    -
+                    F.col(
+                        coluna_fisica
+                    ).cast(
+                        "decimal(38,2)"
+                    ),
+                    2,
+                ),
+            ),
+        )
+    )
+
+    COLUNAS_DIFERENCA_DETALHE.append(
+        nome_diferenca
+    )
+
+
+# ============================================================
+# 22. RESULTADO DA RECONCILIAÇÃO
+# ============================================================
+
+soma_diferencas_absolutas = reduce(
+    lambda acumulado, coluna:
+        acumulado
+        +
+        F.abs(
+            F.coalesce(
+                F.col(coluna),
+                F.lit(0).cast(
+                    "decimal(38,2)"
+                ),
+            )
+        ),
+
+    COLUNAS_DIFERENCA_DETALHE,
+
+    F.lit(0).cast(
+        "decimal(38,2)"
+    ),
+)
+
+
+df_persona_classificacao = (
+    df_persona_classificacao
+
+    .withColumn(
+        "VL_DIF_DETALHE_CLS_ABS",
+
+        F.when(
+            F.col(
+                "FL_BASE_TRANSACIONAL_ENCONTRADA"
+            ) == "S",
+
+            soma_diferencas_absolutas,
+        ),
+    )
+
+    .withColumn(
+        "FL_RECON_QT_CLS",
+
+        F.when(
+            F.col(
+                "FL_BASE_TRANSACIONAL_ENCONTRADA"
+            ) == "N",
+
+            F.lit(None).cast(
+                "string"
+            ),
+        )
+        .when(
+            (
+                F.col(
+                    "DIF_QT_TRANS_TOTAL_CLS"
+                ) == 0
+            )
+            &
+            (
+                F.col(
+                    "DIF_QT_TRANS_ENT_CLS"
+                ) == 0
+            )
+            &
+            (
+                F.col(
+                    "DIF_QT_TRANS_SAI_CLS"
+                ) == 0
+            ),
+
+            F.lit("S"),
+        )
+        .otherwise(
+            F.lit("N")
+        ),
+    )
+
+    .withColumn(
+        "FL_RECON_VL_CLS",
+
+        F.when(
+            F.col(
+                "FL_BASE_TRANSACIONAL_ENCONTRADA"
+            ) == "N",
+
+            F.lit(None).cast(
+                "string"
+            ),
+        )
+        .when(
+            (
+                F.abs(
+                    F.col(
+                        "DIF_VL_ENT_TOTAL_CLS"
+                    )
+                ) <= 0.02
+            )
+            &
+            (
+                F.abs(
+                    F.col(
+                        "DIF_VL_SAI_TOTAL_CLS"
+                    )
+                ) <= 0.02
+            ),
+
+            F.lit("S"),
+        )
+        .otherwise(
+            F.lit("N")
+        ),
+    )
+
+    .withColumn(
+        "FL_RECON_DETALHE_CLS",
+
+        F.when(
+            F.col(
+                "FL_BASE_TRANSACIONAL_ENCONTRADA"
+            ) == "N",
+
+            F.lit(None).cast(
+                "string"
+            ),
+        )
+        .when(
+            F.col(
+                "VL_DIF_DETALHE_CLS_ABS"
+            ) <= 0.10,
+
+            F.lit("S"),
+        )
+        .otherwise(
+            F.lit("N")
+        ),
+    )
+
+    .withColumn(
+        "FL_RECON_GERAL_CLS",
+
+        F.when(
+            F.col(
+                "FL_BASE_TRANSACIONAL_ENCONTRADA"
+            ) == "N",
+
+            F.lit(None).cast(
+                "string"
+            ),
+        )
+        .when(
+            (
+                F.col(
+                    "FL_RECON_QT_CLS"
+                ) == "S"
+            )
+            &
+            (
+                F.col(
+                    "FL_RECON_VL_CLS"
+                ) == "S"
+            )
+            &
+            (
+                F.col(
+                    "FL_RECON_DETALHE_CLS"
+                ) == "S"
+            ),
+
+            F.lit("S"),
+        )
+        .otherwise(
+            F.lit("N")
+        ),
+    )
+
+    .withColumn(
+        "TX_STATUS_RECONCILIACAO_CLS",
+
+        F.when(
+            F.col(
+                "FL_BASE_TRANSACIONAL_ENCONTRADA"
+            ) == "N",
+
+            F.lit(
+                "Sem base transacional"
+            ),
+        )
+        .when(
+            F.col(
+                "FL_RECON_GERAL_CLS"
+            ) == "S",
+
+            F.lit("Conciliado"),
+        )
+        .otherwise(
+            F.lit("Com diferença")
+        ),
+    )
+)
+
+
+COLUNAS_RECONCILIACAO.extend(
+    COLUNAS_DIFERENCA_DETALHE
+)
+
+
+COLUNAS_RECONCILIACAO.extend([
+    "VL_DIF_DETALHE_CLS_ABS",
+
+    "FL_RECON_QT_CLS",
+    "FL_RECON_VL_CLS",
+    "FL_RECON_DETALHE_CLS",
+    "FL_RECON_GERAL_CLS",
+
+    "TX_STATUS_RECONCILIACAO_CLS",
+])
+
+
+# ============================================================
+# 23. ORDEM FINAL DAS COLUNAS
+# ============================================================
+
+COLUNAS_CLASSIFICACOES_ENTRADA = []
+
+
+for sufixo in CLASSIFICACOES_ENTRADA:
+
+    COLUNAS_CLASSIFICACOES_ENTRADA.extend([
+        f"QT_CLS_ENT_{sufixo}",
+        f"VL_CLS_ENT_{sufixo}",
+        f"PC_CLS_ENT_{sufixo}",
+        f"PC_QT_CLS_ENT_{sufixo}",
+        f"FL_TEM_CLS_ENT_{sufixo}",
+    ])
+
+
+COLUNAS_CLASSIFICACOES_SAIDA = []
+
+
+for sufixo in CLASSIFICACOES_SAIDA:
+
+    COLUNAS_CLASSIFICACOES_SAIDA.extend([
+        f"QT_CLS_SAI_{sufixo}",
+        f"VL_CLS_SAI_{sufixo}",
+        f"PC_CLS_SAI_{sufixo}",
+        f"PC_QT_CLS_SAI_{sufixo}",
+        f"FL_TEM_CLS_SAI_{sufixo}",
+    ])
+
+
+COLUNAS_RESUMO_CLASSIFICACAO = [
+    "FL_BASE_TRANSACIONAL_ENCONTRADA",
+
+    "QT_TRANS_TOTAL_CLS",
+    "VL_MOV_TOTAL_CLS",
+
+    "QT_TRANS_ENT_CLS",
+    "VL_ENT_TOTAL_CLS",
+    "FL_TEM_ENTRADA_CLS",
+
+    "QT_TRANS_SAI_CLS",
+    "VL_SAI_TOTAL_CLS",
+    "FL_TEM_SAIDA_CLS",
+
+    "QT_CLASSIFICACOES_ATIVAS_CLS",
+    "QT_CATEGORIAS_OGNL_DISTINTAS_CLS",
+
+    "QT_CLS_ENT_ATIVAS",
+    "QT_CLS_SAI_ATIVAS",
+
+    "TX_DIVERSIFICACAO_ENT_CLS",
+    "TX_DIVERSIFICACAO_SAI_CLS",
+
+    "TX_FAIXA_QT_TRANS_CLS",
+
+    "FL_TEM_MOV_AGRO_CLS",
+    "QT_TRANS_AGRO_CLS",
+    "VL_TRANS_AGRO_CLS",
+]
+
+
+if (
+    "QT_PRODUTOS_DISTINTOS_CLS"
+    in df_persona_classificacao.columns
+):
+
+    COLUNAS_RESUMO_CLASSIFICACAO.append(
+        "QT_PRODUTOS_DISTINTOS_CLS"
+    )
+
+
+COLUNAS_DOMINANCIA = [
+    "CD_CLS_ENT_DOMINANTE",
+    "NM_CLS_ENT_DOMINANTE",
+    "VL_CLS_ENT_DOMINANTE",
+    "PC_CLS_ENT_DOMINANTE",
+    "TX_CONCENTRACAO_ENT_CLS",
+    "QT_CLS_ENT_EMPATE_DOMINANCIA",
+    "FL_EMPATE_CLS_ENT_DOMINANTE",
+
+    "CD_CLS_SAI_DOMINANTE",
+    "NM_CLS_SAI_DOMINANTE",
+    "VL_CLS_SAI_DOMINANTE",
+    "PC_CLS_SAI_DOMINANTE",
+    "TX_CONCENTRACAO_SAI_CLS",
+    "QT_CLS_SAI_EMPATE_DOMINANCIA",
+    "FL_EMPATE_CLS_SAI_DOMINANTE",
+
+    "CD_ASSINATURA_FLUXO",
+    "NR_ID_ASSINATURA_FLUXO",
+    "TX_ASSINATURA_FLUXO",
+]
+
+
+COLUNAS_QUALIDADE = [
+    coluna
+    for coluna in [
+        "QT_TRANS_MAPEADAS_CLS",
+        "QT_TRANS_FALLBACK_CLS",
+
+        "VL_TRANS_MAPEADAS_CLS",
+        "VL_TRANS_FALLBACK_CLS",
+
+        "PC_QT_TRANS_FALLBACK_CLS",
+        "PC_VL_TRANS_FALLBACK_CLS",
+
+        "FL_TEM_FALLBACK_CLS",
+        "TX_FAIXA_PC_VL_FALLBACK_CLS",
+        "TX_QUALIDADE_CLASSIFICACAO_CLS",
+    ]
+    if coluna
+    in df_persona_classificacao.columns
+]
+
+
+ORDEM_FINAL = (
+    COLUNAS_PERSONA_ORIGINAIS
+
+    + COLUNAS_RESUMO_CLASSIFICACAO
+
+    + COLUNAS_CLASSIFICACOES_ENTRADA
+
+    + COLUNAS_CLASSIFICACOES_SAIDA
+
+    + COLUNAS_DOMINANCIA
+
+    + COLUNAS_QUALIDADE
+
+    + COLUNAS_RECONCILIACAO
+)
+
+
+# Remove duplicações preservando a ordem
+ORDEM_FINAL_SEM_DUPLICIDADE = []
+
+
+for coluna in ORDEM_FINAL:
+
+    if (
+        coluna
+        in df_persona_classificacao.columns
+        and coluna
+        not in ORDEM_FINAL_SEM_DUPLICIDADE
+    ):
+
+        ORDEM_FINAL_SEM_DUPLICIDADE.append(
+            coluna
+        )
+
+
+# Inclui qualquer coluna não prevista no final
+for coluna in (
+    df_persona_classificacao.columns
+):
+
+    if (
+        coluna
+        not in ORDEM_FINAL_SEM_DUPLICIDADE
+    ):
+
+        ORDEM_FINAL_SEM_DUPLICIDADE.append(
+            coluna
+        )
+
+
+# ============================================================
+# 24. DATAFRAME FINAL
+# ============================================================
+
+df_persona_classificacao_final = (
+    df_persona_classificacao
+
+    .select(
+        *ORDEM_FINAL_SEM_DUPLICIDADE
+    )
+)
+
+
+# ============================================================
+# 25. VIEW FINAL
+# ============================================================
+
+df_persona_classificacao_final \
+    .createOrReplaceTempView(
+        VIEW_FINAL
+    )
+
+
+# ============================================================
+# 26. VALIDAÇÃO DO ENRIQUECIMENTO
+# ============================================================
+
+tb_validacao_enriquecimento = (
+    df_persona_classificacao_final
+
+    .agg(
+        F.count("*").alias(
+            "QT_LINHAS"
+        ),
+
+        F.countDistinct(
+            "CD_CLI"
+        ).alias(
+            "QT_CLIENTES"
+        ),
+
+        F.sum(
+            F.when(
+                F.col(
+                    "FL_BASE_TRANSACIONAL_ENCONTRADA"
+                ) == "S",
+                1,
+            ).otherwise(0)
+        ).alias(
+            "QT_LINHAS_COM_BASE_TRANSACIONAL"
+        ),
+
+        F.sum(
+            F.when(
+                F.col(
+                    "FL_BASE_TRANSACIONAL_ENCONTRADA"
+                ) == "N",
+                1,
+            ).otherwise(0)
+        ).alias(
+            "QT_LINHAS_SEM_BASE_TRANSACIONAL"
+        ),
+
+        F.sum(
+            F.when(
+                F.col(
+                    "FL_RECON_GERAL_CLS"
+                ) == "S",
+                1,
+            ).otherwise(0)
+        ).alias(
+            "QT_LINHAS_CONCILIADAS"
+        ),
+
+        F.sum(
+            F.when(
+                F.col(
+                    "FL_RECON_GERAL_CLS"
+                ) == "N",
+                1,
+            ).otherwise(0)
+        ).alias(
+            "QT_LINHAS_COM_DIFERENCA"
+        ),
+
+        F.countDistinct(
+            "CD_ASSINATURA_FLUXO"
+        ).alias(
+            "QT_ASSINATURAS_FLUXO"
+        ),
+    )
+
+    .withColumn(
+        "PC_LINHAS_COM_BASE_TRANSACIONAL",
+
+        F.round(
+            F.col(
+                "QT_LINHAS_COM_BASE_TRANSACIONAL"
+            )
+            /
+            F.col(
+                "QT_LINHAS"
+            )
+            * 100,
+            4,
+        ),
+    )
+
+    .withColumn(
+        "PC_LINHAS_CONCILIADAS",
+
+        F.when(
+            F.col(
+                "QT_LINHAS_COM_BASE_TRANSACIONAL"
+            ) > 0,
+
+            F.round(
+                F.col(
+                    "QT_LINHAS_CONCILIADAS"
+                )
+                /
+                F.col(
+                    "QT_LINHAS_COM_BASE_TRANSACIONAL"
+                )
+                * 100,
+                4,
+            ),
+        ),
+    )
+)
+
+
+tb_validacao_enriquecimento \
+    .createOrReplaceTempView(
+        VIEW_VALIDACAO
+    )
+
+
+# ============================================================
+# 27. RESULTADO
+# ============================================================
+
+print("\n" + "=" * 120)
+print("ENRIQUECIMENTO FINAL CONCLUÍDO")
+print("=" * 120)
+
+print(
+    "\nView de entrada:"
+)
+
+print(
+    VIEW_PERSONA
+)
+
+print(
+    "\nSumarização transacional:"
+)
+
+print(
+    VIEW_TRANSACOES_CLIENTE
+)
+
+print(
+    "\nDataFrame final:"
+)
+
+print(
+    "df_persona_classificacao_final"
+)
+
+print(
+    "\nView final:"
+)
+
+print(
+    VIEW_FINAL
+)
+
+print(
+    "\nView de validação:"
+)
+
+print(
+    VIEW_VALIDACAO
+)
+
+print(
+    "\nQuantidade de colunas da persona:"
+)
+
+print(
+    len(
+        COLUNAS_PERSONA_ORIGINAIS
+    )
+)
+
+print(
+    "\nQuantidade total de colunas finais:"
+)
+
+print(
+    len(
+        df_persona_classificacao_final.columns
+    )
+)
+
+print("\nValidação:")
+
+tb_validacao_enriquecimento.show(
+    truncate=False
+)
