@@ -241,10 +241,10 @@ df = df.withColumn(
         CASE
             WHEN NR_MAIOR_PONTUACAO > 0 THEN filter(array(
                 CASE WHEN NR_PONT_CATEG = NR_MAIOR_PONTUACAO THEN 'Categorizacao de gastos' END,
-                CASE WHEN NR_PONT_ORC   = NR_MAIOR_PONTUACAO THEN 'Gestao do orcamento' END,
-                CASE WHEN NR_PONT_CONS  = NR_MAIOR_PONTUACAO THEN 'Consumo planejado' END,
-                CASE WHEN NR_PONT_RES   = NR_MAIOR_PONTUACAO THEN 'Formacao de reserva' END,
-                CASE WHEN NR_PONT_CRED  = NR_MAIOR_PONTUACAO THEN 'Uso consciente do credito' END
+                CASE WHEN NR_PONT_ORC   = NR_MAIOR_PONTUACAO THEN 'Gestao do Orcamento' END,
+                CASE WHEN NR_PONT_CONS  = NR_MAIOR_PONTUACAO THEN 'Consumo Planejado' END,
+                CASE WHEN NR_PONT_RES   = NR_MAIOR_PONTUACAO THEN 'Formacao de Reserva' END,
+                CASE WHEN NR_PONT_CRED  = NR_MAIOR_PONTUACAO THEN 'Uso Consciente do Credito' END
             ), x -> x is not null)
             ELSE cast(array() as array<string>)
         END
@@ -298,6 +298,32 @@ def leitura_tema(col_final):
         "apareceu como sinal secundario no periodo"
     ).otherwise("nao recebeu sinal suficiente para virar prioridade")
 
+tx_sinais_principais = F.concat_ws(
+    " e ",
+    F.when(F.col("NR_PONT_CONC_RES") == 2, F.lit("baixa formacao de reserva")),
+    F.when(F.col("NR_PONT_CONC_CRED") == 1, F.lit("uso moderado de credito"))
+     .when(F.col("NR_PONT_CONC_CRED") == 2, F.lit("alta utilizacao de credito")),
+    F.when(F.col("NR_PONT_CONC_ESS") == 2, F.lit("alta concentracao de essenciais")),
+    F.when(F.col("NR_PONT_CONC_FLEX") == 2, F.lit("alta concentracao de flexiveis")),
+    F.when(F.col("NR_PONT_CONC_GEN") == 99, F.lit("baixa categorizacao do gasto"))
+)
+
+
+def label_tema(col_final):
+    final = F.coalesce(F.col(col_final), F.lit(0))
+    maior = F.coalesce(F.col("NR_MAIOR_PONTUACAO"), F.lit(0))
+    return F.when(
+        (maior == 0) | (final == 0),
+        "Nao prioritario"
+    ).when(
+        (final == maior) & (F.col("QT_TEMAS_MAIOR_PONTUACAO") > 1),
+        "Empatado no topo"
+    ).when(
+        final == maior,
+        "Tema prioritario"
+    ).otherwise("Sinal secundario")
+
+
 df = (
     df
     .withColumn("TX_LEITURA_TEMA_CATEG", leitura_tema("NR_PONT_CATEG"))
@@ -315,6 +341,109 @@ df = (
             F.concat_ws("", F.lit("a regra original nao deixa uma prioridade unica; houve empate entre "), F.col("TX_TEMAS_MAIOR_PONTUACAO"))
         ).otherwise(
             F.concat_ws("", F.lit("o tema com maior prioridade pratica foi "), F.element_at("ARR_TEMAS_MAIOR_PONTUACAO", 1))
+        )
+    )
+    .withColumn(
+        "TX_LABEL_CONC_GEN",
+        F.when(sem_saida_total, "Sem saidas")
+         .when(F.col("NR_PONT_CONC_GEN") == 0, "Alta categorizacao")
+         .when(F.col("NR_PONT_CONC_GEN") == 99, "Baixa categorizacao")
+         .otherwise("Categorizacao nao classificada")
+    )
+    .withColumn(
+        "TX_LABEL_CONC_ESS",
+        F.when(sem_saida_total, "Sem saidas")
+         .when(F.col("NR_PONT_CONC_ESS") == 0, "Baixa concentracao")
+         .when(F.col("NR_PONT_CONC_ESS") == 1, "Concentracao moderada")
+         .when(F.col("NR_PONT_CONC_ESS") == 2, "Alta concentracao")
+         .otherwise("Concentracao nao classificada")
+    )
+    .withColumn(
+        "TX_LABEL_CONC_FLEX",
+        F.when(sem_saida_total, "Sem saidas")
+         .when(F.col("NR_PONT_CONC_FLEX") == 0, "Baixa concentracao")
+         .when(F.col("NR_PONT_CONC_FLEX") == 1, "Concentracao moderada")
+         .when(F.col("NR_PONT_CONC_FLEX") == 2, "Alta concentracao")
+         .otherwise("Concentracao nao classificada")
+    )
+    .withColumn(
+        "TX_LABEL_CONC_RES",
+        F.when(sem_saida_total, "Sem saidas")
+         .when(F.col("NR_PONT_CONC_RES") == 0, "Boa formacao de reserva")
+         .when(F.col("NR_PONT_CONC_RES") == 1, "Formacao intermediaria")
+         .when(F.col("NR_PONT_CONC_RES") == 2, "Baixa formacao de reserva")
+         .otherwise("Formacao de reserva nao classificada")
+    )
+    .withColumn(
+        "TX_LABEL_CONC_CRED",
+        F.when(sem_saida_total, "Sem saidas")
+         .when(F.col("NR_PONT_CONC_CRED") == 0, "Baixa utilizacao")
+         .when(F.col("NR_PONT_CONC_CRED") == 1, "Uso moderado de credito")
+         .when(F.col("NR_PONT_CONC_CRED") == 2, "Alta utilizacao de credito")
+         .otherwise("Utilizacao de credito nao classificada")
+    )
+    .withColumn("TX_LABEL_TEMA_CATEG", label_tema("NR_PONT_CATEG"))
+    .withColumn("TX_LABEL_TEMA_ORC", label_tema("NR_PONT_ORC"))
+    .withColumn("TX_LABEL_TEMA_CONS", label_tema("NR_PONT_CONS"))
+    .withColumn("TX_LABEL_TEMA_RES", label_tema("NR_PONT_RES"))
+    .withColumn("TX_LABEL_TEMA_CRED", label_tema("NR_PONT_CRED"))
+    .withColumn(
+        "TX_STATUS_DECISAO",
+        F.when(F.col("NR_MAIOR_PONTUACAO") == 0, "Sem prioridade")
+         .when(F.col("QT_TEMAS_MAIOR_PONTUACAO") > 1, "Empate")
+         .otherwise("Tema unico")
+    )
+    .withColumn(
+        "TX_TEMA_PRIORITARIO",
+        F.when(F.col("NR_MAIOR_PONTUACAO") == 0, "Sem tema prioritario")
+         .when(F.col("QT_TEMAS_MAIOR_PONTUACAO") > 1, F.concat_ws("", F.lit("Empate entre "), F.col("TX_TEMAS_MAIOR_PONTUACAO")))
+         .otherwise(F.element_at("ARR_TEMAS_MAIOR_PONTUACAO", 1))
+    )
+    .withColumn(
+        "TX_LEITURA_DECISAO",
+        F.when(F.col("NR_MAIOR_PONTUACAO") == 0, "nao ha prioridade financeira definida no periodo")
+         .when(F.col("QT_TEMAS_MAIOR_PONTUACAO") > 1, "nao ha prioridade unica pela regra original")
+         .otherwise("ha uma prioridade unica pela regra original")
+    )
+    .withColumn(
+        "TX_TEMAS_TOPO_EXIBICAO",
+        F.when(F.col("NR_MAIOR_PONTUACAO") == 0, "Sem tema no topo")
+         .otherwise(F.col("TX_TEMAS_MAIOR_PONTUACAO"))
+    )
+    .withColumn(
+        "TX_MOTIVO_DECISAO",
+        F.when(F.col("NR_MAIOR_PONTUACAO") == 0, "nenhum tema recebeu pontuacao final maior que zero")
+         .when(
+             F.col("QT_TEMAS_MAIOR_PONTUACAO") > 1,
+             F.concat_ws("", F.lit("todos chegaram a "), F.col("NR_MAIOR_PONTUACAO").cast("string"), F.lit(" pontos na soma direta da regra original"))
+         ).otherwise(
+             F.concat_ws("", F.element_at("ARR_TEMAS_MAIOR_PONTUACAO", 1), F.lit(" chegou a "), F.col("NR_MAIOR_PONTUACAO").cast("string"), F.lit(" pontos na soma direta da regra original"))
+         )
+    )
+    .withColumn(
+        "TX_PRINCIPAL_SINAL_OBSERVADO",
+        F.when(tx_sinais_principais == "", "sem sinal concentrado de maior atencao")
+         .otherwise(tx_sinais_principais)
+    )
+    .withColumn(
+        "TX_SINTESE_FINAL",
+        F.concat_ws(
+            "",
+            F.when(
+                F.col("TX_PRINCIPAL_SINAL_OBSERVADO") == "sem sinal concentrado de maior atencao",
+                F.lit("O cliente nao apresentou sinal concentrado de maior atencao. ")
+            ).otherwise(
+                F.concat_ws("", F.lit("O cliente apresentou "), F.col("TX_PRINCIPAL_SINAL_OBSERVADO"), F.lit(". "))
+            ),
+            F.when(
+                F.col("QT_TEMAS_MAIOR_PONTUACAO") > 1,
+                F.concat_ws("", F.lit("Pela regra original, houve empate entre "), F.col("TX_TEMAS_MAIOR_PONTUACAO"), F.lit("."))
+            ).when(
+                F.col("NR_MAIOR_PONTUACAO") == 0,
+                F.lit("Pela regra original, nenhum tema ficou prioritario.")
+            ).otherwise(
+                F.concat_ws("", F.lit("Pela regra original, "), F.element_at("ARR_TEMAS_MAIOR_PONTUACAO", 1), F.lit(" ficou como tema prioritario."))
+            )
         )
     )
 )
@@ -476,89 +605,71 @@ df = df.withColumn(
     "TX_PERSONA_UNICA",
     F.concat_ws(
         "",
-        F.lit("LEITURA UNICA POR CLIENTE\n\n"),
-        F.lit("Cliente "), s("CD_CLI"), F.lit(" - macroperfil "), s("NM_MAC_PRFL_CLI"),
-        F.lit(", perfil de renda "), s("NM_PRFL"), F.lit(" e perfil financeiro "),
-        s("NM_PRFL_FIN"), F.lit(".\n"),
-        F.lit("Periodo: "), s("DT_REF_INI"), F.lit(" a "), s("DT_REF_FIM"), F.lit(".\n\n"),
+        F.lit("LEITURA FINANCEIRA DO CLIENTE\n\n"),
+
+        F.lit("CLIENTE\n"),
+        F.lit("Cliente: "), s("CD_CLI"), F.lit("\n"),
+        F.lit("Macroperfil: "), s("NM_MAC_PRFL_CLI"), F.lit("\n"),
+        F.lit("Perfil financeiro: "), s("NM_PRFL_FIN"), F.lit("\n"),
+        F.lit("Periodo: "), s("DT_REF_INI"), F.lit(" a "), s("DT_REF_FIM"), F.lit("\n\n"),
+
+        F.lit("RESUMO EXECUTIVO\n"),
+        F.lit("Tema prioritario: "), s("TX_TEMA_PRIORITARIO"), F.lit("\n"),
+        F.lit("Leitura: "), s("TX_LEITURA_DECISAO"), F.lit("\n"),
+        F.lit("Principal sinal observado: "), s("TX_PRINCIPAL_SINAL_OBSERVADO"), F.lit("\n"),
+        F.lit("Resultado do mes: "), s("TX_STS_FINAL"), F.lit("\n"),
+        F.lit("Comprometimento: "), pc_sai_ent_fmt, F.lit("\n\n"),
 
         F.lit("MOVIMENTACAO\n"),
-        F.lit("- Leitura: "), s("TX_LEITURA_MOVIMENTACAO"), F.lit(".\n"),
-        F.lit("- Motivo: entradas de R$ "), brl("VL_ENT_TOTAL"), F.lit(", saidas de R$ "), brl("VL_SAI_TOTAL"),
-        F.lit(", resultado de R$ "), brl("VL_RES_ORC"), F.lit(" e comprometimento de "), pc_sai_ent_fmt,
-        F.lit(" ("), s("TX_REGRA_RESULTADO"), F.lit("; "), s("TX_STS_FINAL"), F.lit(").\n\n"),
+        F.lit("Entradas: R$ "), brl("VL_ENT_TOTAL"), F.lit("\n"),
+        F.lit("Saidas: R$ "), brl("VL_SAI_TOTAL"), F.lit("\n"),
+        F.lit("Resultado: R$ "), brl("VL_RES_ORC"), F.lit("\n"),
+        F.lit("Leitura: "), s("TX_LEITURA_MOVIMENTACAO"), F.lit("\n"),
+        F.lit("Motivo: saidas representaram "), pc_sai_ent_fmt, F.lit(" das entradas\n\n"),
 
         F.lit("CONCENTRACAO DOS GASTOS\n"),
-        F.lit("- Categorizacao: "), s("TX_LEITURA_CONC_GEN"), F.lit(".\n"),
-        F.lit("  Motivo: R$ "), brl("VL_SAI_GEN"), F.lit(" de R$ "), brl("VL_SAI_TOTAL"),
-        F.lit(" ficaram em saidas genericas, equivalente a "), pct("PC_SAI_GEN"), F.lit("%; referencia "), pref("PC_REF_GEN"),
-        F.lit("%; regra: "), s("TX_REGRA_CONC_GEN"), F.lit("; pontuacao "), n("NR_PONT_CONC_GEN"), F.lit(".\n"),
-        F.lit("- Essenciais: "), s("TX_LEITURA_CONC_ESS"), F.lit(".\n"),
-        F.lit("  Motivo: R$ "), brl("VL_SAI_ESS"), F.lit(" de R$ "), brl("VL_SAI_TOTAL"),
-        F.lit(" foram despesas essenciais, equivalente a "), pct("PC_SAI_ESS"), F.lit("%; referencia "), pref("PC_REF_ESS"),
-        F.lit("%; regra: "), s("TX_REGRA_CONC_ESS"), F.lit("; pontuacao "), n("NR_PONT_CONC_ESS"), F.lit(".\n"),
-        F.lit("- Flexiveis: "), s("TX_LEITURA_CONC_FLEX"), F.lit(".\n"),
-        F.lit("  Motivo: R$ "), brl("VL_SAI_FLEX"), F.lit(" de R$ "), brl("VL_SAI_TOTAL"),
-        F.lit(" foram despesas flexiveis, equivalente a "), pct("PC_SAI_FLEX"), F.lit("%; referencia "), pref("PC_REF_FLEX"),
-        F.lit("%; regra: "), s("TX_REGRA_CONC_FLEX"), F.lit("; pontuacao "), n("NR_PONT_CONC_FLEX"), F.lit(".\n"),
-        F.lit("- Reserva: "), s("TX_LEITURA_CONC_RES"), F.lit(".\n"),
-        F.lit("  Motivo: R$ "), brl("VL_SAI_RES"), F.lit(" de R$ "), brl("VL_SAI_TOTAL"),
-        F.lit(" foram direcionados para reserva ou futuro, equivalente a "), pct("PC_SAI_RES"), F.lit("%; referencia "), pref("PC_REF_RES"),
-        F.lit("%; regra: "), s("TX_REGRA_CONC_RES"), F.lit("; pontuacao "), n("NR_PONT_CONC_RES"), F.lit(".\n"),
-        F.lit("- Credito: "), s("TX_LEITURA_CONC_CRED"), F.lit(".\n"),
-        F.lit("  Motivo: R$ "), brl("VL_SAI_DIV"), F.lit(" de R$ "), brl("VL_SAI_TOTAL"),
-        F.lit(" foram saidas ligadas a dividas, credito ou custo financeiro, equivalente a "), pct("PC_SAI_CRED"), F.lit("%; referencia "), pref("PC_REF_CRED"),
-        F.lit("%; regra: "), s("TX_REGRA_CONC_CRED"), F.lit("; pontuacao "), n("NR_PONT_CONC_CRED"), F.lit(".\n\n"),
+        F.lit("Tema | Leitura | % Saidas | Ref. | Pontos\n"),
+        F.lit("Categorizacao | "), s("TX_LABEL_CONC_GEN"), F.lit(" | "), pct("PC_SAI_GEN"), F.lit("% | "), pref("PC_REF_GEN"), F.lit("% | "), n("NR_PONT_CONC_GEN"), F.lit("\n"),
+        F.lit("Essenciais | "), s("TX_LABEL_CONC_ESS"), F.lit(" | "), pct("PC_SAI_ESS"), F.lit("% | "), pref("PC_REF_ESS"), F.lit("% | "), n("NR_PONT_CONC_ESS"), F.lit("\n"),
+        F.lit("Flexiveis | "), s("TX_LABEL_CONC_FLEX"), F.lit(" | "), pct("PC_SAI_FLEX"), F.lit("% | "), pref("PC_REF_FLEX"), F.lit("% | "), n("NR_PONT_CONC_FLEX"), F.lit("\n"),
+        F.lit("Reserva | "), s("TX_LABEL_CONC_RES"), F.lit(" | "), pct("PC_SAI_RES"), F.lit("% | "), pref("PC_REF_RES"), F.lit("% | "), n("NR_PONT_CONC_RES"), F.lit("\n"),
+        F.lit("Credito | "), s("TX_LABEL_CONC_CRED"), F.lit(" | "), pct("PC_SAI_CRED"), F.lit("% | "), pref("PC_REF_CRED"), F.lit("% | "), n("NR_PONT_CONC_CRED"), F.lit("\n\n"),
 
-        F.lit("PONTUACAO PELO ORCAMENTO\n"),
-        F.lit("- Leitura: "), s("TX_LEITURA_ORCAMENTO"), F.lit(".\n"),
-        F.lit("- Motivo: resultado "), s("TX_STS_FINAL"), F.lit(", comprometimento de "), pc_sai_ent_fmt,
-        F.lit("; pontos por tema: Categorizacao "), n("NR_PONT_ORC_GEN"),
-        F.lit(", Gestao do Orcamento "), n("NR_PONT_ORC_ESS"),
-        F.lit(", Consumo Planejado "), n("NR_PONT_ORC_FLEX"),
-        F.lit(", Formacao de Reserva "), n("NR_PONT_ORC_RES"),
-        F.lit(", Uso Consciente do Credito "), n("NR_PONT_ORC_CRED"), F.lit(".\n\n"),
-
-        F.lit("PONTUACAO PELO PERFIL\n"),
-        F.lit("- Leitura: "), s("TX_LEITURA_PERFIL"), F.lit(".\n"),
-        F.lit("- Motivo: perfil base "), s("NM_PRFL_FIN"), F.lit("; pontos por tema: Categorizacao "), n("NR_PONT_PRFL_GEN"),
-        F.lit(", Gestao do Orcamento "), n("NR_PONT_PRFL_ESS"),
-        F.lit(", Consumo Planejado "), n("NR_PONT_PRFL_FLEX"),
-        F.lit(", Formacao de Reserva "), n("NR_PONT_PRFL_RES"),
-        F.lit(", Uso Consciente do Credito "), n("NR_PONT_PRFL_CRED"), F.lit(".\n\n"),
+        F.lit("PONTUACAO POR CONTEXTO\n"),
+        F.lit("Origem | Base | Categ. | Gestao | Consumo | Reserva | Credito\n"),
+        F.lit("Orcamento | "), s("TX_STS_FINAL"), F.lit("; "), pc_sai_ent_fmt,
+        F.lit(" | "), n("NR_PONT_ORC_GEN"),
+        F.lit(" | "), n("NR_PONT_ORC_ESS"),
+        F.lit(" | "), n("NR_PONT_ORC_FLEX"),
+        F.lit(" | "), n("NR_PONT_ORC_RES"),
+        F.lit(" | "), n("NR_PONT_ORC_CRED"), F.lit("\n"),
+        F.lit("Perfil | "), s("NM_PRFL_FIN"),
+        F.lit(" | "), n("NR_PONT_PRFL_GEN"),
+        F.lit(" | "), n("NR_PONT_PRFL_ESS"),
+        F.lit(" | "), n("NR_PONT_PRFL_FLEX"),
+        F.lit(" | "), n("NR_PONT_PRFL_RES"),
+        F.lit(" | "), n("NR_PONT_PRFL_CRED"), F.lit("\n\n"),
 
         F.lit("RESULTADO POR TEMA\n"),
-        F.lit("Criterio: soma direta de concentracao + orcamento + perfil.\n"),
-        F.lit("- Categorizacao de gastos: "), s("TX_LEITURA_TEMA_CATEG"), F.lit(".\n"),
-        F.lit("  Motivo: pontuacao final "), n("NR_PONT_CATEG"), F.lit("; igual a pontuacao de concentracao generica.\n"),
-        F.lit("- Gestao do orcamento: "), s("TX_LEITURA_TEMA_ORC"), F.lit(".\n"),
-        F.lit("  Motivo: pontuacao final "), n("NR_PONT_ORC"), F.lit("; "), s("TX_FORMULA_FINAL_ORC"), F.lit(".\n"),
-        F.lit("- Consumo planejado: "), s("TX_LEITURA_TEMA_CONS"), F.lit(".\n"),
-        F.lit("  Motivo: pontuacao final "), n("NR_PONT_CONS"), F.lit("; "), s("TX_FORMULA_FINAL_CONS"), F.lit(".\n"),
-        F.lit("- Formacao de reserva: "), s("TX_LEITURA_TEMA_RES"), F.lit(".\n"),
-        F.lit("  Motivo: pontuacao final "), n("NR_PONT_RES"), F.lit("; "), s("TX_FORMULA_FINAL_RES"), F.lit(".\n"),
-        F.lit("- Uso consciente do credito: "), s("TX_LEITURA_TEMA_CRED"), F.lit(".\n"),
-        F.lit("  Motivo: pontuacao final "), n("NR_PONT_CRED"), F.lit("; "), s("TX_FORMULA_FINAL_CRED"), F.lit(".\n\n"),
+        F.lit("Tema | Conc. | Orc. | Perfil | Final | Leitura\n"),
+        F.lit("Categorizacao de gastos | "), n("NR_PONT_CONC_GEN"), F.lit(" | "), n("NR_PONT_ORC_GEN"), F.lit(" | "), n("NR_PONT_PRFL_GEN"), F.lit(" | "), n("NR_PONT_CATEG"), F.lit(" | "), s("TX_LABEL_TEMA_CATEG"), F.lit("\n"),
+        F.lit("Gestao do Orcamento | "), n("NR_PONT_CONC_ESS"), F.lit(" | "), n("NR_PONT_ORC_ESS"), F.lit(" | "), n("NR_PONT_PRFL_ESS"), F.lit(" | "), n("NR_PONT_ORC"), F.lit(" | "), s("TX_LABEL_TEMA_ORC"), F.lit("\n"),
+        F.lit("Consumo Planejado | "), n("NR_PONT_CONC_FLEX"), F.lit(" | "), n("NR_PONT_ORC_FLEX"), F.lit(" | "), n("NR_PONT_PRFL_FLEX"), F.lit(" | "), n("NR_PONT_CONS"), F.lit(" | "), s("TX_LABEL_TEMA_CONS"), F.lit("\n"),
+        F.lit("Formacao de Reserva | "), n("NR_PONT_CONC_RES"), F.lit(" | "), n("NR_PONT_ORC_RES"), F.lit(" | "), n("NR_PONT_PRFL_RES"), F.lit(" | "), n("NR_PONT_RES"), F.lit(" | "), s("TX_LABEL_TEMA_RES"), F.lit("\n"),
+        F.lit("Uso Consciente do Credito | "), n("NR_PONT_CONC_CRED"), F.lit(" | "), n("NR_PONT_ORC_CRED"), F.lit(" | "), n("NR_PONT_PRFL_CRED"), F.lit(" | "), n("NR_PONT_CRED"), F.lit(" | "), s("TX_LABEL_TEMA_CRED"), F.lit("\n\n"),
 
-        F.lit("ASPECTO FINANCEIRO DE MAIOR PONTUACAO\n"),
-        F.lit("- Leitura: "), s("TX_LEITURA_ASPECTO_DESTAQUE"), F.lit(".\n"),
-        F.lit("- Motivo: "), s("TX_RESULTADO_ASPECTO_DESTAQUE"), F.lit(".\n\n"),
+        F.lit("DECISAO DA REGRA\n"),
+        F.lit("Status: "), s("TX_STATUS_DECISAO"), F.lit("\n"),
+        F.lit("Temas no topo: "), s("TX_TEMAS_TOPO_EXIBICAO"), F.lit("\n"),
+        F.lit("Motivo: "), s("TX_MOTIVO_DECISAO"), F.lit("\n\n"),
 
-        F.lit("CLASSIFICACAO CONSOLIDADA DA CONCENTRACAO\n"),
-        F.lit("- Leitura: "), s("TX_CLASSIFICACAO_GERAL"), F.lit(". Esta classificacao resume a intensidade dos sinais de concentracao, sem somar orcamento ou perfil.\n"),
-        F.lit("- Motivo: "), n("NR_PONT_CONC_ESS"), F.lit(" + "), n("NR_PONT_CONC_FLEX"),
-        F.lit(" + "), n("NR_PONT_CONC_RES"), F.lit(" + "), n("NR_PONT_CONC_CRED"),
-        F.lit(" = "), n("NR_PONT_PERSONA"), F.lit("; faixa "), s("TX_FAIXA_CLASSIFICACAO_GERAL"), F.lit(".\n\n"),
-
-        F.lit("SINTESE FINAL\n"),
-        F.lit("- Leitura: "), s("TX_LEITURA_ASPECTO_DESTAQUE"), F.lit(". Como apoio, o periodo mostra "),
-        s("TX_CLASSIFICACAO_ESS"), F.lit(", "), s("TX_CLASSIFICACAO_FLEX"), F.lit(", "),
-        s("TX_CLASSIFICACAO_RES"), F.lit(" e "), s("TX_CLASSIFICACAO_CRED"), F.lit(".\n"),
-        F.lit("- Motivo: maior pontuacao final "), n("NR_MAIOR_PONTUACAO"), F.lit("; temas no topo: "),
-        s("TX_TEMAS_MAIOR_PONTUACAO"), F.lit("; classificacao da concentracao: "),
-        s("TX_CLASSIFICACAO_GERAL"), F.lit(".")
+        F.lit("SINTESE\n"),
+        s("TX_SINTESE_FINAL")
     )
 )
+
+------------
+
 
 %%spark
 
