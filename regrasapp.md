@@ -1,88 +1,52 @@
-# Apresentação — Regras de Pontuação
+# Apresentação — Regras de Pontuação do Radar Financeiro
+
+---
 
 ## Slide 1 — Perfis financeiros
 
-**Objetivo:** usar o perfil como contexto do cliente.
+> O perfil financeiro representa o momento do cliente e ajuda a personalizar a leitura das movimentações.
 
-| Macroperfil | Subperfis |
-|---|---|
-| Endividado | Consciente, Acrobata, Iminente, Inadimplente |
-| Equilibrista | Equilibrista |
-| Investidor | Precavido, Protegido, Despreocupado, Acelerado |
+| Macroperfil | Subperfil | Definição resumida |
+|---|---|---|
+| **Endividado** | **Consciente** | Possui dívidas pequenas e controladas. |
+| **Endividado** | **Acrobata** | Apresenta comprometimento moderado da renda. |
+| **Endividado** | **Iminente** | Possui alto comprometimento da renda e risco elevado de atraso. |
+| **Endividado** | **Inadimplente** | Possui operações em atraso e renda comprometida. |
+| **Equilibrista** | **Equilibrista** | Não possui dívidas relevantes, mas ainda não dispõe de reserva suficiente para imprevistos. |
+| **Investidor** | **Precavido** | Está construindo a reserva de emergência, ainda insuficiente. |
+| **Investidor** | **Protegido** | Possui reserva de emergência completa, em ativos seguros e líquidos. |
+| **Investidor** | **Despreocupado** | Possui investimentos superiores à reserva recomendada, mas com maior exposição a risco. |
+| **Investidor** | **Acelerado** | Ainda não possui reserva adequada e investe em ativos de maior risco. |
 
----
-
-## Slide 2 — Como a pontuação funciona
-
-A pontuação combina três leituras:
-
-| Componente | Papel |
-|---|---|
-| Concentração | Identifica o principal sinal nas movimentações |
-| Orçamento | Reforça o contexto do mês |
-| Perfil | Diferencia clientes com sinais semelhantes |
-
-**Fórmula:**
-
-Pontuação final = Concentração + Orçamento + Perfil
+**Papel no Radar:** diferenciar clientes que apresentam movimentações semelhantes.
 
 ---
 
-## Slide 3 — Pontuação por concentração
+## Slide 2 — Regras de pontuação
 
-A concentração é o principal sinal do período.
+> **Pontuação final = Concentração + Orçamento + Perfil**
 
-| Tema | Indicador | Referência | Pontuação |
-|---|---|---:|---|
-| Gestão do Orçamento | Saídas essenciais | 50% / 75% | 0, 1 ou 2 |
-| Consumo Planejado | Saídas flexíveis | 30% / 45% | 0, 1 ou 2 |
-| Formação de Reserva | Saídas para reserva | 20% / 30% | 0, 1 ou 2 |
-| Uso Consciente do Crédito | Saídas com crédito | 30% / 45% | 0, 1 ou 2 |
-| Categorização dos Gastos | Saídas genéricas | 75% | 0 ou 99 |
+| Tema | Concentração — sinal principal | Orçamento — contexto do mês | Perfil — reforço |
+|---|---|---|---|
+| **Gestão do Orçamento** | Essenciais:<br>• abaixo de 50% = `0`<br>• de 50% a menos de 75% = `1`<br>• 75% ou mais = `2` | Deficitário = `+1`<br>Neutro ou Superavitário = `0` | Endividado Acrobata = `+1` |
+| **Consumo Planejado** | Flexíveis:<br>• abaixo de 30% = `0`<br>• de 30% a menos de 45% = `1`<br>• 45% ou mais = `2` | Deficitário = `+1`<br>Neutro ou Superavitário = `0` | Endividado Consciente = `+1` |
+| **Formação de Reserva** | Reserva:<br>• 30% ou mais = `0`<br>• de 20% a menos de 30% = `1`<br>• abaixo de 20% = `2` | Superavitário = `+1`<br>Neutro ou Deficitário = `0` | Equilibrista = `+1` |
+| **Uso Consciente do Crédito** | Crédito:<br>• abaixo de 30% = `0`<br>• de 30% a menos de 45% = `1`<br>• 45% ou mais = `2` | Deficitário = `+1`<br>Neutro ou Superavitário = `0` | Endividado Iminente ou Inadimplente = `+1` |
+| **Categorização dos Gastos** | Genéricas:<br>• até 75% = `0`<br>• acima de 75% = `99` | `0` | `0` |
 
----
+### Regras gerais
 
-## Slide 4 — Pontuação por orçamento
+- A concentração é calculada sobre o total das saídas.
+- A concentração é o principal componente da pontuação.
+- O orçamento acrescenta, no máximo, `1` ponto.
+- A classificação Forte ou Fraco não altera a pontuação.
+- O resultado Neutro não acrescenta pontos.
+- O perfil acrescenta, no máximo, `1` ponto.
+- Cada perfil completo reforça, no máximo, um tema.
+- Os perfis Investidores não recebem reforço automático.
+- O perfil somente reforça um tema que já tenha Pontuação por Concentração maior que zero.
+- Quando a concentração do tema for zero, sua Pontuação Final também será zero.
+- Os quatro temas principais possuem pontuação máxima de `4`.
+- Empates entre temas são mantidos para avaliação negocial.
 
-O orçamento reforça a leitura do mês.
-
-| Resultado do mês | Orçamento | Consumo | Reserva | Crédito |
-|---|---:|---:|---:|---:|
-| Deficitário | +1 | +1 | 0 | +1 |
-| Neutro | 0 | 0 | 0 | 0 |
-| Superavitário | 0 | 0 | +1 | 0 |
-
-**Regra:** o orçamento acrescenta no máximo 1 ponto.
-
----
-
-## Slide 5 — Pontuação por perfil
-
-O perfil reforça apenas um tema.
-
-| Perfil | Tema reforçado | Pontuação |
-|---|---|---:|
-| Endividado Consciente | Consumo Planejado | +1 |
-| Endividado Acrobata | Gestão do Orçamento | +1 |
-| Endividado Iminente | Uso Consciente do Crédito | +1 |
-| Endividado Inadimplente | Uso Consciente do Crédito | +1 |
-| Equilibrista | Formação de Reserva | +1 |
-| Investidores | Nenhum reforço | 0 |
-
-**Regra:** o perfil acrescenta no máximo 1 ponto.
-
----
-
-## Slide 6 — Regras finais
-
-| Regra | Definição |
-|---|---|
-| Concentração | Principal componente da pontuação |
-| Orçamento | Reforço limitado a 1 ponto |
-| Perfil | Reforço limitado a 1 ponto |
-| Tema sem concentração | Pontuação final igual a zero |
-| Empates | Mantidos para decisão negocial |
-| Pontuação máxima | 4 pontos por tema principal |
-
-**Mensagem-chave:**  
-A movimentação define os temas relevantes; orçamento e perfil apenas reforçam.
+> **A movimentação identifica os temas relevantes, o orçamento reforça o contexto e o perfil diferencia clientes com sinais semelhantes.**
