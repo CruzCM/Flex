@@ -1,0 +1,379 @@
+# Plano Detalhado UX V1: Jornada Guiada no Notebook
+
+## Resumo
+A melhoria será feita sobre o notebook atual, mantendo `fluxo_geracao("ollama")` e toda a lógica funcional existente. A mudança será concentrada na camada de apresentação em `src/app.py`, principalmente na classe `Visual` e nos métodos `mostrar_*` da classe `Experiencia`.
+
+A V1 vai transformar a saída atual, que ainda parece parcialmente um log técnico, em uma jornada guiada com cards padronizados, leitura progressiva e detalhes técnicos recolhidos.
+
+## Objetivos
+- Fazer o usuário entender claramente: o que escolheu, o que está sendo gerado, qual resultado saiu e quais detalhes técnicos existem para auditoria.
+- Remover repetição visual de títulos como `Escolhas confirmadas`, `Entrada`, `Saída`, `Fluxo - caminho`, `Prompt oficial enviado`.
+- Manter transparência técnica sem misturar payload, system e caminho interno com a leitura principal.
+- Preservar o motor, os YAMLs, os prompts e o objeto final `Resultado`.
+- Melhorar também o fallback de terminal, mantendo textos e ordem coerentes mesmo sem HTML.
+
+## O Que Não Vai Mudar
+- Não alterar `motor.py`, exceto se aparecer necessidade mínima de compatibilidade durante implementação.
+- Não alterar prompts YAML, catálogos de produto, público, cenário, apresentação ou tendência.
+- Não alterar chamada ao Genera/Ollama.
+- Não criar web app nesta V1.
+- Não adicionar filtros, favoritos, ranking, comparação avançada ou botões de copiar nesta primeira etapa.
+
+## Nova Regra de Exibição
+- Menus de escolha continuam simples, fora de cards.
+- Após uma escolha, o menu não vira card nem é repetido.
+- Cada escolha confirmada gera um card informativo padronizado.
+- Cards principais ficam abertos por padrão quando têm conteúdo de negócio.
+- Detalhes técnicos ficam recolhidos por padrão com o rótulo `Ver detalhes técnicos`.
+- Payload LLM sempre fica no final do bloco técnico.
+- Status será normalizado como `Pronto`, `Processando`, `Erro`, `Pendente` ou `Selecionado`.
+
+## Mudanças em `Visual`
+Criar helpers reutilizáveis para reduzir HTML espalhado e garantir padrão único:
+
+- `card(titulo, campos, aberto=True, destaque=False)`: renderiza card principal com campo em uma linha e valor abaixo.
+- `card_com_secoes(titulo, campos_topo, secoes, detalhes_tecnicos=None)`: usado para processo, tendência e resultado.
+- `detalhes_tecnicos(conteudo)`: cria acordeão recolhido com `System`, `Entrada`, `Payload LLM` e JSON.
+- `pipeline(titulo, etapas)`: renderiza pipeline vertical, por exemplo `Tendência P1 -> Voz BB P1 -> Tagline P1 -> Headline P1 -> CTA P1`.
+- `saida_item(titulo, valor, compacto=False)`: destaca `Headline`, `Tagline` e `CTA`.
+- `status(valor)`: normaliza status visual e textual.
+- `json_bloco(dados)`: renderiza JSON com `ensure_ascii=False`, indentado e no final técnico.
+- Ajustar CSS para largura confortável, espaçamento de 32px entre cards, leitura de 70-90 caracteres e cards com borda discreta.
+
+## Preparação
+Trocar o bloco atual:
+
+- De seção `Preparação` + card `Tudo pronto`
+- Para card único `Preparação`
+
+Campos finais:
+
+- `Provedor`
+- `Status`
+- `Catálogos`
+
+Valores:
+
+- `Genera oficial` ou `Ollama local`
+- `Pronto`
+- `Carregados`
+
+## Produto
+Fluxo:
+
+- Mostrar menu simples com produtos.
+- Após escolha, exibir card `Produto`.
+
+Campos:
+
+- nome do produto como destaque inicial
+- `Descrição`
+- `Benefício racional`
+- `Benefício emocional`
+
+Ajustes:
+
+- Não usar o nome do produto como título do card.
+- Não repetir lista de produtos após a escolha.
+- Normalizar acentos: `Descrição`, `Benefício racional`, `Benefício emocional`.
+
+## Público
+Fluxo:
+
+- Mostrar menu simples com públicos.
+- Após escolha, exibir card `Público`.
+
+Campos:
+
+- nome do público como destaque inicial
+- `Descrição`
+- `Necessidade racional`
+- `Necessidade emocional`
+
+Ajustes:
+
+- Não usar `Publico` sem acento na interface.
+- Não expor nomes internos como `familia_estabelecida`.
+
+## Apresentação
+Fluxo:
+
+- Mostrar menu simples com apresentações.
+- Após escolha, exibir um único card `Apresentação`.
+
+Campos visíveis:
+
+- nome da apresentação
+- `Template padrão`
+- `Template preenchido`
+
+Ajustes:
+
+- Remover a duplicação atual de seção `Apresentacao` e depois `Apresentação`.
+- Manter placeholders do template padrão como código visual.
+- Renderizar template preenchido como texto de leitura, sem HTML cru.
+- Não criar cards separados para `Template padrão` e `Apresentação preenchida`.
+
+## Cenário
+Fluxo:
+
+- Mostrar menu simples com cenários.
+- Após escolha, exibir card `Cenário`.
+
+Campos:
+
+- nome do cenário
+- `Função`
+- `Estrutura`
+
+Ajustes:
+
+- Usar `Função`, não `Funcao`.
+- Se `exibir_usuario` for útil e não for `null`, usar como texto visível; caso contrário, manter `texto_prompt`.
+
+## Parâmetros de Geração
+Depois dos inputs de limite e da pergunta de parâmetros automáticos, exibir card `Parâmetros de Geração`.
+
+Campos:
+
+- `Limites automáticos`: `Sim`
+- `Tagline`: `100 caracteres` ou valor escolhido
+- `Headline`: `25 caracteres` ou valor escolhido
+- `Configuração automática de prompt`: `Sim` ou `Não`
+
+Ajustes:
+
+- Remover card atual `Escolha confirmada`.
+- Não exibir `[S/n]` como parte da visualização final.
+- Se parâmetros forem manuais, mostrar valores finais aplicados por etapa em cards técnicos ou no momento da configuração manual.
+
+## Resumo da Geração
+Substituir `Escolhas iniciais` e `Escolhas confirmadas` por card único `Resumo da Geração`.
+
+Seções internas:
+
+- `Contexto`: Produto e Público.
+- `Estratégia`: Apresentação e Cenário.
+- `Limites`: Tagline e Headline.
+- `Configurações`: Limites automáticos e Prompt automático.
+
+Ajustes:
+
+- Card deve aparecer antes da execução do motor.
+- Deve ser consultável e compacto.
+- Não repetir menus de escolha.
+
+## Base Criativa
+Manter a ideia atual, mas renomear e simplificar o conteúdo.
+
+Card `Base Criativa`:
+
+- `Plano da base criativa`
+- `Revisão Textual`: quantidade de prompts disponíveis
+- `Copywriter`: quantidade de prompts disponíveis
+- `Regra`: quando houver mais de um resultado válido, o usuário escolhe qual segue
+
+Ajustes:
+
+- Usar `Revisão Textual`, não `Revisor textual`.
+- Evitar linguagem técnica excessiva.
+
+## Revisão Textual
+Para cada alternativa gerada, exibir card `Revisão Textual`.
+
+Campos visíveis:
+
+- `Alternativa`: número
+- `Prompt`: `P1`, `P2`, etc.
+- `Status`: `Pronto` ou `Erro`
+- `Resultado`: texto gerado ou mensagem de erro
+
+Detalhes técnicos recolhidos:
+
+- `Prompt utilizado`
+- `Entrada`
+- `Template preenchido`
+- `System`
+- `Payload LLM`
+
+Ajustes:
+
+- Substituir títulos atuais como `Revisor textual - Alternativa 1 - p1 - pronta`.
+- Remover `Entrada - alternativa 1` e `Saída - alternativa 1` como acordeões principais.
+- Colocar resultado antes dos detalhes técnicos.
+- No terminal, manter a mesma ordem textual.
+
+## Seleção de Alternativas
+Quando houver mais de uma alternativa válida:
+
+- Mostrar texto simples, não card pesado.
+- Título: `Seleção`
+- Texto: `Escolha a alternativa que deve seguir no fluxo.`
+- Opções: `Alternativa 1 - Prompt P1`, `Alternativa 2 - Prompt P2`
+
+Após a escolha:
+
+- Exibir card curto `Seleção`
+- Campos:
+  - `Etapa`
+  - `Alternativa selecionada`
+  - `Prompt`
+  - `Status`: `Selecionado`
+
+## Copywriter
+Aplicar exatamente o mesmo padrão de `Revisão Textual`.
+
+Campos visíveis:
+
+- `Alternativa`
+- `Prompt`
+- `Status`
+- `Resultado`
+
+Detalhes técnicos recolhidos:
+
+- `Prompt utilizado`
+- `Entrada`
+- `Template preenchido`
+- `System`
+- `Payload LLM`
+
+## Tendências
+Antes do loop automático, exibir card `Tendências`.
+
+Campos:
+
+- `Plano de Tendências`
+- lista numerada com as 10 tendências
+- `Conjuntos finais previstos`
+- `Regra`: cada tendência inicia um ramo independente
+
+Ajustes:
+
+- Trocar `Variações por tendência` por `Tendências`.
+- Usar nomes de tendência legíveis.
+- Manter a barra de progresso fora de card.
+
+## Pipeline de Tendência
+Para cada fluxo concluído, exibir card com o nome da tendência, por exemplo `Afinidade`.
+
+Campos:
+
+- `Fluxo`: número
+- `Status`: `Pronto`
+- `Pipeline`: vertical
+
+Pipeline:
+
+```text
+Tendência P1
+-> Voz BB P1
+-> Tagline P1
+-> Headline P1
+-> CTA P1
+```
+
+Ajustes:
+
+- Remover linha longa `Fluxo 1 - Tendencia p1 -> Voz BB...` do título.
+- Remover `Caminho:` da camada principal.
+- Manter caminho completo apenas no payload técnico.
+
+## Resultado da Tendência
+Após o pipeline, exibir card `Resultado da Tendência - Nome`.
+
+Seções visíveis:
+
+- `Texto com Tendência`
+- `Texto na Voz BB`
+- `Tagline`
+- `Headline`
+- `CTA`
+
+Detalhes técnicos recolhidos:
+
+- `Entrada`
+- `System`
+- `Payload LLM`
+
+Ajustes:
+
+- Headline, Tagline e CTA terão destaque visual por serem itens curtos e copiáveis.
+- Textos longos ficam com largura confortável e quebra preservada.
+- Payload consolidado do fluxo fica no final.
+
+## Resultado Final
+Ao final, exibir card `Resultado Final`.
+
+Se houver conjuntos:
+
+- `Total de conjuntos gerados`
+- `Regra`
+
+Se for resultado único:
+
+- `Headline`
+- `Tagline`
+- `CTA`
+- `Texto final`
+
+Ajustes:
+
+- Trocar `Resultados finais` + `Resultado final` por nomenclatura única.
+- Manter destaque visual do card final.
+- Não ocultar o resultado principal dentro de um acordeão fechado.
+
+## Tratamento Técnico
+Payloads continuarão sendo gerados pelos métodos atuais:
+
+- `prompt_oficial_resultado`
+- `prompt_oficial_fluxo`
+
+Mas a visualização mudará:
+
+- O nome visível será `Payload LLM`.
+- Campos como `arquivo_prompt`, `mensagens_enviadas`, `best_of`, `frequency_penalty` e `presence_penalty` ficam apenas no JSON técnico.
+- O JSON fica recolhido por padrão.
+- `System` fica separado de `Entrada`.
+
+## Fallback de Terminal
+Para execução fora de notebook:
+
+- Usar os mesmos títulos oficiais.
+- Campo e valor em linhas separadas.
+- Separar cards com linhas visuais simples.
+- Não depender de HTML para a UX fazer sentido.
+- Manter payload no final da saída técnica.
+
+## Testes
+Criar testes com `unittest`, sem adicionar dependência nova.
+
+Testes unitários:
+
+- Status `pronto`, `concluido`, `não concluída` viram `Pronto`, `Pronto`, `Erro`.
+- Pipeline de tendência aparece na ordem oficial.
+- Cards de processo exibem `Resultado` antes de `Payload LLM`.
+- Detalhes técnicos saem recolhidos no HTML.
+- Labels públicos usam acento e nomenclatura oficial.
+- JSON técnico mantém `ensure_ascii=False`.
+
+Smoke test manual:
+
+- Rodar `motor.validar_catalogos()` e confirmar lista vazia.
+- Abrir notebook e executar `fluxo_geracao("ollama")`.
+- Escolher um produto, público, apresentação e cenário.
+- Confirmar que menus não ficam repetidos como cards.
+- Confirmar que `Produto`, `Público`, `Apresentação`, `Cenário`, `Parâmetros de Geração` e `Resumo da Geração` aparecem na ordem.
+- Confirmar que `Revisão Textual` e `Copywriter` usam o mesmo padrão.
+- Confirmar que cada tendência mostra pipeline curto e resultado separado.
+- Confirmar que `System` e `Payload LLM` ficam em `Ver detalhes técnicos`.
+
+## Critérios de Aceite
+- A jornada pode ser entendida apenas rolando a tela.
+- Não há títulos duplicados próximos com o mesmo significado.
+- Nenhum card mistura decisão de negócio com JSON técnico aberto.
+- Resultado gerado fica visível sem abrir detalhes técnicos.
+- Payload LLM aparece sempre no final dos detalhes.
+- A execução retorna o mesmo objeto `Resultado` de antes.
+- Catálogos continuam válidos.
+- O notebook continua funcionando com a mesma chamada atual.
