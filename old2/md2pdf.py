@@ -213,6 +213,7 @@ REGRAS
   - Cada página possui um único fundo uniforme; superfícies são locais.
   - Cabeçalho e rodapé não são gerados.
   - HTML arbitrário, JavaScript, imagens e recursos externos não são processados.
+    A exceção segura em texto comum é <br>, aceito como quebra de linha.
   - Nenhum logotipo ou fonte proprietária é incorporado.
 """.strip()
 
@@ -2656,8 +2657,10 @@ def safe_inline(text: str) -> str:
 
     Links externos continuam não clicáveis. Links Markdown internos no formato
     ``[rótulo](#destino)`` são transformados em navegação dentro do próprio PDF.
+    A tag HTML segura ``<br>`` é preservada como quebra de linha.
     """
     escaped = html.escape(text, quote=True)
+    escaped = re.sub(r"&lt;\s*br\s*/?\s*&gt;", "<br/>", escaped, flags=re.IGNORECASE)
 
     internal_link_re = re.compile(
         r"\[([^\]\n]{1,2000})\]\(\s*#([^\)\s]{1,1000})\s*\)"
