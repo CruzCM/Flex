@@ -2,13 +2,15 @@
 """MD2PDF: conversor seguro de Markdown para PDF.
 
 Fluxos públicos:
+    python md2pdf.py
     python md2pdf.py -help
     python md2pdf.py -install
+    python md2pdf.py -gui
     python md2pdf.py -use [tema] entrada.md [saida.pdf]
 
-A única dependência externa é o ReportLab. A conversão é permitida apenas
-pelo comando ``-use``. O PDF usa fundo uniforme, sem cabeçalho, rodapé ou
-painel global de conteúdo.
+A única dependência externa é o ReportLab. A conversão pode ser feita pela
+GUI padrão, pelo comando ``-gui`` ou pelo comando ``-use``. O PDF usa fundo
+uniforme, sem cabeçalho, rodapé ou painel global de conteúdo.
 """
 
 from __future__ import annotations
@@ -16,6 +18,7 @@ from __future__ import annotations
 import argparse
 from collections import defaultdict, deque
 import html
+import json
 import math
 import importlib.util
 import os
@@ -44,14 +47,23 @@ MD2PDF {SCRIPT_VERSION} - Markdown seguro para PDF
 
 FLUXO OFICIAL
 
-  1. Mostrar ajuda e exemplos:
+  1. Usar pelo editor, apertando F5 / Run Python File:
+     python md2pdf.py
+
+     Sem argumentos, o MD2PDF prepara o ambiente automaticamente quando
+     necessário e abre a GUI para escolher Markdown, tipo/tema e local do PDF.
+
+  2. Mostrar ajuda e exemplos:
      python md2pdf.py -help
 
-  2. Preparar o ambiente na primeira utilização:
+  3. Opcional: preparar ou reparar o ambiente manualmente:
      python md2pdf.py -install
 
-  3. Converter sempre usando -use:
+  4. Converter pelo CLI usando -use:
      python md2pdf.py -use [tema] entrada.md [saida.pdf]
+
+  5. Converter pelo CLI com janelas do Windows no WSL/Pengwin:
+     python md2pdf.py -gui
 
 TEMAS DISPONÍVEIS
 
@@ -127,7 +139,7 @@ COMANDO -INSTALL
 
   Verifica Python, venv, pip, permissões, espaço livre, ReportLab e a geração
   real de um PDF de teste. Quando necessário, cria um ambiente virtual privado.
-  Não é necessário ativar o ambiente manualmente.
+  Este comando é opcional: o fluxo por F5/GUI prepara tudo automaticamente.
 
 COMANDO -USE
 
@@ -145,6 +157,15 @@ COMANDO -USE
 
   Uso guiado:
      python md2pdf.py -use
+
+COMANDO -GUI
+
+  python md2pdf.py
+  python md2pdf.py -gui
+
+  Sem argumentos, ou com -gui, prepara o ambiente automaticamente quando
+  necessário e abre janelas nativas do Windows para selecionar o Markdown,
+  escolher o tipo/tema do PDF e informar onde salvar o arquivo PDF.
 
 COMPONENTES TEMATIZADOS
 
@@ -205,7 +226,7 @@ OUTRAS OPÇÕES
 
 REGRAS
 
-  - A conversão só funciona com -use.
+  - A conversão começa pelo F5/sem argumentos, por -gui ou por -use.
   - A entrada deve ser UTF-8 e terminar em .md ou .markdown.
   - A saída explícita deve terminar em .pdf.
   - Um tema desconhecido é rejeitado; o padrão é bb-light-dark.
@@ -439,7 +460,11 @@ def _install_environment() -> int:
     if ready:
         _print_check(True, detail)
         print("\nA instalação já está pronta. Nenhuma alteração foi necessária.")
-        print("Use: python md2pdf.py -use entrada.md [saida.pdf]")
+        print("Use pelo editor com F5 ou execute:")
+        print("  python md2pdf.py")
+        print("Também continuam disponíveis:")
+        print("  python md2pdf.py -gui")
+        print("  python md2pdf.py -use entrada.md [saida.pdf]")
         return 0
 
     # Quando o próprio comando já está sendo executado dentro de um ambiente
@@ -453,7 +478,11 @@ def _install_environment() -> int:
             _print_check(True, current_detail)
             print("\nO ambiente virtual Python atual já possui tudo que o MD2PDF precisa.")
             print("Ele foi registrado como ambiente gerenciado; nenhuma instalação foi necessária.")
-            print("Use: python md2pdf.py -use entrada.md [saida.pdf]")
+            print("Use pelo editor com F5 ou execute:")
+            print("  python md2pdf.py")
+            print("Também continuam disponíveis:")
+            print("  python md2pdf.py -gui")
+            print("  python md2pdf.py -use entrada.md [saida.pdf]")
             return 0
 
     _runtime_pointer().unlink(missing_ok=True)
@@ -537,7 +566,10 @@ def _install_environment() -> int:
     _write_runtime_pointer(python_path)
 
     print("\nInstalação concluída com sucesso.")
-    print("Não ative o ambiente manualmente; use o comando -use:")
+    print("Não ative o ambiente manualmente. Use pelo editor com F5 ou execute:")
+    print("  python md2pdf.py")
+    print("Também continuam disponíveis:")
+    print("  python md2pdf.py -gui")
     print("  python md2pdf.py -use entrada.md [saida.pdf]")
     return 0
 
@@ -589,7 +621,244 @@ def _interactive_use_arguments() -> list[str]:
     return arguments
 
 
-def _prepare_use(arguments: list[str]) -> tuple[list[str], int | None]:
+class _GuidedUseCancelled(Exception):
+    pass
+
+
+def _is_wsl_environment() -> bool:
+    if os.environ.get("WSL_DISTRO_NAME") or os.environ.get("WSL_INTEROP"):
+        return True
+    osrelease = Path("/proc/sys/kernel/osrelease")
+    try:
+        return osrelease.is_file() and "microsoft" in osrelease.read_text(
+            encoding="utf-8",
+            errors="ignore",
+        ).lower()
+    except OSError:
+        return False
+
+
+def _windows_powershell_command() -> str | None:
+    if os.name == "nt":
+        for candidate in ("powershell.exe", "powershell"):
+            found = shutil.which(candidate)
+            if found:
+                return found
+        return "powershell.exe"
+    if _is_wsl_environment():
+        return shutil.which("powershell.exe") or "powershell.exe"
+    return None
+
+
+def _windows_dialog_script() -> str:
+    return r"""
+$ErrorActionPreference = 'Stop'
+[Console]::OutputEncoding = New-Object System.Text.UTF8Encoding $false
+Add-Type -AssemblyName System.Windows.Forms
+Add-Type -AssemblyName System.Drawing
+[System.Windows.Forms.Application]::EnableVisualStyles()
+
+function Write-Result($value) {
+    [Console]::Out.WriteLine(($value | ConvertTo-Json -Compress))
+}
+
+$open = New-Object System.Windows.Forms.OpenFileDialog
+$open.Title = 'MD2PDF - abrir Markdown'
+$open.Filter = 'Markdown (*.md;*.markdown)|*.md;*.markdown|Todos os arquivos (*.*)|*.*'
+$open.Multiselect = $false
+$open.CheckFileExists = $true
+$open.CheckPathExists = $true
+if ($open.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
+    Write-Result ([ordered]@{ cancelled = $true })
+    exit 0
+}
+$inputPath = $open.FileName
+
+$themeLabels = [ordered]@{
+    'BB claro/escuro - padrao' = 'bb-light-dark'
+    'BB claro - leitura longa e impressao' = 'bb-light'
+    'BB escuro - digital e executivo' = 'bb-dark'
+    'Claro generico' = 'light'
+    'Escuro generico' = 'dark'
+}
+
+$form = New-Object System.Windows.Forms.Form
+$form.Text = 'MD2PDF - tipo do PDF'
+$form.StartPosition = 'CenterScreen'
+$form.FormBorderStyle = 'FixedDialog'
+$form.MaximizeBox = $false
+$form.MinimizeBox = $false
+$form.Topmost = $true
+$form.ClientSize = New-Object System.Drawing.Size(430, 150)
+
+$label = New-Object System.Windows.Forms.Label
+$label.Text = 'Tipo/tema do PDF:'
+$label.AutoSize = $true
+$label.Location = New-Object System.Drawing.Point(18, 20)
+$form.Controls.Add($label)
+
+$combo = New-Object System.Windows.Forms.ComboBox
+$combo.DropDownStyle = 'DropDownList'
+$combo.Location = New-Object System.Drawing.Point(18, 46)
+$combo.Size = New-Object System.Drawing.Size(390, 28)
+foreach ($item in $themeLabels.Keys) {
+    [void]$combo.Items.Add($item)
+}
+$combo.SelectedIndex = 0
+$form.Controls.Add($combo)
+
+$okButton = New-Object System.Windows.Forms.Button
+$okButton.Text = 'Continuar'
+$okButton.Location = New-Object System.Drawing.Point(232, 100)
+$okButton.Size = New-Object System.Drawing.Size(84, 30)
+$okButton.DialogResult = [System.Windows.Forms.DialogResult]::OK
+$form.AcceptButton = $okButton
+$form.Controls.Add($okButton)
+
+$cancelButton = New-Object System.Windows.Forms.Button
+$cancelButton.Text = 'Cancelar'
+$cancelButton.Location = New-Object System.Drawing.Point(324, 100)
+$cancelButton.Size = New-Object System.Drawing.Size(84, 30)
+$cancelButton.DialogResult = [System.Windows.Forms.DialogResult]::Cancel
+$form.CancelButton = $cancelButton
+$form.Controls.Add($cancelButton)
+
+if ($form.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
+    $form.Dispose()
+    Write-Result ([ordered]@{ cancelled = $true })
+    exit 0
+}
+$themeName = $themeLabels[[string]$combo.SelectedItem]
+$form.Dispose()
+
+$save = New-Object System.Windows.Forms.SaveFileDialog
+$save.Title = 'MD2PDF - salvar PDF'
+$save.Filter = 'PDF (*.pdf)|*.pdf|Todos os arquivos (*.*)|*.*'
+$save.DefaultExt = 'pdf'
+$save.AddExtension = $true
+$save.OverwritePrompt = $true
+$save.CheckPathExists = $true
+$save.InitialDirectory = [System.IO.Path]::GetDirectoryName($inputPath)
+$save.FileName = [System.IO.Path]::ChangeExtension(
+    [System.IO.Path]::GetFileName($inputPath),
+    '.pdf'
+)
+if ($save.ShowDialog() -ne [System.Windows.Forms.DialogResult]::OK) {
+    Write-Result ([ordered]@{ cancelled = $true })
+    exit 0
+}
+
+Write-Result ([ordered]@{
+    cancelled = $false
+    input = $inputPath
+    output = $save.FileName
+    theme = $themeName
+})
+""".strip()
+
+
+def _run_windows_dialogs() -> dict:
+    powershell = _windows_powershell_command()
+    if powershell is None:
+        raise RuntimeError(
+            "A GUI Windows exige WSL/Pengwin com interoperabilidade Windows ativa."
+        )
+
+    try:
+        result = subprocess.run(
+            [
+                powershell,
+                "-NoProfile",
+                "-STA",
+                "-ExecutionPolicy",
+                "Bypass",
+                "-Command",
+                _windows_dialog_script(),
+            ],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=None,
+            check=False,
+        )
+    except OSError as exc:
+        message = (
+            "Nao foi possivel abrir a GUI do Windows. "
+            "Verifique a interoperabilidade do WSL."
+        )
+        raise RuntimeError(message) from exc
+
+    if result.returncode != 0:
+        detail = result.stderr.strip().splitlines()
+        suffix = f": {detail[-1]}" if detail else ""
+        raise RuntimeError(f"A GUI do Windows falhou{suffix}")
+
+    response_lines = [line.strip() for line in result.stdout.splitlines() if line.strip()]
+    for line in reversed(response_lines):
+        try:
+            data = json.loads(line.lstrip("\ufeff"))
+        except json.JSONDecodeError:
+            continue
+        if isinstance(data, dict):
+            return data
+    raise RuntimeError("A GUI do Windows nao retornou uma resposta valida.")
+
+
+def _manual_windows_path_to_wsl(path: str) -> str | None:
+    match = re.match(r"^([A-Za-z]):[\\/](.*)$", path)
+    if not match:
+        return None
+    drive = match.group(1).lower()
+    remainder = match.group(2).replace("\\", "/")
+    return f"/mnt/{drive}/{remainder}"
+
+
+def _windows_path_for_runtime(path: str) -> str:
+    if os.name == "nt":
+        return path
+    if not _is_wsl_environment():
+        raise RuntimeError("Caminhos Windows so podem ser convertidos dentro do WSL/Pengwin.")
+
+    result = _run_quiet(["wslpath", "-u", path], timeout=10)
+    if result is not None and result.returncode == 0:
+        converted = result.stdout.strip()
+        if converted:
+            return converted
+
+    converted = _manual_windows_path_to_wsl(path)
+    if converted is not None:
+        return converted
+    raise RuntimeError(f"Nao foi possivel converter o caminho Windows para WSL: {path}")
+
+
+def _gui_use_arguments() -> list[str]:
+    data = _run_windows_dialogs()
+    if data.get("cancelled"):
+        raise _GuidedUseCancelled()
+
+    windows_input = str(data.get("input") or "").strip()
+    windows_output = str(data.get("output") or "").strip()
+    theme_name = str(data.get("theme") or "bb-light-dark").strip()
+    valid_themes = {"bb-light", "bb-light-dark", "bb-dark", "light", "dark"}
+    if not windows_input or not windows_output:
+        raise RuntimeError("A GUI do Windows retornou caminhos incompletos.")
+    if theme_name not in valid_themes:
+        theme_name = "bb-light-dark"
+
+    input_path = _windows_path_for_runtime(windows_input)
+    output_path = _windows_path_for_runtime(windows_output)
+    return ["--theme", theme_name, input_path, output_path, "--force"]
+
+
+def _prepare_use(
+    arguments: list[str],
+    argument_factory: Callable[[], list[str]] | None = None,
+    *,
+    auto_install: bool = True,
+) -> tuple[list[str], int | None]:
     """Executa todas as checagens obrigatórias antes da transformação."""
     print("MD2PDF - checagem obrigatória antes do uso\n")
 
@@ -607,26 +876,45 @@ def _prepare_use(arguments: list[str]) -> tuple[list[str], int | None]:
         return arguments, 2
 
     managed_ready, managed_detail = _managed_environment_info()
-    _print_check(managed_ready, f"ambiente privado: {managed_detail}")
+    if managed_ready:
+        _print_check(True, f"ambiente privado: {managed_detail}")
+    elif auto_install:
+        print(f"[INFO] ambiente privado: {managed_detail}")
+    else:
+        _print_check(False, f"ambiente privado: {managed_detail}")
+
+    if not managed_ready and auto_install:
+        print("\n[INFO] Preparando o ambiente automaticamente. Isso pode levar alguns instantes.")
+        install_code = _install_environment()
+        if install_code != 0:
+            return arguments, install_code
+        managed_ready, managed_detail = _managed_environment_info()
+        _print_check(managed_ready, f"ambiente privado: {managed_detail}")
 
     if not managed_ready:
         print("\n[ACAO NECESSARIA] O MD2PDF ainda não está pronto para converter.")
-        print("Execute primeiro:")
+        print("Use pelo editor com F5 ou execute:")
+        print("  python md2pdf.py")
+        print("Para reparo manual, ainda existe:")
         print("  python md2pdf.py -install")
-        print("\nDepois execute a transformação com:")
+        print("Depois, se preferir CLI:")
+        print("  python md2pdf.py -gui")
         print("  python md2pdf.py -use entrada.md [saida.pdf]")
         return arguments, 2
 
     if not arguments:
         try:
-            arguments = _interactive_use_arguments()
-        except (EOFError, KeyboardInterrupt, ValueError) as exc:
+            arguments = (argument_factory or _interactive_use_arguments)()
+        except _GuidedUseCancelled:
+            print("Operacao cancelada.")
+            return [], 0
+        except (EOFError, KeyboardInterrupt, ValueError, RuntimeError) as exc:
             print(f"Uso guiado cancelado: {exc}", file=sys.stderr)
             return [], 130 if isinstance(exc, KeyboardInterrupt) else 2
 
     if not _is_running_managed_python():
         python_path = _selected_python()
-        print("\n[OK] Não é necessário executar -install.")
+        print("\n[OK] Ambiente pronto para converter.")
         print(f"[OK] Usando automaticamente o ambiente privado: {python_path}")
         sys.stdout.flush()
         sys.stderr.flush()
@@ -645,45 +933,52 @@ def _prepare_use(arguments: list[str]) -> tuple[list[str], int | None]:
 
     if not _reportlab_available_here():
         print("\n[ERRO] O ambiente privado falhou na checagem final.", file=sys.stderr)
-        print("Execute novamente: python md2pdf.py -install", file=sys.stderr)
+        print("Execute novamente pelo F5 ou rode: python md2pdf.py -install", file=sys.stderr)
         return arguments, 2
 
-    print("\n[OK] Não é necessário executar -install.")
+    print("\n[OK] Ambiente pronto para converter.")
     print("[OK] Todas as verificações do ambiente passaram.")
     os.environ["MD2PDF_INTERNAL_USE"] = "1"
     return arguments, None
 
 
 def _early_bootstrap(raw_arguments: list[str]) -> tuple[list[str], bool]:
-    """Permite conversão somente pelo fluxo público -use."""
+    """Permite conversão pelos fluxos públicos F5, -gui ou -use."""
     arguments = list(raw_arguments)
     help_aliases = {"-help", "--help", "-h", "help", "ajuda"}
     install_aliases = {"-install", "--install", "install"}
     use_aliases = {"-use", "--use", "use"}
+    gui_aliases = {"-gui", "--gui", "gui"}
     version_aliases = {"--version", "-version", "version"}
     internal_use = os.environ.get("MD2PDF_INTERNAL_USE") == "1"
 
     if not arguments:
+        arguments, return_code = _prepare_use([], argument_factory=_gui_use_arguments)
+        if return_code is not None:
+            raise SystemExit(return_code)
+        use_mode = True
+    elif arguments[0] in help_aliases:
         print(HELP_TEXT)
         raise SystemExit(0)
-
-    if arguments[0] in help_aliases:
-        print(HELP_TEXT)
-        raise SystemExit(0)
-
-    if arguments[0] in version_aliases:
+    elif arguments[0] in version_aliases:
         print(f"{SCRIPT_NAME} {SCRIPT_VERSION}")
         raise SystemExit(0)
-
-    if arguments[0] in install_aliases:
+    elif arguments[0] in install_aliases:
         if len(arguments) > 1:
             print("O comando -install não recebe outros argumentos.", file=sys.stderr)
             raise SystemExit(2)
         raise SystemExit(_install_environment())
-
-    if arguments[0] in use_aliases:
+    elif arguments[0] in use_aliases:
         arguments = arguments[1:]
         arguments, return_code = _prepare_use(arguments)
+        if return_code is not None:
+            raise SystemExit(return_code)
+        use_mode = True
+    elif arguments[0] in gui_aliases:
+        if len(arguments) > 1:
+            print("O comando -gui nao recebe outros argumentos.", file=sys.stderr)
+            raise SystemExit(2)
+        arguments, return_code = _prepare_use([], argument_factory=_gui_use_arguments)
         if return_code is not None:
             raise SystemExit(return_code)
         use_mode = True
@@ -691,8 +986,10 @@ def _early_bootstrap(raw_arguments: list[str]) -> tuple[list[str], bool]:
         # Processo reiniciado pelo próprio -use dentro do ambiente privado.
         use_mode = True
     else:
-        print("Erro: a transformação só pode ser executada com o comando -use.", file=sys.stderr)
+        print("Erro: a transformação só pode ser executada com -use ou -gui.", file=sys.stderr)
         print("\nForma correta:", file=sys.stderr)
+        print("  python md2pdf.py", file=sys.stderr)
+        print("  python md2pdf.py -gui", file=sys.stderr)
         print("  python md2pdf.py -use entrada.md [saida.pdf]", file=sys.stderr)
         print("  python md2pdf.py -use --bb-light entrada.md saida.pdf", file=sys.stderr)
         print("  python md2pdf.py -use --bb-dark entrada.md saida.pdf", file=sys.stderr)
@@ -704,7 +1001,7 @@ def _early_bootstrap(raw_arguments: list[str]) -> tuple[list[str], bool]:
 
     if not _reportlab_available_here():
         print("Erro: o ambiente de conversão está incompleto.", file=sys.stderr)
-        print("Execute: python md2pdf.py -install", file=sys.stderr)
+        print("Execute novamente pelo F5 ou rode: python md2pdf.py -install", file=sys.stderr)
         raise SystemExit(2)
 
     return arguments, use_mode
@@ -3650,7 +3947,7 @@ def build_pdf(
 
 
 HELP_EPILOG = r"""
-Use "python md2pdf.py -help" para ver o manual completo, os cinco temas, os dois modos de saída e exemplos para Windows.
+Use "python md2pdf.py -help" para ver o manual completo, os cinco temas, os modos de saída e a GUI Windows para WSL/Pengwin.
 """
 
 
