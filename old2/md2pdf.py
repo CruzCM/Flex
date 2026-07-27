@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""MD2PDF v7: conversor seguro de Markdown para PDF.
+"""MD2PDF: conversor seguro de Markdown para PDF.
 
 Fluxos públicos:
-    python md2pdf_v7.py -help
-    python md2pdf_v7.py -install
-    python md2pdf_v7.py -use [tema] entrada.md [saida.pdf]
+    python md2pdf.py -help
+    python md2pdf.py -install
+    python md2pdf.py -use [tema] entrada.md [saida.pdf]
 
 A única dependência externa é o ReportLab. A conversão é permitida apenas
 pelo comando ``-use``. O PDF usa fundo uniforme, sem cabeçalho, rodapé ou
@@ -45,13 +45,13 @@ MD2PDF {SCRIPT_VERSION} - Markdown seguro para PDF
 FLUXO OFICIAL
 
   1. Mostrar ajuda e exemplos:
-     python md2pdf_v7.py -help
+     python md2pdf.py -help
 
   2. Preparar o ambiente na primeira utilização:
-     python md2pdf_v7.py -install
+     python md2pdf.py -install
 
   3. Converter sempre usando -use:
-     python md2pdf_v7.py -use [tema] entrada.md [saida.pdf]
+     python md2pdf.py -use [tema] entrada.md [saida.pdf]
 
 TEMAS DISPONÍVEIS
 
@@ -85,35 +85,35 @@ TEMAS DISPONÍVEIS
 EXEMPLOS DE TEMAS
 
   Tema padrão bb-light-dark:
-     python md2pdf_v7.py -use documento.md
+     python md2pdf.py -use documento.md
 
   Tema BB claro:
-     python md2pdf_v7.py -use --bb-light documento.md
+     python md2pdf.py -use --bb-light documento.md
 
   Tema BB claro/escuro:
-     python md2pdf_v7.py -use --bb-light-dark documento.md
+     python md2pdf.py -use --bb-light-dark documento.md
 
   Tema BB escuro:
-     python md2pdf_v7.py -use --bb-dark documento.md
+     python md2pdf.py -use --bb-dark documento.md
 
   Seleção pelo nome:
-     python md2pdf_v7.py -use -t bb-dark documento.md
+     python md2pdf.py -use -t bb-dark documento.md
 
   Temas antigos, mantidos por compatibilidade:
-     python md2pdf_v7.py -use -l documento.md
-     python md2pdf_v7.py -use -d documento.md
+     python md2pdf.py -use -l documento.md
+     python md2pdf.py -use -d documento.md
 
 DOIS MODOS DE GERAÇÃO
 
   Modo 1 - saída informada pelo usuário:
 
-     python md2pdf_v7.py -use --bb-dark entrada.md saida.pdf --force
+     python md2pdf.py -use --bb-dark entrada.md saida.pdf --force
 
   Você escolhe o nome e a pasta. Se o PDF já existir, use --force.
 
   Modo 2 - saída automática:
 
-     python md2pdf_v7.py -use --bb-dark entrada.md
+     python md2pdf.py -use --bb-dark entrada.md
 
   O PDF é criado automaticamente:
   - na mesma pasta do Markdown;
@@ -123,7 +123,7 @@ DOIS MODOS DE GERAÇÃO
 
 COMANDO -INSTALL
 
-  python md2pdf_v7.py -install
+  python md2pdf.py -install
 
   Verifica Python, venv, pip, permissões, espaço livre, ReportLab e a geração
   real de um PDF de teste. Quando necessário, cria um ambiente virtual privado.
@@ -132,19 +132,19 @@ COMANDO -INSTALL
 COMANDO -USE
 
   Saída automática:
-     python md2pdf_v7.py -use entrada.md
-     python md2pdf_v7.py -use --bb-light entrada.md
-     python md2pdf_v7.py -use --bb-dark entrada.md
+     python md2pdf.py -use entrada.md
+     python md2pdf.py -use --bb-light entrada.md
+     python md2pdf.py -use --bb-dark entrada.md
 
   Saída explícita:
-     python md2pdf_v7.py -use entrada.md saida.pdf
-     python md2pdf_v7.py -use --bb-dark entrada.md saida.pdf --force
+     python md2pdf.py -use entrada.md saida.pdf
+     python md2pdf.py -use --bb-dark entrada.md saida.pdf --force
 
   Ocultar a barra de progresso:
-     python md2pdf_v7.py -use entrada.md --no-progress
+     python md2pdf.py -use entrada.md --no-progress
 
   Uso guiado:
-     python md2pdf_v7.py -use
+     python md2pdf.py -use
 
 COMPONENTES TEMATIZADOS
 
@@ -185,10 +185,10 @@ FLUXOGRAMAS MERMAID (SUBCONJUNTO SEGURO)
 MOTOR MERMAID AUTOMÁTICO
 
   Padrão - analisa o grafo e escolhe o layout com menor penalidade:
-     python md2pdf_v7.py -use --mermaid-auto documento.md
+     python md2pdf.py -use --mermaid-auto documento.md
 
   Modo fiel - prioriza TD, TB, LR ou RL e a ordem declarada:
-     python md2pdf_v7.py -use --mermaid-strict documento.md
+     python md2pdf.py -use --mermaid-strict documento.md
 
   O modo automático avalia candidatos compactos, equilibrados, legíveis e
   horizontais. A pontuação considera número de páginas, grupos cortados,
@@ -245,25 +245,50 @@ def _runtime_pointer() -> Path:
     return _app_home() / RUNTIME_POINTER_NAME
 
 
+def _runtime_entrypoint_path(path: Path) -> Path:
+    """Return an absolute path without resolving venv symlinks."""
+    return Path(os.path.abspath(os.fspath(path.expanduser())))
+
+
+def _runtime_entrypoint_key(path: Path) -> str:
+    normalized = os.path.normpath(os.fspath(_runtime_entrypoint_path(path)))
+    return os.path.normcase(normalized)
+
+
+def _points_to_managed_venv_target(candidate: Path, venv_python: Path) -> bool:
+    """Detect old pointers that stored the symlink target instead of the venv."""
+    if _runtime_entrypoint_key(candidate) == _runtime_entrypoint_key(venv_python):
+        return False
+    if not candidate.is_file() or not venv_python.is_file():
+        return False
+    try:
+        return candidate.resolve() == venv_python.resolve()
+    except OSError:
+        return False
+
+
 def _selected_python() -> Path:
+    venv_python = _runtime_entrypoint_path(_venv_python())
     pointer = _runtime_pointer()
     try:
         if pointer.is_file():
             value = pointer.read_text(encoding="utf-8").strip()
             if value:
-                candidate = Path(value).expanduser()
+                candidate = _runtime_entrypoint_path(Path(value))
                 if candidate.is_file():
+                    if _points_to_managed_venv_target(candidate, venv_python):
+                        return venv_python
                     return candidate
     except (OSError, UnicodeError):
         pass
-    return _venv_python()
+    return venv_python
 
 
 def _write_runtime_pointer(python_path: Path) -> None:
     pointer = _runtime_pointer()
     pointer.parent.mkdir(parents=True, exist_ok=True)
     temporary = pointer.with_suffix(".tmp")
-    temporary.write_text(str(python_path.resolve()), encoding="utf-8")
+    temporary.write_text(str(_runtime_entrypoint_path(python_path)), encoding="utf-8")
     os.replace(temporary, pointer)
 
 
@@ -347,10 +372,9 @@ def _managed_environment_info() -> tuple[bool, str]:
 
 
 def _is_running_managed_python() -> bool:
-    try:
-        return Path(sys.executable).resolve() == _selected_python().resolve()
-    except OSError:
-        return False
+    current_python = _runtime_entrypoint_key(Path(sys.executable))
+    managed_python = _runtime_entrypoint_key(_selected_python())
+    return current_python == managed_python
 
 
 def _check_directory_writable(directory: Path) -> tuple[bool, str]:
@@ -414,21 +438,21 @@ def _install_environment() -> int:
     if ready:
         _print_check(True, detail)
         print("\nA instalação já está pronta. Nenhuma alteração foi necessária.")
-        print("Use: python md2pdf_v7.py -use entrada.md [saida.pdf]")
+        print("Use: python md2pdf.py -use entrada.md [saida.pdf]")
         return 0
 
     # Quando o próprio comando já está sendo executado dentro de um ambiente
     # virtual válido, ele pode ser registrado como runtime gerenciado. Isso
     # evita downloads desnecessários e mantém o funcionamento offline.
     if sys.prefix != sys.base_prefix and _reportlab_available_here():
-        current_python = Path(sys.executable).resolve()
+        current_python = _runtime_entrypoint_path(Path(sys.executable))
         current_ready, current_detail = _runtime_environment_info(current_python)
         if current_ready:
             _write_runtime_pointer(current_python)
             _print_check(True, current_detail)
             print("\nO ambiente virtual Python atual já possui tudo que o MD2PDF precisa.")
             print("Ele foi registrado como ambiente gerenciado; nenhuma instalação foi necessária.")
-            print("Use: python md2pdf_v7.py -use entrada.md [saida.pdf]")
+            print("Use: python md2pdf.py -use entrada.md [saida.pdf]")
             return 0
 
     _runtime_pointer().unlink(missing_ok=True)
@@ -513,7 +537,7 @@ def _install_environment() -> int:
 
     print("\nInstalação concluída com sucesso.")
     print("Não ative o ambiente manualmente; use o comando -use:")
-    print("  python md2pdf_v7.py -use entrada.md [saida.pdf]")
+    print("  python md2pdf.py -use entrada.md [saida.pdf]")
     return 0
 
 
@@ -587,9 +611,9 @@ def _prepare_use(arguments: list[str]) -> tuple[list[str], int | None]:
     if not managed_ready:
         print("\n[ACAO NECESSARIA] O MD2PDF ainda não está pronto para converter.")
         print("Execute primeiro:")
-        print("  python md2pdf_v7.py -install")
+        print("  python md2pdf.py -install")
         print("\nDepois execute a transformação com:")
-        print("  python md2pdf_v7.py -use entrada.md [saida.pdf]")
+        print("  python md2pdf.py -use entrada.md [saida.pdf]")
         return arguments, 2
 
     if not arguments:
@@ -620,7 +644,7 @@ def _prepare_use(arguments: list[str]) -> tuple[list[str], int | None]:
 
     if not _reportlab_available_here():
         print("\n[ERRO] O ambiente privado falhou na checagem final.", file=sys.stderr)
-        print("Execute novamente: python md2pdf_v7.py -install", file=sys.stderr)
+        print("Execute novamente: python md2pdf.py -install", file=sys.stderr)
         return arguments, 2
 
     print("\n[OK] Não é necessário executar -install.")
@@ -668,18 +692,18 @@ def _early_bootstrap(raw_arguments: list[str]) -> tuple[list[str], bool]:
     else:
         print("Erro: a transformação só pode ser executada com o comando -use.", file=sys.stderr)
         print("\nForma correta:", file=sys.stderr)
-        print("  python md2pdf_v7.py -use entrada.md [saida.pdf]", file=sys.stderr)
-        print("  python md2pdf_v7.py -use --bb-light entrada.md saida.pdf", file=sys.stderr)
-        print("  python md2pdf_v7.py -use --bb-dark entrada.md saida.pdf", file=sys.stderr)
+        print("  python md2pdf.py -use entrada.md [saida.pdf]", file=sys.stderr)
+        print("  python md2pdf.py -use --bb-light entrada.md saida.pdf", file=sys.stderr)
+        print("  python md2pdf.py -use --bb-dark entrada.md saida.pdf", file=sys.stderr)
         print("\nPara preparar o ambiente:", file=sys.stderr)
-        print("  python md2pdf_v7.py -install", file=sys.stderr)
+        print("  python md2pdf.py -install", file=sys.stderr)
         print("\nPara ver exemplos:", file=sys.stderr)
-        print("  python md2pdf_v7.py -help", file=sys.stderr)
+        print("  python md2pdf.py -help", file=sys.stderr)
         raise SystemExit(2)
 
     if not _reportlab_available_here():
         print("Erro: o ambiente de conversão está incompleto.", file=sys.stderr)
-        print("Execute: python md2pdf_v7.py -install", file=sys.stderr)
+        print("Execute: python md2pdf.py -install", file=sys.stderr)
         raise SystemExit(2)
 
     return arguments, use_mode
@@ -3623,13 +3647,13 @@ def build_pdf(
 
 
 HELP_EPILOG = r"""
-Use "python md2pdf_v7.py -help" para ver o manual completo, os cinco temas, os dois modos de saída e exemplos para Windows.
+Use "python md2pdf.py -help" para ver o manual completo, os cinco temas, os dois modos de saída e exemplos para Windows.
 """
 
 
 def make_argument_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        prog="python md2pdf_v7.py -use",
+        prog="python md2pdf.py -use",
         add_help=False,
         description=(
             "Converte um subconjunto seguro de Markdown para PDF, "
