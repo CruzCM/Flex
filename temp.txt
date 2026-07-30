@@ -1,0 +1,54 @@
+%%spark
+
+tabela = TABELAS_HIVE["hive_cliente_recomendacao_ativa"]
+objeto = nome_tabela_hive(database, tabela)
+
+df_destino = ler_tabela_hive(database, tabela)
+schema_esperado = schema_contrato_hive(tabela)
+
+esperado = [
+    (campo.name, campo.dataType.simpleString())
+    for campo in schema_esperado.fields
+]
+
+encontrado = [
+    (campo.name, campo.dataType.simpleString())
+    for campo in df_destino.schema.fields
+]
+
+print("objeto={}".format(objeto))
+print("quantidade_esperada={}".format(len(esperado)))
+print("quantidade_encontrada={}".format(len(encontrado)))
+
+divergencias = 0
+quantidade_maxima = max(len(esperado), len(encontrado))
+
+for indice in range(quantidade_maxima):
+    posicao = indice + 1
+
+    campo_esperado = (
+        esperado[indice]
+        if indice < len(esperado)
+        else "CAMPO_INEXISTENTE"
+    )
+
+    campo_encontrado = (
+        encontrado[indice]
+        if indice < len(encontrado)
+        else "CAMPO_INEXISTENTE"
+    )
+
+    if campo_esperado != campo_encontrado:
+        divergencias += 1
+        print(
+            "posicao={} esperado={} encontrado={}".format(
+                posicao,
+                campo_esperado,
+                campo_encontrado,
+            )
+        )
+
+if divergencias == 0:
+    print("SEM_DIVERGENCIA: schema atual corresponde ao contrato.")
+else:
+    print("total_divergencias={}".format(divergencias))
