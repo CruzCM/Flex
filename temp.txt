@@ -1,54 +1,456 @@
 %%spark
 
+# ============================================================
+# DIAGNOSTICO FINAL:
+#   1. sbx_t2i2016.RCM_FNC_CLI
+#   2. hive_t2i.RCM_FNC_CLI
+#   3. CONTRATO_HIVE do 2_contrato.ipynb
+#
+# Somente leitura de metadados.
+# ============================================================
+
 tabela = TABELAS_HIVE["hive_cliente_recomendacao_ativa"]
-objeto = nome_tabela_hive(database, tabela)
 
-df_destino = ler_tabela_hive(database, tabela)
-schema_esperado = schema_contrato_hive(tabela)
-
-esperado = [
-    (campo.name, campo.dataType.simpleString())
-    for campo in schema_esperado.fields
+objetos = [
+    ("DESENVOLVIMENTO", "sbx_t2i2016", tabela),
+    ("PRODUCAO", "hive_t2i", tabela),
 ]
 
-encontrado = [
-    (campo.name, campo.dataType.simpleString())
-    for campo in df_destino.schema.fields
+resultados = {}
+
+
+def mensagem_erro_segura(exc):
+    texto = str(exc)
+
+    try:
+        texto = _redigir_segredos(texto)
+    except Exception:
+        pass
+
+    return " ".join(texto.split())[:1000]
+
+
+def comparar_schemas(esperado, encontrado):
+    divergencias = []
+    quantidade = max(len(esperado), len(encontrado))
+
+    for indice in range(quantidade):
+
+        campo_esperado = (
+            esperado[indice]
+            if indice < len(esperado)
+            else "CAMPO_INEXISTENTE"
+        )
+
+        campo_encontrado = (
+            encontrado[indice]
+            if indice < len(encontrado)
+            else "CAMPO_INEXISTENTE"
+        )
+
+        if campo_esperado != campo_encontrado:
+            divergencias.append({
+                "posicao": indice + 1,
+                "esperado": campo_esperado,
+                "encontrado": campo_encontrado,
+            })
+
+    return divergencias
+
+
+# ============================================================
+# 1. CARREGA E VERIFICA O CONTRATO DO 2_CONTRATO.IPYNB
+# ============================================================
+
+print("=" * 110)
+print("[CONTRATO_IPYNB] tabela={}".format(tabela))
+print("=" * 110)
+
+if tabela not in CONTRATO_HIVE:
+    raise ValueError(
+        "Tabela {} nao encontrada em CONTRATO_HIVE.".format(tabela)
+    )
+
+contrato = CONTRATO_HIVE[tabela]
+schema_contrato_obj = schema_contrato_hive(tabela)
+
+schema_contrato = [
+    (
+        str(campo.name).strip().upper(),
+        campo.dataType.simpleString(),
+    )
+    for campo in schema_contrato_obj.fields
 ]
 
-print("objeto={}".format(objeto))
-print("quantidade_esperada={}".format(len(esperado)))
-print("quantidade_encontrada={}".format(len(encontrado)))
+campos_contrato = contrato.get("campos", [])
+chaves_contrato = contrato.get("chaves", [])
+dominios_contrato = contrato.get("dominios", {})
+regras_contrato = contrato.get("regras", {})
 
-divergencias = 0
-quantidade_maxima = max(len(esperado), len(encontrado))
+nomes_contrato = [
+    str(nome).strip().upper()
+    for nome, tipo, aceita_nulo in campos_contrato
+]
 
-for indice in range(quantidade_maxima):
-    posicao = indice + 1
+nomes_repetidos = []
 
-    campo_esperado = (
-        esperado[indice]
-        if indice < len(esperado)
-        else "CAMPO_INEXISTENTE"
+for nome in nomes_contrato:
+    if (
+        nomes_contrato.count(nome) > 1
+        and nome not in nomes_repetidos
+    ):
+        nomes_repetidos.append(nome)
+
+chaves_ausentes = [
+    chave
+    for chave in chaves_contrato
+    if str(chave).strip().upper() not in nomes_contrato
+]
+
+dominios_ausentes = [
+    campo
+    for campo in dominios_contrato
+    if str(campo).strip().upper() not in nomes_contrato
+]
+
+print("quantidade_colunas={}".format(len(schema_contrato)))
+print("chaves={}".format(chaves_contrato))
+print("dominios={}".format(dominios_contrato))
+print("regras={}".format(regras_contrato))
+print("campos_repetidos={}".format(nomes_repetidos))
+print("chaves_ausentes={}".format(chaves_ausentes))
+print("dominios_ausentes={}".format(dominios_ausentes))
+
+if nomes_repetidos or chaves_ausentes or dominios_ausentes:
+    print("consistencia_interna_contrato=ERRO")
+else:
+    print("consistencia_interna_contrato=OK")
+
+print("")
+print("schema_contrato:")
+
+for indice in range(len(campos_contrato)):
+    nome, tipo, aceita_nulo = campos_contrato[indice]
+
+    print(
+        "posicao={:02d} campo={} tipo={} aceita_nulo={}".format(
+            indice + 1,
+            nome,
+            tipo.simpleString(),
+            aceita_nulo,
+        )
     )
 
-    campo_encontrado = (
-        encontrado[indice]
-        if indice < len(encontrado)
-        else "CAMPO_INEXISTENTE"
-    )
 
-    if campo_esperado != campo_encontrado:
-        divergencias += 1
-        print(
-            "posicao={} esperado={} encontrado={}".format(
-                posicao,
-                campo_esperado,
-                campo_encontrado,
+# ============================================================
+# 2. LEITURA DOS DOIS SCHEMAS FISICOS
+# ============================================================
+
+for ambiente, database, tabela_fisica in objetos:
+
+    objeto = "{}.{}".format(database, tabela_fisica)
+
+    print("")
+    print("=" * 110)
+    print("[{}] objeto={}".format(ambiente, objeto))
+    print("=" * 110)
+
+    resultado = {
+        "ambiente": ambiente,
+        "objeto": objeto,
+        "leitura": None,
+        "schema_original": None,
+        "schema_canonico": None,
+        "divergencias_contrato": [],
+        "contrato": None,
+        "ambiguidades": {},
+    }
+
+    try:
+        existe = bool(
+            spark.catalog.tableExists(
+                tabela_fisica,
+                database,
             )
         )
 
-if divergencias == 0:
-    print("SEM_DIVERGENCIA: schema atual corresponde ao contrato.")
+        print(
+            "catalogo={}".format(
+                "EXISTE"
+                if existe
+                else "NAO_ENCONTRADA"
+            )
+        )
+
+    except Exception as exc:
+        existe = None
+
+        print(
+            "catalogo=ERRO tipo={} mensagem={}".format(
+                type(exc).__name__,
+                mensagem_erro_segura(exc),
+            )
+        )
+
+    try:
+        df_schema = spark.sql(
+            "SELECT * FROM `{}`.`{}` LIMIT 0".format(
+                database,
+                tabela_fisica,
+            )
+        )
+
+    except Exception as exc:
+        resultado["leitura"] = "ERRO"
+
+        print(
+            "leitura_schema=ERRO tipo={} mensagem={}".format(
+                type(exc).__name__,
+                mensagem_erro_segura(exc),
+            )
+        )
+
+        resultados[ambiente] = resultado
+        continue
+
+    schema_original = []
+    schema_canonico = []
+    origens_por_nome_canonico = {}
+
+    for campo in df_schema.schema.fields:
+
+        nome_original = str(campo.name).strip()
+        nome_canonico = nome_original.upper()
+        tipo = campo.dataType.simpleString()
+
+        schema_original.append(
+            (
+                nome_original,
+                tipo,
+                campo.nullable,
+            )
+        )
+
+        schema_canonico.append(
+            (
+                nome_canonico,
+                tipo,
+            )
+        )
+
+        if nome_canonico not in origens_por_nome_canonico:
+            origens_por_nome_canonico[nome_canonico] = []
+
+        origens_por_nome_canonico[nome_canonico].append(
+            nome_original
+        )
+
+    ambiguidades = {}
+
+    for nome_canonico in origens_por_nome_canonico:
+        origens = origens_por_nome_canonico[nome_canonico]
+
+        if len(origens) > 1:
+            ambiguidades[nome_canonico] = origens
+
+    resultado["leitura"] = "OK"
+    resultado["schema_original"] = schema_original
+    resultado["schema_canonico"] = schema_canonico
+    resultado["ambiguidades"] = ambiguidades
+
+    colunas_com_case_diferente = [
+        nome
+        for nome, tipo, nullable in schema_original
+        if nome != nome.upper()
+    ]
+
+    print("leitura_schema=OK")
+    print("quantidade_colunas={}".format(len(schema_original)))
+    print("colunas_ambiguas={}".format(ambiguidades))
+    print(
+        "normalizacao_case={}".format(
+            "NECESSARIA"
+            if colunas_com_case_diferente
+            else "NAO_NECESSARIA"
+        )
+    )
+
+    print("")
+    print("schema_fisico:")
+
+    for indice in range(len(schema_original)):
+
+        nome_original, tipo, nullable = schema_original[indice]
+        nome_canonico = schema_canonico[indice][0]
+
+        print(
+            "posicao={:02d} original={} "
+            "canonico={} tipo={} nullable={}".format(
+                indice + 1,
+                nome_original,
+                nome_canonico,
+                tipo,
+                nullable,
+            )
+        )
+
+    # Mesma comparação usada pela publicação:
+    # nome normalizado + tipo + ordem.
+    divergencias = comparar_schemas(
+        schema_contrato,
+        schema_canonico,
+    )
+
+    resultado["divergencias_contrato"] = divergencias
+
+    if ambiguidades:
+        resultado["contrato"] = "INCOMPATIVEL_COLUNAS_AMBIGUAS"
+
+    elif divergencias:
+        resultado["contrato"] = "INCOMPATIVEL"
+
+    else:
+        resultado["contrato"] = "COMPATIVEL"
+
+    print("")
+    print(
+        "comparacao_com_contrato_ipynb={}".format(
+            resultado["contrato"]
+        )
+    )
+
+    if divergencias:
+        print(
+            "total_divergencias={}".format(
+                len(divergencias)
+            )
+        )
+
+        for divergencia in divergencias:
+            print(
+                "divergencia posicao={} "
+                "contrato={} fisico={}".format(
+                    divergencia["posicao"],
+                    divergencia["esperado"],
+                    divergencia["encontrado"],
+                )
+            )
+    else:
+        print(
+            "resultado=NOMES_TIPOS_E_ORDEM_COMPATIVEIS"
+        )
+
+    resultados[ambiente] = resultado
+
+
+# ============================================================
+# 3. COMPARA DESENVOLVIMENTO COM PRODUCAO
+# ============================================================
+
+print("")
+print("=" * 110)
+print("[COMPARACAO] DESENVOLVIMENTO X PRODUCAO")
+print("=" * 110)
+
+desenv = resultados.get("DESENVOLVIMENTO")
+producao = resultados.get("PRODUCAO")
+
+if (
+    desenv is None
+    or producao is None
+    or desenv["leitura"] != "OK"
+    or producao["leitura"] != "OK"
+):
+    print("comparacao_ambientes=NAO_EXECUTADA_POR_ERRO_DE_LEITURA")
+
 else:
-    print("total_divergencias={}".format(divergencias))
+    schema_desenv = desenv["schema_canonico"]
+    schema_producao = producao["schema_canonico"]
+
+    schema_original_desenv = [
+        (nome, tipo)
+        for nome, tipo, nullable in desenv["schema_original"]
+    ]
+
+    schema_original_producao = [
+        (nome, tipo)
+        for nome, tipo, nullable in producao["schema_original"]
+    ]
+
+    if schema_desenv == schema_producao:
+
+        if schema_original_desenv == schema_original_producao:
+            print("comparacao_ambientes=IGUAIS")
+        else:
+            print(
+                "comparacao_ambientes="
+                "IGUAIS_APOS_NORMALIZACAO_CASE"
+            )
+
+    else:
+        print("comparacao_ambientes=DIFERENTES")
+
+        divergencias_ambientes = comparar_schemas(
+            schema_desenv,
+            schema_producao,
+        )
+
+        for divergencia in divergencias_ambientes:
+            print(
+                "divergencia posicao={} "
+                "desenvolvimento={} producao={}".format(
+                    divergencia["posicao"],
+                    divergencia["esperado"],
+                    divergencia["encontrado"],
+                )
+            )
+
+
+# ============================================================
+# 4. DIAGNOSTICO FINAL
+# ============================================================
+
+print("")
+print("=" * 110)
+print("[DIAGNOSTICO_FINAL]")
+print("=" * 110)
+
+for ambiente in ["DESENVOLVIMENTO", "PRODUCAO"]:
+
+    resultado = resultados.get(ambiente)
+
+    if resultado is None:
+        print("{}=SEM_RESULTADO".format(ambiente))
+        continue
+
+    print(
+        "{} objeto={} leitura={} contrato={}".format(
+            ambiente,
+            resultado["objeto"],
+            resultado["leitura"],
+            resultado["contrato"],
+        )
+    )
+
+if (
+    desenv is not None
+    and producao is not None
+    and desenv["contrato"] == "COMPATIVEL"
+    and producao["contrato"] == "COMPATIVEL"
+):
+    print(
+        "conclusao=AS_DUAS_TABELAS_ESTAO_COMPATIVEIS_COM_2_CONTRATO"
+    )
+    print(
+        "orientacao=Se o pipeline ainda apresentar "
+        "HIVE_DESTINO_SCHEMA_INCOMPATIVEL, reinicie a sessao "
+        "Spark e recarregue os notebooks."
+    )
+else:
+    print(
+        "conclusao=EXISTE_DIVERGENCIA_ENTRE_TABELA_FISICA_E_CONTRATO"
+    )
+    print(
+        "orientacao=Consultar as linhas de divergencia "
+        "exibidas acima."
+    )
