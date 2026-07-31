@@ -7,8 +7,7 @@ import traceback
 from pprint import pformat
 from typing import Dict, Optional
 from pyspark.sql import DataFrame, SparkSession
-from datetime import date, datetime
-from decimal import Decimal
+from datetime import datetime
 from pyspark.sql.functions import col, md5
 
 
@@ -626,155 +625,6 @@ class ClientOracleSpark:
 
             return None
 
-    def update(
-            self,
-            table_name: str,
-            values: Dict[str, object],
-            where: Dict[str, object],
-            owner: Optional[str] = None,
-        ) -> int:
-            padrao_identificador = re.compile(r"^[A-Za-z][A-Za-z0-9_$#]*$")
-
-            def normalizar_identificador(valor, nome_campo):
-                texto = str(valor or "").strip()
-                if not padrao_identificador.fullmatch(texto):
-                    raise ErroContratoDados(
-                        codigo="ORACLE_IDENTIFICADOR_INVALIDO",
-                        mensagem="Identificador Oracle invalido para UPDATE.",
-                        objeto=nome_campo,
-                        detalhes={"valor": texto},
-                        acao="Informar owner, tabela e colunas Oracle validos.",
-                    )
-                return texto.upper()
-
-            if not isinstance(values, dict) or not values:
-                raise ErroContratoDados(
-                    codigo="ORACLE_UPDATE_SEM_VALORES",
-                    mensagem="UPDATE Oracle exige ao menos uma coluna em values.",
-                    objeto=table_name,
-                )
-
-            if not isinstance(where, dict) or not where:
-                raise ErroContratoDados(
-                    codigo="ORACLE_UPDATE_SEM_FILTRO",
-                    mensagem="UPDATE Oracle exige ao menos uma condicao em where.",
-                    objeto=table_name,
-                    acao="Informar filtros para impedir atualizacao integral acidental.",
-                )
-
-            tabela_final = normalizar_identificador(table_name, "table_name")
-            owner_final = normalizar_identificador(
-                owner or self.schema,
-                "owner",
-            )
-            valores_finais = [
-                (normalizar_identificador(coluna, "values"), valor)
-                for coluna, valor in values.items()
-            ]
-            filtros_finais = [
-                (normalizar_identificador(coluna, "where"), valor)
-                for coluna, valor in where.items()
-            ]
-
-            parametros = []
-            atribuicoes = []
-            for coluna, valor in valores_finais:
-                if valor is None:
-                    atribuicoes.append(f"{coluna} = NULL")
-                else:
-                    atribuicoes.append(f"{coluna} = ?")
-                    parametros.append(valor)
-
-            condicoes = []
-            for coluna, valor in filtros_finais:
-                if valor is None:
-                    condicoes.append(f"{coluna} IS NULL")
-                else:
-                    condicoes.append(f"{coluna} = ?")
-                    parametros.append(valor)
-
-            comando = (
-                f"UPDATE {owner_final}.{tabela_final} "
-                f"SET {', '.join(atribuicoes)} "
-                f"WHERE {' AND '.join(condicoes)}"
-            )
-
-            def vincular_parametro(stmt, indice, valor):
-                jvm = self.spark._jvm
-                if isinstance(valor, bool):
-                    stmt.setBoolean(indice, valor)
-                elif isinstance(valor, int):
-                    stmt.setLong(indice, valor)
-                elif isinstance(valor, float):
-                    stmt.setDouble(indice, valor)
-                elif isinstance(valor, Decimal):
-                    stmt.setBigDecimal(
-                        indice,
-                        jvm.java.math.BigDecimal(str(valor)),
-                    )
-                elif isinstance(valor, datetime):
-                    timestamp = jvm.java.sql.Timestamp.valueOf(
-                        valor.strftime("%Y-%m-%d %H:%M:%S.%f")
-                    )
-                    stmt.setTimestamp(indice, timestamp)
-                elif isinstance(valor, date):
-                    stmt.setDate(
-                        indice,
-                        jvm.java.sql.Date.valueOf(valor.isoformat()),
-                    )
-                elif isinstance(valor, str):
-                    stmt.setString(indice, valor)
-                elif isinstance(valor, (bytes, bytearray)):
-                    stmt.setBytes(indice, bytearray(valor))
-                else:
-                    stmt.setObject(indice, valor)
-
-            conn = None
-            stmt = None
-            try:
-                conn = self._abrir_conexao()
-                conn.setAutoCommit(False)
-                stmt = conn.prepareStatement(comando)
-                for indice, valor in enumerate(parametros, start=1):
-                    vincular_parametro(stmt, indice, valor)
-                quantidade = int(stmt.executeUpdate())
-                conn.commit()
-                return quantidade
-            except ErroPipeline:
-                if conn is not None:
-                    try:
-                        conn.rollback()
-                    except Exception:
-                        pass
-                raise
-            except Exception as exc:
-                if conn is not None:
-                    try:
-                        conn.rollback()
-                    except Exception:
-                        pass
-                raise ErroAcessoDados(
-                    codigo="ORACLE_UPDATE_FALHOU",
-                    mensagem="Falha ao atualizar registros no Oracle.",
-                    objeto=f"{owner_final}.{tabela_final}",
-                    detalhes={
-                        "colunas": [coluna for coluna, _ in valores_finais],
-                        "filtros": [coluna for coluna, _ in filtros_finais],
-                    },
-                    acao="Verificar tipos, constraints, filtros e permissoes da tabela Oracle.",
-                ) from exc
-            finally:
-                if stmt is not None:
-                    try:
-                        stmt.close()
-                    except Exception:
-                        pass
-                if conn is not None:
-                    try:
-                        conn.close()
-                    except Exception:
-                        pass
-
     def carregar_df(
             self,
             df: DataFrame,
@@ -1141,7 +991,6 @@ Ele disponibiliza na sessao Spark:
 Leituras Oracle e DB2 usam spark.read.format("jdbc").options(...).load().
 Escritas Oracle usam writer JDBC Spark.
 Comandos Oracle sem retorno usam conexao JDBC direta.
-Updates Oracle usam update(table_name, values, where, owner=None), com parametros JDBC.
 O cliente Oracle valida por padrao a conexao direta com SELECT 1 FROM DUAL.
 Use criar_cliente_oracle_spark(validar_conexao=False) apenas para adiar o preflight.
 
