@@ -1,112 +1,56 @@
 %%spark
 
 jvm = spark._jvm
-driver = cliente_oracle.driver
 
-print("=" * 70)
-print("1. JARS REGISTRADOS NA SESSÃO")
-print("=" * 70)
+context_loader = (
+    jvm.java.lang.Thread
+    .currentThread()
+    .getContextClassLoader()
+)
 
-spark_jars = spark.sparkContext.getConf().get("spark.jars", "")
-print("spark.jars:", spark_jars or "<vazio>")
+driver_class = jvm.java.lang.Class.forName(
+    cliente_oracle.driver,
+    True,
+    context_loader,
+)
 
-jars_contexto = []
-try:
-    iterator = spark._jsc.sc().listJars().iterator()
-    while iterator.hasNext():
-        jars_contexto.append(str(iterator.next()))
-except Exception as exc:
-    print("Falha ao consultar SparkContext.listJars():", exc)
+driver_instance = driver_class.newInstance()
 
-print("SparkContext.listJars():")
-for jar in jars_contexto:
-    print(" -", jar)
-
-print("SparkFiles root:", jvm.org.apache.spark.SparkFiles.getRootDirectory())
-
-print()
-print("=" * 70)
-print("2. CLASSLOADER PADRÃO")
-print("=" * 70)
-
-classe_driver = None
-
-try:
-    classe_driver = jvm.java.lang.Class.forName(driver)
-    print("Class.forName padrão: OK")
-except Exception as exc:
-    print("Class.forName padrão: FALHOU")
-    print(type(exc).__name__, str(exc))
-
-print()
-print("=" * 70)
-print("3. CONTEXT CLASSLOADER")
-print("=" * 70)
-
-try:
-    context_loader = (
-        jvm.java.lang.Thread
-        .currentThread()
-        .getContextClassLoader()
-    )
-
-    classe_driver = jvm.java.lang.Class.forName(
-        driver,
-        True,
-        context_loader,
-    )
-
-    print("ContextClassLoader:", context_loader.getClass().getName())
-    print("Carga pelo ContextClassLoader: OK")
-
-except Exception as exc:
-    print("Carga pelo ContextClassLoader: FALHOU")
-    print(type(exc).__name__, str(exc))
-
-print()
-print("=" * 70)
-print("4. CONEXÃO JDBC DIRETA — SOMENTE SELECT")
-print("=" * 70)
+props = jvm.java.util.Properties()
+props.setProperty("user", cliente_oracle.user)
+props.setProperty("password", cliente_oracle.password)
 
 conn = None
 stmt = None
 resultado = None
 
 try:
-    conn = jvm.java.sql.DriverManager.getConnection(
+    conn = driver_instance.connect(
         cliente_oracle.url,
-        cliente_oracle.user,
-        cliente_oracle.password,
+        props,
     )
+
+    if conn is None:
+        raise RuntimeError(
+            "O driver Oracle não reconheceu a URL JDBC."
+        )
 
     stmt = conn.createStatement()
     resultado = stmt.executeQuery("SELECT 1 AS QTD FROM DUAL")
 
     if not resultado.next():
-        raise RuntimeError("SELECT de diagnóstico não retornou linha.")
+        raise RuntimeError("SELECT não retornou uma linha.")
 
-    print("Conexão JDBC direta: OK")
+    print("Driver:", driver_instance.getClass().getName())
+    print("Conexão direta por driver.connect: OK")
     print("SELECT 1 FROM DUAL:", int(resultado.getInt(1)))
-
-except Exception as exc:
-    print("Conexão JDBC direta: FALHOU")
-    print(type(exc).__name__, str(exc))
 
 finally:
     if resultado is not None:
-        try:
-            resultado.close()
-        except Exception:
-            pass
+        resultado.close()
 
     if stmt is not None:
-        try:
-            stmt.close()
-        except Exception:
-            pass
+        stmt.close()
 
     if conn is not None:
-        try:
-            conn.close()
-        except Exception:
-            pass
+        conn.close()
