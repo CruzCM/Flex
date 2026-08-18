@@ -1,0 +1,2510 @@
+%%spark
+
+# ====================================================================================================
+# AUDITORIA FINAL DE ERROS — RADAR FINANCEIRO V15
+# ====================================================================================================
+#
+# OBJETIVO
+#   Catalogar, quantificar, explicar e priorizar TODOS os erros/anomalias possíveis observáveis em:
+#
+#       sbx_t2i2016.ana_edu_fin_cli
+#
+#   e, quando disponíveis, nas fontes:
+#
+#       DB2GFP.TRAN_RLZD_INST_PCT
+#       DB2GFP.CT_GRDR_FNCO
+#       DB2D1D.DVS_GRDR_FNCO_PF
+#       DB2GFP.GR_CTGR_TRAN
+#       DB2GFP.CTGR_TRAN_OPB
+#       HIVE_D1Q.RDPR_PF
+#
+# PRINCÍPIOS
+#   1. Não altera SparkConf.
+#   2. Não grava nenhuma tabela.
+#   3. Não altera dados.
+#   4. Execução FAIL-OPEN por fonte: erro de uma fonte não impede o relatório final.
+#   5. NULL esperado não é tratado como erro.
+#   6. Sentinela não é confundida com NULL.
+#   7. Regra implementada corretamente, mas conceitualmente discutível, recebe categoria própria.
+#   8. Fontes muito grandes são lidas com recortes/pushdown e máximo de 16 fluxos JDBC por leitura.
+#   9. Toda saída relevante aparece em tabelas de fácil leitura.
+#
+# CLASSIFICAÇÃO DOS ACHADOS
+#   ERRO_TECNICO
+#   DADO_ORIGEM_INVALIDO
+#   DEPARA_AUSENTE
+#   COBERTURA_AUSENTE
+#   NULL_ESPERADO
+#   SENTINELA_ESPERADA
+#   REGRA_NEGOCIO_DISCUSSIVEL
+#   CAMPO_RESERVADO
+#   DIAGNOSTICO_INDISPONIVEL
+#
+# SEVERIDADE
+#   P0 = crítico / resultado de negócio incorreto
+#   P1 = alto / perda de cobertura ou de-para relevante
+#   P2 = médio / qualidade ou fallback relevante
+#   P3 = informativo / esperado / governança
+#
+# ====================================================================================================
+
+import os
+import time
+import math
+import datetime
+import traceback
+from decimal import Decimal
+
+from pyspark import StorageLevel
+from pyspark.sql import functions as F
+from pyspark.sql import Window
+from pyspark.sql.types import NumericType, StringType
+
+
+# ====================================================================================================
+# 0. PARÂMETROS DO ESTUDO
+# ====================================================================================================
+
+TABELA_ALVO = "sbx_t2i2016.ana_edu_fin_cli"
+COMPETENCIA = "2026-08-01"
+
+# Fontes externas.
+ATIVAR_DB2 = True
+ATIVAR_CATALOGO_DB2 = True
+ATIVAR_PERFIL_DB2 = True
+ATIVAR_PUBLICO_CPF_CICLO_DB2 = True
+ATIVAR_TRANSACOES_DB2 = True
+ATIVAR_RDPR_HIVE = True
+
+# Investigações que podem custar mais tempo.
+RDPR_LOOKBACK_DIAS = 90
+
+# Mantém no máximo os mesmos 16 fluxos JDBC usados pelo pipeline.
+FAIXAS_PTC = [
+    (1, 25, "G1"),
+    (26, 50, "G2"),
+    (51, 75, "G3"),
+    (76, 100, "G4"),
+]
+
+# Top N para impressões de anomalias.
+TOP_N = 30
+
+VIEW_BASE = "vw_aud_erro_radar_base"
+
+
+# ====================================================================================================
+# 0.1 DE-PARA EXECUTÁVEL DA V15 — 68 REGRAS C/D
+# ====================================================================================================
+
+RADAR_MAP_ROWS = [('C', 1, 1, 'Receitas', 'Salário', 1, 'Renda', 1, 0), ('C', 2, 1, 'Receitas', 'Vale Alimentação', 1, 'Renda', 1, 0), ('C', 3, 1, 'Receitas', 'Restituição de IR', 2, 'Estorno', 1, 0), ('C', 4, 1, 'Receitas', 'Bonificação', 1, 'Renda', 1, 0), ('C', 5, 1, 'Receitas', 'Outros Rendimentos', 1, 'Renda', 1, 0), ('D', 6, 2, 'Casa', 'Água', 6, 'Essenciais', 1, 0), ('D', 7, 2, 'Casa', 'Eletricidade e Gás', 6, 'Essenciais', 1, 0), ('D', 9, 2, 'Casa', 'Compra de Imóvel', 9, 'Obrigações', 1, 0), ('D', 10, 2, 'Casa', 'Aluguel e Condomínio', 6, 'Essenciais', 1, 0), ('D', 11, 2, 'Casa', 'Móveis e Utensílios', 7, 'Não Essenciais', 1, 0), ('D', 12, 2, 'Casa', 'Serviços e Manutenção', 6, 'Essenciais', 1, 0), ('D', 13, 2, 'Casa', 'Empregados', 7, 'Não Essenciais', 1, 0), ('D', 14, 2, 'Casa', 'Animais e Pets', 7, 'Não Essenciais', 1, 0), ('D', 15, 3, 'Educação', 'Educação Superior', 7, 'Não Essenciais', 1, 0), ('D', 16, 3, 'Educação', 'Colégio', 6, 'Essenciais', 1, 0), ('D', 17, 3, 'Educação', 'Idiomas', 7, 'Não Essenciais', 1, 0), ('D', 18, 3, 'Educação', 'Publicações e Papelaria', 7, 'Não Essenciais', 1, 0), ('D', 20, 3, 'Educação', 'Outros Gastos, Educação', 7, 'Não Essenciais', 1, 0), ('D', 21, 4, 'Lazer', 'Viagens e Lazer', 7, 'Não Essenciais', 1, 0), ('D', 22, 4, 'Lazer', 'Esportes e Academia', 7, 'Não Essenciais', 1, 0), ('D', 25, 4, 'Lazer', 'Cultura e Entretenimento', 7, 'Não Essenciais', 1, 0), ('D', 27, 5, 'Saúde', 'Plano de Saúde', 6, 'Essenciais', 1, 0), ('D', 28, 5, 'Saúde', 'Serviços de Saúde', 6, 'Essenciais', 1, 0), ('D', 29, 5, 'Saúde', 'Dentista', 6, 'Essenciais', 1, 0), ('D', 30, 5, 'Saúde', 'Farmácias e Drogarias', 6, 'Essenciais', 1, 0), ('D', 32, 6, 'Alimentação', 'Feira e Supermercado', 6, 'Essenciais', 1, 0), ('D', 35, 6, 'Alimentação', 'Bar, Rest. e Padaria', 7, 'Não Essenciais', 1, 0), ('D', 36, 7, 'Transporte', 'Compra de Veículo', 9, 'Obrigações', 1, 0), ('D', 37, 7, 'Transporte', 'Combustível', 6, 'Essenciais', 1, 0), ('D', 38, 7, 'Transporte', 'Estacionamento e Pedágio', 7, 'Não Essenciais', 1, 0), ('D', 39, 7, 'Transporte', 'Seguro de Veículo', 7, 'Não Essenciais', 1, 0), ('D', 40, 7, 'Transporte', 'Serviços e Manutenção', 7, 'Não Essenciais', 1, 0), ('D', 41, 7, 'Transporte', 'Transporte Urbano e Apps', 6, 'Essenciais', 1, 0), ('D', 42, 8, 'Despesas Pessoais', 'Vestuário e Acessórios', 7, 'Não Essenciais', 1, 0), ('D', 43, 8, 'Despesas Pessoais', 'Cuidado Pessoal e Beleza', 7, 'Não Essenciais', 1, 0), ('D', 44, 8, 'Despesas Pessoais', 'Compras Diversas', 5, 'Indeterminado', 1, 0), ('D', 45, 8, 'Despesas Pessoais', 'Pensão Alimentícia', 6, 'Essenciais', 1, 0), ('D', 46, 8, 'Despesas Pessoais', 'Seguros e Previdência', 5, 'Indeterminado', 1, 0), ('D', 47, 8, 'Despesas Pessoais', 'Doação', 7, 'Não Essenciais', 1, 0), ('D', 48, 8, 'Despesas Pessoais', 'Gasto com Familiares', 7, 'Não Essenciais', 1, 0), ('D', 49, 8, 'Despesas Pessoais', 'Presentes', 7, 'Não Essenciais', 1, 0), ('D', 51, 9, 'Comunicação', 'Telefonia e Internet', 6, 'Essenciais', 1, 0), ('D', 53, 9, 'Comunicação', 'Assinatura TV e Streaming', 7, 'Não Essenciais', 1, 0), ('D', 54, 10, 'Tarifas e impostos', 'IPTU', 6, 'Essenciais', 1, 0), ('D', 55, 10, 'Tarifas e impostos', 'IPVA e Gastos Detran', 6, 'Essenciais', 1, 0), ('D', 56, 10, 'Tarifas e impostos', 'Imposto de Renda', 6, 'Essenciais', 1, 0), ('D', 57, 10, 'Tarifas e impostos', 'ISS(Imposto sobre Serviços)', 6, 'Essenciais', 1, 0), ('D', 58, 10, 'Tarifas e impostos', 'GPS(Guia de Previdência Social)', 8, 'Futuro', 1, 0), ('D', 59, 10, 'Tarifas e impostos', 'Serviços Financeiros', 9, 'Obrigações', 1, 0), ('D', 60, 8, 'Despesas Pessoais', 'Serviços Diversos', 7, 'Não Essenciais', 1, 0), ('D', 61, 4, 'Lazer', 'Jogos e Loterias', 7, 'Não Essenciais', 1, 0), ('D', 111, 12, 'Fatura', 'Cartão de Crédito', 9, 'Obrigações', 0, 0), ('D', 279, 11, 'Outros', 'Gastos Diversos', 5, 'Indeterminado', 1, 0), ('C', 300, 14, 'Agro', 'Receitas Agro', 1, 'Renda', 0, 1), ('D', 310, 14, 'Agro', 'Criações', 5, 'Indeterminado', 0, 1), ('D', 330, 14, 'Agro', 'Cultivos', 5, 'Indeterminado', 0, 1), ('D', 350, 14, 'Agro', 'Insumos', 5, 'Indeterminado', 0, 1), ('D', 370, 14, 'Agro', 'Apoio Produtivo', 5, 'Indeterminado', 0, 1), ('D', 3787, 10, 'Tarifas e impostos', 'IOF', 9, 'Obrigações', 1, 0), ('D', 3788, 10, 'Tarifas e impostos', 'Encargos e Tarifas', 9, 'Obrigações', 1, 0), ('D', 3790, 2, 'Casa', 'Seguro Residencial', 7, 'Não Essenciais', 1, 0), ('D', 4417, 8, 'Despesas Pessoais', 'Empréstimos e Prestações', 9, 'Obrigações', 1, 0), ('D', 39434, 11, 'Outros', 'Cheque', 5, 'Indeterminado', 1, 0), ('D', 39435, 11, 'Outros', 'Saque', 5, 'Indeterminado', 1, 0), ('D', 39436, 11, 'Outros', 'Transferência', 5, 'Indeterminado', 1, 0), ('D', 39437, 11, 'Outros', 'Boletos Diversos', 5, 'Indeterminado', 1, 0), ('D', 448977, 13, 'Investimentos', 'Aplicação', 8, 'Futuro', 1, 0), ('C', 448978, 13, 'Investimentos', 'Resgate de Investimentos', 3, 'Resgate', 1, 0)]
+
+RADAR_MAP_SCHEMA = [
+    "CD_NTZ_CTB_TRAN",
+    "CD_CTGR_TRAN_OGNL",
+    "CD_GRUPO_RADAR",
+    "TX_GRUPO_RADAR",
+    "TX_CATEGORIA_RADAR",
+    "CD_CLASS_RADAR",
+    "TX_CLASS_RADAR",
+    "IN_PARTICIPA",
+    "IN_AGRO",
+]
+
+
+# ====================================================================================================
+# 0.2 HELPERS DE APRESENTAÇÃO
+# ====================================================================================================
+
+def linha(char="=", tam=150):
+    return char * tam
+
+
+def secao(numero, titulo):
+    print("\n" + linha("="))
+    print(f" [{numero:02d}] {titulo.upper()}")
+    print(linha("="))
+
+
+def subsecao(titulo):
+    print("\n" + linha("-"))
+    print(" " + titulo)
+    print(linha("-"))
+
+
+def fmt_int(v):
+    if v is None:
+        return "-"
+    try:
+        return f"{int(v):,}".replace(",", ".")
+    except Exception:
+        return str(v)
+
+
+def fmt_pct(v, casas=2):
+    if v is None:
+        return "-"
+    try:
+        return f"{float(v) * 100:.{casas}f}%".replace(".", ",")
+    except Exception:
+        return str(v)
+
+
+def fmt_money(v):
+    if v is None:
+        return "-"
+    try:
+        x = float(v)
+        return f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except Exception:
+        return str(v)
+
+
+def fmt_float(v, casas=4):
+    if v is None:
+        return "-"
+    try:
+        return f"{float(v):.{casas}f}".replace(".", ",")
+    except Exception:
+        return str(v)
+
+
+def encurta(v, limite=70):
+    if v is None:
+        return "-"
+    s = str(v).replace("\n", " ")
+    return s if len(s) <= limite else s[: limite - 3] + "..."
+
+
+def tabela_print(colunas, linhas_dados, alinhamentos=None, max_width=70):
+    if not linhas_dados:
+        print("  (sem registros)")
+        return
+
+    if alinhamentos is None:
+        alinhamentos = ["E"] * len(colunas)
+
+    linhas_txt = []
+    for row in linhas_dados:
+        vals = []
+        for v in row:
+            vals.append(encurta(v, max_width))
+        linhas_txt.append(vals)
+
+    larg = [len(str(c)) for c in colunas]
+    for row in linhas_txt:
+        for i, v in enumerate(row):
+            larg[i] = min(max(larg[i], len(v)), max_width)
+
+    cab = " | ".join(
+        f"{str(c):<{larg[i]}}" if alinhamentos[i] == "E"
+        else f"{str(c):>{larg[i]}}"
+        for i, c in enumerate(colunas)
+    )
+    print("  " + cab)
+    print("  " + "-+-".join("-" * w for w in larg))
+
+    for row in linhas_txt:
+        txt = " | ".join(
+            f"{row[i]:<{larg[i]}}" if alinhamentos[i] == "E"
+            else f"{row[i]:>{larg[i]}}"
+            for i in range(len(colunas))
+        )
+        print("  " + txt)
+
+
+# ====================================================================================================
+# 0.3 CONTROLE DE EXECUÇÃO / SCORECARD
+# ====================================================================================================
+
+achados = []
+falhas_execucao = []
+etapas = []
+
+
+def registrar_achado(
+    codigo,
+    severidade,
+    tipo,
+    origem,
+    descricao,
+    qtd_clientes=None,
+    qtd_registros=None,
+    valor_impactado=None,
+    recomendacao=None,
+):
+    achados.append({
+        "CODIGO": codigo,
+        "SEV": severidade,
+        "TIPO": tipo,
+        "ORIGEM": origem,
+        "CLIENTES": qtd_clientes,
+        "REGISTROS": qtd_registros,
+        "VALOR": valor_impactado,
+        "DESCRICAO": descricao,
+        "RECOMENDACAO": recomendacao or "",
+    })
+
+
+def executar_etapa(nome, func):
+    t0 = time.time()
+    print(f"\n>>> INÍCIO: {nome}")
+    try:
+        retorno = func()
+        dur = time.time() - t0
+        etapas.append((nome, "OK", dur, ""))
+        print(f"<<< FIM: {nome} | OK | {dur:.2f}s")
+        return retorno
+    except Exception as exc:
+        dur = time.time() - t0
+        msg = f"{type(exc).__name__}: {exc}"
+        etapas.append((nome, "FALHA", dur, msg))
+        falhas_execucao.append((nome, msg))
+        print(f"<<< FIM: {nome} | FALHA | {dur:.2f}s")
+        print("    ", msg)
+        print("    O estudo continuará (fail-open).")
+        return None
+
+
+# ====================================================================================================
+# 0.4 CONECTOR DB2 — REUSA A SESSÃO SE JÁ EXISTIR
+# ====================================================================================================
+
+def obter_conector_db2():
+    if not ATIVAR_DB2:
+        return None
+
+    # 1. Reusa conector já criado pelo notebook.
+    if "conector_db2" in globals() and globals().get("conector_db2") is not None:
+        print("Conector DB2 reutilizado da sessão: conector_db2")
+        return globals()["conector_db2"]
+
+    # 2. Se o helper do projeto já estiver carregado, cria a partir do env da sessão Spark.
+    if "criar_conector_db2_spark" in globals():
+        print("Criando conector DB2 com criar_conector_db2_spark(env=os.environ)...")
+        return globals()["criar_conector_db2_spark"](env=dict(os.environ))
+
+    print(
+        "[AVISO] Nenhum conector DB2 encontrado. "
+        "Os pilares DB2 serão marcados como não executados. "
+        "A auditoria da tabela final e do Hive continuará."
+    )
+    return None
+
+
+CON_DB2 = obter_conector_db2()
+
+
+# ====================================================================================================
+# 0.5 DATAS
+# ====================================================================================================
+
+def subtrair_um_mes(data):
+    ano = data.year
+    mes = data.month - 1
+    if mes == 0:
+        mes = 12
+        ano -= 1
+    # Para o caso do dia 29/30/31.
+    import calendar
+    dia = min(data.day, calendar.monthrange(ano, mes)[1])
+    return datetime.date(ano, mes, dia)
+
+
+# ====================================================================================================
+# 1. CARREGA E MATERIALIZA A COMPETÊNCIA
+# ====================================================================================================
+
+inicio_total = time.time()
+
+secao(1, "Contrato físico e snapshot da competência")
+
+if not spark.catalog.tableExists(TABELA_ALVO):
+    raise RuntimeError(f"Tabela não existe: {TABELA_ALVO}")
+
+spark.catalog.refreshTable(TABELA_ALVO)
+
+df_tabela = spark.table(TABELA_ALVO)
+
+competencias = [
+    r["DT_MES_EXEA"]
+    for r in spark.sql(
+        f"SELECT DISTINCT DT_MES_EXEA FROM {TABELA_ALVO} ORDER BY DT_MES_EXEA"
+    ).collect()
+]
+
+print("Tabela             :", TABELA_ALVO)
+print("Competências       :", [str(x) for x in competencias])
+print("Colunas físicas    :", len(df_tabela.columns))
+print("Partições leitura  :", df_tabela.rdd.getNumPartitions())
+
+df_base = (
+    df_tabela
+    .where(F.col("DT_MES_EXEA") == F.to_date(F.lit(COMPETENCIA)))
+    .persist(StorageLevel.MEMORY_AND_DISK)
+)
+df_base.createOrReplaceTempView(VIEW_BASE)
+
+TOTAL_BASE = df_base.count()
+
+if TOTAL_BASE == 0:
+    raise RuntimeError(f"Competência {COMPETENCIA} vazia.")
+
+print("Linhas competência :", fmt_int(TOTAL_BASE))
+print("Storage             :", df_base.storageLevel)
+
+meta_datas = spark.sql(f"""
+SELECT
+    MIN(DT_EXEA) AS DT_EXEA_MIN,
+    MAX(DT_EXEA) AS DT_EXEA_MAX,
+    MIN(DT_REF_INI) AS DT_REF_INI_MIN,
+    MAX(DT_REF_FIM) AS DT_REF_FIM_MAX
+FROM {VIEW_BASE}
+""").first()
+
+DATA_EXEA = meta_datas["DT_EXEA_MAX"]
+DATA_REF_MIN = meta_datas["DT_REF_INI_MIN"]
+DATA_REF_MAX = meta_datas["DT_REF_FIM_MAX"]
+DATA_PUBLICO_FIM = DATA_EXEA
+DATA_PUBLICO_INI = subtrair_um_mes(DATA_PUBLICO_FIM)
+DATA_PERFIL_INI = datetime.date(DATA_EXEA.year - 1, DATA_EXEA.month, DATA_EXEA.day)
+
+print("DT_EXEA             :", DATA_EXEA)
+print("Envelope transações :", DATA_REF_MIN, "a", DATA_REF_MAX)
+print("Janela público      :", DATA_PUBLICO_INI, "a", DATA_PUBLICO_FIM)
+print("Janela perfil       :", DATA_PERFIL_INI, "a", DATA_EXEA)
+
+
+# ====================================================================================================
+# 2. PILAR 1 — MATRIZ DE NULIDADE/DOMÍNIO DAS 72 COLUNAS
+# ====================================================================================================
+
+secao(2, "Pilar 1 — Matriz inteligente de nulidade, zero, negativo e cardinalidade")
+
+def pilar_matriz_72():
+    exprs = []
+    metadata = []
+
+    for field in df_base.schema.fields:
+        c = field.name
+        alias_base = c.replace("`", "")
+
+        exprs.append(
+            F.sum(F.when(F.col(c).isNull(), F.lit(1)).otherwise(F.lit(0)))
+            .cast("long")
+            .alias(f"N__{alias_base}")
+        )
+        exprs.append(
+            F.approx_count_distinct(F.col(c), rsd=0.02)
+            .cast("long")
+            .alias(f"D__{alias_base}")
+        )
+
+        if isinstance(field.dataType, NumericType):
+            exprs.append(
+                F.sum(F.when(F.col(c) == 0, 1).otherwise(0))
+                .cast("long")
+                .alias(f"Z__{alias_base}")
+            )
+            exprs.append(
+                F.sum(F.when(F.col(c) < 0, 1).otherwise(0))
+                .cast("long")
+                .alias(f"G__{alias_base}")
+            )
+            metadata.append((c, field.dataType.simpleString(), "NUM"))
+        elif isinstance(field.dataType, StringType):
+            exprs.append(
+                F.sum(
+                    F.when(
+                        F.col(c).isNotNull() & (F.trim(F.col(c)) == ""),
+                        1
+                    ).otherwise(0)
+                )
+                .cast("long")
+                .alias(f"B__{alias_base}")
+            )
+            metadata.append((c, field.dataType.simpleString(), "TXT"))
+        else:
+            metadata.append((c, field.dataType.simpleString(), "OUTRO"))
+
+    agg = df_base.agg(*exprs).first().asDict()
+
+    obrigatorias = {
+        "CD_CLI", "TS_ATL_TRAN", "DD_INC_MM_CLC_BLC", "VL_REN_PRES",
+        "DT_REF_INI", "DT_REF_FIM", "DT_EXEA",
+        "QT_TRANS_TOTAL", "QT_TRANS_ENT", "QT_TRANS_SAI",
+        "VL_TRANS_ENT", "VL_TRANS_SAI",
+        "VL_ENT_REN", "VL_ENT_EST", "VL_ENT_RESG", "VL_ENT_OUT", "VL_ENT_CRED", "VL_ENT_TOTAL",
+        "VL_SAI_IND", "VL_SAI_ESS", "VL_SAI_NAO_ESS", "VL_SAI_FUT", "VL_SAI_OBR", "VL_SAI_TOTAL",
+        "PC_SAI_ENT",
+        "PC_REF_IND", "PC_REF_ESS", "PC_REF_NAO_ESS", "PC_REF_FUT", "PC_REF_OBR",
+        "FL_TEM_MOV_AGRO", "FL_MULT_MOE", "DT_MES_EXEA",
+    }
+
+    reservadas = {"FL_PARTICIPA_RADAR"}
+
+    condicional_perfil = {
+        "CD_MAC_PRFL_CLI", "NM_MAC_PRFL_CLI",
+        "CD_MIC_PRFL_CLI", "NM_MIC_PRFL_CLI", "NM_PRFL_FIN",
+    }
+
+    condicional_movimento = {
+        "VL_RES_ORC", "CD_RES_ORC", "TX_RES_ORC",
+        "CD_FAIXA_ORC", "TX_STS_FINAL",
+        "NR_PONT_CONC_IND", "NR_PONT_CONC_ESS", "NR_PONT_CONC_NAO_ESS",
+        "NR_PONT_CONC_FUT", "NR_PONT_CONC_OBR",
+        "NR_PONT_ORC_IND", "NR_PONT_ORC_ESS", "NR_PONT_ORC_NAO_ESS",
+        "NR_PONT_ORC_FUT", "NR_PONT_ORC_OBR",
+        "NR_PONT_PRFL_IND",
+        "NR_PONT_IND_FIM",
+    }
+
+    condicional_perfil_mov = {
+        "NR_PONT_PRFL_ESS", "NR_PONT_PRFL_NAO_ESS",
+        "NR_PONT_PRFL_FUT", "NR_PONT_PRFL_OBR",
+        "NR_PONT_ESS_FIM", "NR_PONT_NAO_ESS_FIM",
+        "NR_PONT_FUT_FIM", "NR_PONT_OBR_FIM",
+        "CD_TEMA_VENCEDOR", "TX_TEMA_VENCEDOR",
+    }
+
+    linhas = []
+    erros_obrigatorios = 0
+
+    for c, tipo, classe in metadata:
+        n = int(agg.get(f"N__{c}", 0) or 0)
+        d = int(agg.get(f"D__{c}", 0) or 0)
+        z = agg.get(f"Z__{c}")
+        neg = agg.get(f"G__{c}")
+        blank = agg.get(f"B__{c}")
+
+        if c in obrigatorias:
+            contrato = "OBRIGATÓRIO"
+            status = "OK" if n == 0 else "ERRO"
+            if n > 0:
+                erros_obrigatorios += n
+        elif c in reservadas:
+            contrato = "RESERVADO"
+            status = "OK" if n == TOTAL_BASE else "REVISAR"
+        elif c == "TX_STS_RES":
+            contrato = "NULL_CONDICIONAL"
+            status = "AVALIAR_REGRA"
+        elif c in condicional_perfil:
+            contrato = "NULL_CONDICIONAL_PERFIL"
+            status = "AVALIAR_REGRA"
+        elif c in condicional_movimento:
+            contrato = "NULL_CONDICIONAL_MOV"
+            status = "AVALIAR_REGRA"
+        elif c in condicional_perfil_mov:
+            contrato = "NULL_CONDICIONAL_PERFIL_MOV"
+            status = "AVALIAR_REGRA"
+        elif c.startswith("PC_SAI_"):
+            contrato = "ZERO_SEM_RENDA"
+            status = "AVALIAR_REGRA"
+        else:
+            contrato = "DERIVADO"
+            status = "AVALIAR"
+
+        linhas.append([
+            c,
+            tipo,
+            contrato,
+            fmt_int(n),
+            fmt_pct(n / TOTAL_BASE if TOTAL_BASE else None),
+            fmt_int(z) if z is not None else "-",
+            fmt_int(neg) if neg is not None else "-",
+            fmt_int(blank) if blank is not None else "-",
+            fmt_int(d),
+            status,
+        ])
+
+    tabela_print(
+        ["Coluna", "Tipo", "Contrato", "NULL", "%NULL", "Zero", "Negativo", "Blank", "~Distintos", "Status"],
+        linhas,
+        ["E", "E", "E", "D", "D", "D", "D", "D", "D", "E"],
+        max_width=32,
+    )
+
+    if erros_obrigatorios > 0:
+        registrar_achado(
+            "NULL_EM_COLUNA_OBRIGATORIA",
+            "P0",
+            "ERRO_TECNICO",
+            TABELA_ALVO,
+            "Uma ou mais colunas de contrato obrigatório possuem NULL.",
+            qtd_registros=erros_obrigatorios,
+            recomendacao="Bloquear a carga e corrigir a origem/derivação.",
+        )
+
+    # Regras condicionais de NULL.
+    regras = spark.sql(f"""
+    SELECT
+        SUM(CASE WHEN CD_CLI IS NULL THEN 1 ELSE 0 END) AS ERRO_CD_CLI_NULL,
+
+        SUM(CASE
+                WHEN (CD_MAC_PRFL_CLI IS NULL) <> (NM_MAC_PRFL_CLI IS NULL)
+                THEN 1 ELSE 0
+            END) AS ERRO_PAR_MACRO,
+
+        SUM(CASE
+                WHEN (CD_MIC_PRFL_CLI IS NULL) <> (NM_MIC_PRFL_CLI IS NULL)
+                THEN 1 ELSE 0
+            END) AS ERRO_PAR_MICRO,
+
+        SUM(CASE
+                WHEN QT_TRANS_TOTAL = 0 AND (
+                    VL_RES_ORC IS NOT NULL OR
+                    CD_RES_ORC IS NOT NULL OR
+                    TX_RES_ORC IS NOT NULL OR
+                    CD_FAIXA_ORC IS NOT NULL OR
+                    TX_STS_FINAL IS NOT NULL OR
+                    CD_TEMA_VENCEDOR IS NOT NULL OR
+                    TX_TEMA_VENCEDOR IS NOT NULL
+                )
+                THEN 1 ELSE 0
+            END) AS ERRO_DERIVADO_PREENCHIDO_SEM_MOV,
+
+        SUM(CASE
+                WHEN QT_TRANS_TOTAL > 0 AND (
+                    VL_RES_ORC IS NULL OR
+                    CD_RES_ORC IS NULL OR
+                    TX_RES_ORC IS NULL OR
+                    CD_FAIXA_ORC IS NULL OR
+                    TX_STS_FINAL IS NULL
+                )
+                THEN 1 ELSE 0
+            END) AS ERRO_DERIVADO_NULL_COM_MOV,
+
+        SUM(CASE
+                WHEN CD_FAIXA_ORC = 0 AND TX_STS_RES IS NOT NULL
+                THEN 1 ELSE 0
+            END) AS ERRO_INTENSIDADE_NEUTRO,
+
+        SUM(CASE
+                WHEN QT_TRANS_TOTAL > 0
+                 AND CD_FAIXA_ORC <> 0
+                 AND TX_STS_RES IS NULL
+                THEN 1 ELSE 0
+            END) AS ERRO_INTENSIDADE_AUSENTE,
+
+        SUM(CASE
+                WHEN QT_TRANS_TOTAL > 0
+                 AND NM_PRFL_FIN IS NOT NULL
+                 AND NM_PRFL_FIN <> 'CODIGO NAO MAPEADO'
+                 AND (
+                    NR_PONT_PRFL_ESS IS NULL OR
+                    NR_PONT_PRFL_NAO_ESS IS NULL OR
+                    NR_PONT_PRFL_FUT IS NULL OR
+                    NR_PONT_PRFL_OBR IS NULL OR
+                    NR_PONT_ESS_FIM IS NULL OR
+                    NR_PONT_NAO_ESS_FIM IS NULL OR
+                    NR_PONT_FUT_FIM IS NULL OR
+                    NR_PONT_OBR_FIM IS NULL OR
+                    CD_TEMA_VENCEDOR IS NULL
+                 )
+                THEN 1 ELSE 0
+            END) AS ERRO_SCORE_NULL_ELEGIVEL,
+
+        SUM(CASE
+                WHEN FL_PARTICIPA_RADAR IS NOT NULL
+                THEN 1 ELSE 0
+            END) AS ERRO_CAMPO_RESERVADO_PREENCHIDO
+
+    FROM {VIEW_BASE}
+    """).first().asDict()
+
+    subsecao("Validação condicional de NULLs")
+    for k, v in regras.items():
+        status = "OK" if int(v or 0) == 0 else "FALHA"
+        print(f"  {k:<42}: {fmt_int(v):>12}  [{status}]")
+
+    for k, v in regras.items():
+        if int(v or 0) > 0:
+            registrar_achado(
+                k,
+                "P0" if "ELEGIVEL" in k or "CD_CLI" in k else "P1",
+                "ERRO_TECNICO",
+                TABELA_ALVO,
+                "Violação do contrato condicional de nulidade.",
+                qtd_clientes=int(v),
+                recomendacao="Inspecionar a regra condicional indicada pelo código do achado.",
+            )
+
+    if regras["ERRO_CAMPO_RESERVADO_PREENCHIDO"] == 0:
+        registrar_achado(
+            "FL_PARTICIPA_RADAR_RESERVADO",
+            "P3",
+            "CAMPO_RESERVADO",
+            TABELA_ALVO,
+            "FL_PARTICIPA_RADAR permanece NULL em toda a competência, conforme desenho atual.",
+            qtd_clientes=TOTAL_BASE,
+            recomendacao="Manter documentado até existir regra oficial para o campo.",
+        )
+
+    return {"matriz": linhas, "condicionais": regras}
+
+
+RES_MATRIZ = executar_etapa("PILAR_1_MATRIZ_72", pilar_matriz_72)
+
+
+# ====================================================================================================
+# 3. PILAR 7 — MATEMÁTICA, DOMÍNIOS E ESTADOS IMPOSSÍVEIS
+# ====================================================================================================
+
+secao(3, "Pilar 7 — Matemática, domínios, limites e estados impossíveis")
+
+def pilar_matematica():
+    r = spark.sql(f"""
+    SELECT
+        COUNT(*) AS BASE,
+
+        -- Chave/datas.
+        COUNT(*) - COUNT(DISTINCT CD_CLI) AS DUP_CD_CLI,
+        SUM(CASE WHEN DT_REF_INI > DT_REF_FIM THEN 1 ELSE 0 END) AS JANELA_INVERTIDA,
+        SUM(CASE WHEN DATEDIFF(DT_REF_FIM, DT_REF_INI) + 1 NOT IN (30,31) THEN 1 ELSE 0 END) AS JANELA_FORA_30_31,
+
+        -- Quantidades.
+        SUM(CASE WHEN QT_TRANS_TOTAL < 0 OR QT_TRANS_ENT < 0 OR QT_TRANS_SAI < 0 THEN 1 ELSE 0 END) AS QT_NEGATIVA,
+        SUM(CASE WHEN QT_TRANS_TOTAL <> COALESCE(QT_TRANS_ENT,0) + COALESCE(QT_TRANS_SAI,0) THEN 1 ELSE 0 END) AS QT_NAO_FECHA_C_D,
+        SUM(CASE WHEN QT_TRANS_TOTAL = 0 AND (
+            VL_TRANS_ENT <> 0 OR VL_TRANS_SAI <> 0 OR VL_ENT_TOTAL <> 0 OR VL_SAI_TOTAL <> 0
+        ) THEN 1 ELSE 0 END) AS SEM_MOV_COM_VALOR,
+
+        -- Componentes monetários negativos.
+        SUM(CASE WHEN
+            VL_TRANS_ENT < 0 OR VL_TRANS_SAI < 0 OR
+            VL_ENT_REN < 0 OR VL_ENT_EST < 0 OR VL_ENT_RESG < 0 OR VL_ENT_OUT < 0 OR VL_ENT_CRED < 0 OR
+            VL_SAI_IND < 0 OR VL_SAI_ESS < 0 OR VL_SAI_NAO_ESS < 0 OR VL_SAI_FUT < 0 OR VL_SAI_OBR < 0
+            THEN 1 ELSE 0 END) AS VALOR_COMPONENTE_NEGATIVO,
+
+        -- Totais.
+        SUM(CASE WHEN ABS(VL_ENT_TOTAL - (
+            COALESCE(VL_ENT_REN,0)+COALESCE(VL_ENT_EST,0)+COALESCE(VL_ENT_RESG,0)+
+            COALESCE(VL_ENT_OUT,0)+COALESCE(VL_ENT_CRED,0)
+        )) > 0.01 THEN 1 ELSE 0 END) AS ERRO_SOMA_ENT,
+
+        SUM(CASE WHEN ABS(VL_SAI_TOTAL - (
+            COALESCE(VL_SAI_IND,0)+COALESCE(VL_SAI_ESS,0)+COALESCE(VL_SAI_NAO_ESS,0)+
+            COALESCE(VL_SAI_FUT,0)+COALESCE(VL_SAI_OBR,0)
+        )) > 0.01 THEN 1 ELSE 0 END) AS ERRO_SOMA_SAI,
+
+        SUM(CASE WHEN ABS(VL_TRANS_ENT - VL_ENT_TOTAL) > 0.01 THEN 1 ELSE 0 END) AS ERRO_TRANS_ENT,
+        SUM(CASE WHEN ABS(VL_TRANS_SAI - VL_SAI_TOTAL) > 0.01 THEN 1 ELSE 0 END) AS ERRO_TRANS_SAI,
+
+        SUM(CASE WHEN QT_TRANS_TOTAL > 0 AND ABS(VL_RES_ORC - (VL_ENT_TOTAL - VL_SAI_TOTAL)) > 0.01 THEN 1 ELSE 0 END) AS ERRO_RES_ORC,
+
+        -- Edge case comprovado.
+        SUM(CASE WHEN QT_TRANS_TOTAL > 0 AND VL_ENT_TOTAL = 0 AND VL_SAI_TOTAL > 0 THEN 1 ELSE 0 END) AS ENTRADA_ZERO_SAIDA_POS,
+        SUM(CASE WHEN QT_TRANS_TOTAL > 0 AND VL_ENT_TOTAL = 0 AND VL_SAI_TOTAL > 0 AND CD_FAIXA_ORC = 4 THEN 1 ELSE 0 END) AS ENTRADA_ZERO_SUPERAVIT,
+        SUM(CASE WHEN QT_TRANS_TOTAL > 0 AND VL_ENT_TOTAL = 0 AND VL_SAI_TOTAL = 0 THEN 1 ELSE 0 END) AS MOV_SEM_VALOR_PART,
+
+        -- Percentuais.
+        SUM(CASE WHEN PC_SAI_ENT < 0 THEN 1 ELSE 0 END) AS PC_SAI_ENT_NEGATIVO,
+        SUM(CASE WHEN PC_SAI_IND < 0 OR PC_SAI_ESS < 0 OR PC_SAI_NAO_ESS < 0 OR PC_SAI_FUT < 0 OR PC_SAI_OBR < 0 THEN 1 ELSE 0 END) AS PC_CLASSE_NEGATIVO,
+
+        -- Referências.
+        SUM(CASE WHEN PC_REF_IND <> 0.750000 THEN 1 ELSE 0 END) AS REF_IND_ERR,
+        SUM(CASE WHEN PC_REF_ESS <> 0.500000 THEN 1 ELSE 0 END) AS REF_ESS_ERR,
+        SUM(CASE WHEN PC_REF_NAO_ESS <> 0.300000 THEN 1 ELSE 0 END) AS REF_NAO_ESS_ERR,
+        SUM(CASE WHEN PC_REF_FUT <> 0.200000 THEN 1 ELSE 0 END) AS REF_FUT_ERR,
+        SUM(CASE WHEN PC_REF_OBR <> 0.300000 THEN 1 ELSE 0 END) AS REF_OBR_ERR,
+
+        -- Faixa.
+        SUM(CASE
+            WHEN QT_TRANS_TOTAL > 0 AND CD_FAIXA_ORC = 0 AND NOT (PC_SAI_ENT BETWEEN 0.95 AND 1.05) THEN 1
+            WHEN QT_TRANS_TOTAL > 0 AND CD_FAIXA_ORC = 1 AND NOT (PC_SAI_ENT > 1.05 AND PC_SAI_ENT <= 1.25) THEN 1
+            WHEN QT_TRANS_TOTAL > 0 AND CD_FAIXA_ORC = 2 AND NOT (PC_SAI_ENT > 1.25) THEN 1
+            WHEN QT_TRANS_TOTAL > 0 AND CD_FAIXA_ORC = 3 AND NOT (PC_SAI_ENT >= 0.75 AND PC_SAI_ENT < 0.95) THEN 1
+            WHEN QT_TRANS_TOTAL > 0 AND CD_FAIXA_ORC = 4 AND NOT (PC_SAI_ENT < 0.75) THEN 1
+            ELSE 0
+        END) AS ERRO_FAIXA,
+
+        -- Pontuação componente.
+        SUM(CASE WHEN NR_PONT_CONC_IND IS NOT NULL AND NR_PONT_CONC_IND NOT IN (0,99) THEN 1 ELSE 0 END) AS DOM_CONC_IND,
+        SUM(CASE WHEN NR_PONT_CONC_ESS IS NOT NULL AND NR_PONT_CONC_ESS NOT BETWEEN 0 AND 2 THEN 1 ELSE 0 END) AS DOM_CONC_ESS,
+        SUM(CASE WHEN NR_PONT_CONC_NAO_ESS IS NOT NULL AND NR_PONT_CONC_NAO_ESS NOT BETWEEN 0 AND 2 THEN 1 ELSE 0 END) AS DOM_CONC_NAO,
+        SUM(CASE WHEN NR_PONT_CONC_FUT IS NOT NULL AND NR_PONT_CONC_FUT NOT BETWEEN 0 AND 2 THEN 1 ELSE 0 END) AS DOM_CONC_FUT,
+        SUM(CASE WHEN NR_PONT_CONC_OBR IS NOT NULL AND NR_PONT_CONC_OBR NOT BETWEEN 0 AND 2 THEN 1 ELSE 0 END) AS DOM_CONC_OBR,
+
+        SUM(CASE WHEN NR_PONT_ORC_IND IS NOT NULL AND NR_PONT_ORC_IND <> 0 THEN 1 ELSE 0 END) AS DOM_ORC_IND,
+        SUM(CASE WHEN NR_PONT_ORC_ESS IS NOT NULL AND NR_PONT_ORC_ESS NOT BETWEEN 0 AND 2 THEN 1 ELSE 0 END) AS DOM_ORC_ESS,
+        SUM(CASE WHEN NR_PONT_ORC_NAO_ESS IS NOT NULL AND NR_PONT_ORC_NAO_ESS NOT BETWEEN 0 AND 2 THEN 1 ELSE 0 END) AS DOM_ORC_NAO,
+        SUM(CASE WHEN NR_PONT_ORC_FUT IS NOT NULL AND NR_PONT_ORC_FUT NOT BETWEEN 0 AND 2 THEN 1 ELSE 0 END) AS DOM_ORC_FUT,
+        SUM(CASE WHEN NR_PONT_ORC_OBR IS NOT NULL AND NR_PONT_ORC_OBR NOT BETWEEN 0 AND 2 THEN 1 ELSE 0 END) AS DOM_ORC_OBR,
+
+        SUM(CASE WHEN NR_PONT_PRFL_IND IS NOT NULL AND NR_PONT_PRFL_IND <> 0 THEN 1 ELSE 0 END) AS DOM_PRFL_IND,
+        SUM(CASE WHEN NR_PONT_PRFL_ESS IS NOT NULL AND NR_PONT_PRFL_ESS NOT BETWEEN 0 AND 2 THEN 1 ELSE 0 END) AS DOM_PRFL_ESS,
+        SUM(CASE WHEN NR_PONT_PRFL_NAO_ESS IS NOT NULL AND NR_PONT_PRFL_NAO_ESS NOT BETWEEN 0 AND 2 THEN 1 ELSE 0 END) AS DOM_PRFL_NAO,
+        SUM(CASE WHEN NR_PONT_PRFL_FUT IS NOT NULL AND NR_PONT_PRFL_FUT NOT BETWEEN 0 AND 2 THEN 1 ELSE 0 END) AS DOM_PRFL_FUT,
+        SUM(CASE WHEN NR_PONT_PRFL_OBR IS NOT NULL AND NR_PONT_PRFL_OBR NOT BETWEEN 0 AND 2 THEN 1 ELSE 0 END) AS DOM_PRFL_OBR,
+
+        -- Pontuação final.
+        SUM(CASE WHEN NR_PONT_IND_FIM IS NOT NULL AND NR_PONT_IND_FIM NOT IN (0,99) THEN 1 ELSE 0 END) AS DOM_FIM_IND,
+        SUM(CASE WHEN NR_PONT_ESS_FIM IS NOT NULL AND NR_PONT_ESS_FIM NOT BETWEEN 0 AND 6 THEN 1 ELSE 0 END) AS DOM_FIM_ESS,
+        SUM(CASE WHEN NR_PONT_NAO_ESS_FIM IS NOT NULL AND NR_PONT_NAO_ESS_FIM NOT BETWEEN 0 AND 6 THEN 1 ELSE 0 END) AS DOM_FIM_NAO,
+        SUM(CASE WHEN NR_PONT_FUT_FIM IS NOT NULL AND NR_PONT_FUT_FIM NOT BETWEEN 0 AND 6 THEN 1 ELSE 0 END) AS DOM_FIM_FUT,
+        SUM(CASE WHEN NR_PONT_OBR_FIM IS NOT NULL AND NR_PONT_OBR_FIM NOT BETWEEN 0 AND 6 THEN 1 ELSE 0 END) AS DOM_FIM_OBR,
+
+        SUM(CASE WHEN NR_PONT_ESS_FIM IS NOT NULL AND NR_PONT_ESS_FIM <> NR_PONT_CONC_ESS + NR_PONT_ORC_ESS + NR_PONT_PRFL_ESS THEN 1 ELSE 0 END) AS ERRO_FIM_ESS,
+        SUM(CASE WHEN NR_PONT_NAO_ESS_FIM IS NOT NULL AND NR_PONT_NAO_ESS_FIM <> NR_PONT_CONC_NAO_ESS + NR_PONT_ORC_NAO_ESS + NR_PONT_PRFL_NAO_ESS THEN 1 ELSE 0 END) AS ERRO_FIM_NAO,
+        SUM(CASE WHEN NR_PONT_FUT_FIM IS NOT NULL AND NR_PONT_FUT_FIM <> NR_PONT_CONC_FUT + NR_PONT_ORC_FUT + NR_PONT_PRFL_FUT THEN 1 ELSE 0 END) AS ERRO_FIM_FUT,
+        SUM(CASE WHEN NR_PONT_OBR_FIM IS NOT NULL AND NR_PONT_OBR_FIM <> NR_PONT_CONC_OBR + NR_PONT_ORC_OBR + NR_PONT_PRFL_OBR THEN 1 ELSE 0 END) AS ERRO_FIM_OBR,
+
+        -- Vencedor.
+        SUM(CASE WHEN CD_TEMA_VENCEDOR IS NOT NULL AND CD_TEMA_VENCEDOR NOT IN (1,2,3,4,5,9) THEN 1 ELSE 0 END) AS TEMA_FORA_DOM,
+
+        SUM(CASE
+            WHEN CD_TEMA_VENCEDOR BETWEEN 1 AND 5
+             AND CASE CD_TEMA_VENCEDOR
+                    WHEN 1 THEN NR_PONT_IND_FIM
+                    WHEN 2 THEN NR_PONT_ESS_FIM
+                    WHEN 3 THEN NR_PONT_NAO_ESS_FIM
+                    WHEN 4 THEN NR_PONT_FUT_FIM
+                    WHEN 5 THEN NR_PONT_OBR_FIM
+                 END <> GREATEST(NR_PONT_IND_FIM, NR_PONT_ESS_FIM, NR_PONT_NAO_ESS_FIM, NR_PONT_FUT_FIM, NR_PONT_OBR_FIM)
+            THEN 1 ELSE 0
+        END) AS VENCEDOR_NAO_MAX,
+
+        SUM(CASE
+            WHEN CD_TEMA_VENCEDOR = 9
+             AND (
+                CAST(NR_PONT_IND_FIM = GREATEST(NR_PONT_IND_FIM,NR_PONT_ESS_FIM,NR_PONT_NAO_ESS_FIM,NR_PONT_FUT_FIM,NR_PONT_OBR_FIM) AS INT) +
+                CAST(NR_PONT_ESS_FIM = GREATEST(NR_PONT_IND_FIM,NR_PONT_ESS_FIM,NR_PONT_NAO_ESS_FIM,NR_PONT_FUT_FIM,NR_PONT_OBR_FIM) AS INT) +
+                CAST(NR_PONT_NAO_ESS_FIM = GREATEST(NR_PONT_IND_FIM,NR_PONT_ESS_FIM,NR_PONT_NAO_ESS_FIM,NR_PONT_FUT_FIM,NR_PONT_OBR_FIM) AS INT) +
+                CAST(NR_PONT_FUT_FIM = GREATEST(NR_PONT_IND_FIM,NR_PONT_ESS_FIM,NR_PONT_NAO_ESS_FIM,NR_PONT_FUT_FIM,NR_PONT_OBR_FIM) AS INT) +
+                CAST(NR_PONT_OBR_FIM = GREATEST(NR_PONT_IND_FIM,NR_PONT_ESS_FIM,NR_PONT_NAO_ESS_FIM,NR_PONT_FUT_FIM,NR_PONT_OBR_FIM) AS INT)
+             ) <= 1
+            THEN 1 ELSE 0
+        END) AS EMPATE_9_SEM_EMPATE_REAL
+
+    FROM {VIEW_BASE}
+    """).first().asDict()
+
+    linhas = []
+    for k, v in r.items():
+        if k == "BASE":
+            continue
+        val = int(v or 0)
+        linhas.append([k, fmt_int(val), "OK" if val == 0 else "REVISAR"])
+
+    tabela_print(
+        ["Teste", "Ocorrências", "Status"],
+        linhas,
+        ["E", "D", "E"],
+        max_width=60,
+    )
+
+    if int(r["ENTRADA_ZERO_SAIDA_POS"] or 0) > 0:
+        registrar_achado(
+            "ENTRADA_ZERO_SAIDA_POSITIVA",
+            "P0",
+            "REGRA_NEGOCIO_DISCUSSIVEL",
+            TABELA_ALVO,
+            "Cliente possui saída participante positiva e entrada participante zero; a razão saída/entrada é indefinida.",
+            qtd_clientes=int(r["ENTRADA_ZERO_SAIDA_POS"]),
+            recomendacao="Não converter divisão por zero em PC_SAI_ENT=0. Criar tratamento explícito.",
+        )
+
+    if int(r["ENTRADA_ZERO_SUPERAVIT"] or 0) > 0:
+        registrar_achado(
+            "ENTRADA_ZERO_CLASSIFICADA_SUPERAVIT",
+            "P0",
+            "REGRA_NEGOCIO_DISCUSSIVEL",
+            TABELA_ALVO,
+            "Entrada zero e saída positiva foram classificadas como Superavitário Acentuado.",
+            qtd_clientes=int(r["ENTRADA_ZERO_SUPERAVIT"]),
+            recomendacao="Reclassificar como déficit/sem entrada identificada e tornar PC_SAI_ENT NULL.",
+        )
+
+    if int(r["MOV_SEM_VALOR_PART"] or 0) > 0:
+        registrar_achado(
+            "MOVIMENTO_SEM_VALOR_PARTICIPANTE",
+            "P1",
+            "REGRA_NEGOCIO_DISCUSSIVEL",
+            TABELA_ALVO,
+            "Há movimento transacional, mas nenhum valor participa das dez classes financeiras.",
+            qtd_clientes=int(r["MOV_SEM_VALOR_PART"]),
+            recomendacao="Separar 'sem movimento' de 'movimento sem valor participante'.",
+        )
+
+    # Tudo que deveria ser estritamente zero e não é.
+    codigos_erro = [
+        "DUP_CD_CLI", "JANELA_INVERTIDA", "QT_NEGATIVA", "SEM_MOV_COM_VALOR",
+        "ERRO_SOMA_ENT", "ERRO_SOMA_SAI", "ERRO_TRANS_ENT", "ERRO_TRANS_SAI",
+        "ERRO_RES_ORC", "PC_SAI_ENT_NEGATIVO", "PC_CLASSE_NEGATIVO",
+        "REF_IND_ERR", "REF_ESS_ERR", "REF_NAO_ESS_ERR", "REF_FUT_ERR", "REF_OBR_ERR",
+        "ERRO_FAIXA",
+        "DOM_CONC_IND", "DOM_CONC_ESS", "DOM_CONC_NAO", "DOM_CONC_FUT", "DOM_CONC_OBR",
+        "DOM_ORC_IND", "DOM_ORC_ESS", "DOM_ORC_NAO", "DOM_ORC_FUT", "DOM_ORC_OBR",
+        "DOM_PRFL_IND", "DOM_PRFL_ESS", "DOM_PRFL_NAO", "DOM_PRFL_FUT", "DOM_PRFL_OBR",
+        "DOM_FIM_IND", "DOM_FIM_ESS", "DOM_FIM_NAO", "DOM_FIM_FUT", "DOM_FIM_OBR",
+        "ERRO_FIM_ESS", "ERRO_FIM_NAO", "ERRO_FIM_FUT", "ERRO_FIM_OBR",
+        "TEMA_FORA_DOM", "VENCEDOR_NAO_MAX", "EMPATE_9_SEM_EMPATE_REAL",
+    ]
+
+    for k in codigos_erro:
+        val = int(r.get(k, 0) or 0)
+        if val > 0:
+            registrar_achado(
+                f"MAT_{k}",
+                "P0",
+                "ERRO_TECNICO",
+                TABELA_ALVO,
+                f"Teste matemático/lógico {k} retornou ocorrências.",
+                qtd_clientes=val,
+                recomendacao="Bloquear versão até explicar/corrigir a divergência.",
+            )
+
+    return r
+
+
+RES_MAT = executar_etapa("PILAR_7_MATEMATICA", pilar_matematica)
+
+
+# ====================================================================================================
+# 4. PILAR 8 — FUNIL MUTUAMENTE EXCLUSIVO DE VENCEDOR/ELEGIBILIDADE
+# ====================================================================================================
+
+secao(4, "Pilar 8 — Funil mutuamente exclusivo de elegibilidade e vencedor")
+
+def pilar_funil():
+    rows = spark.sql(f"""
+    SELECT
+        MOTIVO,
+        COUNT(*) AS QTD
+    FROM (
+        SELECT
+            CASE
+                WHEN QT_TRANS_TOTAL = 0
+                    THEN '01_SEM_MOVIMENTO'
+                WHEN NM_PRFL_FIN IS NULL
+                    THEN '02_COM_MOV_SEM_PERFIL'
+                WHEN NM_PRFL_FIN = 'CODIGO NAO MAPEADO'
+                    THEN '03_COM_MOV_PERFIL_NAO_MAPEADO'
+                WHEN NR_PONT_ESS_FIM IS NULL
+                  OR NR_PONT_NAO_ESS_FIM IS NULL
+                  OR NR_PONT_FUT_FIM IS NULL
+                  OR NR_PONT_OBR_FIM IS NULL
+                    THEN '04_SCORE_INCOMPLETO'
+                WHEN CD_TEMA_VENCEDOR IS NULL
+                    THEN '05_VENCEDOR_NULL_INESPERADO'
+                ELSE '06_VENCEDOR_OK'
+            END AS MOTIVO
+        FROM {VIEW_BASE}
+    ) x
+    GROUP BY MOTIVO
+    ORDER BY MOTIVO
+    """).collect()
+
+    total = sum(int(r["QTD"]) for r in rows)
+    tabela_print(
+        ["Motivo exclusivo", "Clientes", "% Base"],
+        [
+            [r["MOTIVO"], fmt_int(r["QTD"]), fmt_pct(r["QTD"] / total if total else None)]
+            for r in rows
+        ],
+        ["E", "D", "D"],
+    )
+
+    mapa = {r["MOTIVO"]: int(r["QTD"]) for r in rows}
+
+    sem_perfil = mapa.get("02_COM_MOV_SEM_PERFIL", 0)
+    nao_map = mapa.get("03_COM_MOV_PERFIL_NAO_MAPEADO", 0)
+    score_incompleto = mapa.get("04_SCORE_INCOMPLETO", 0)
+    null_inesp = mapa.get("05_VENCEDOR_NULL_INESPERADO", 0)
+
+    if sem_perfil > 0:
+        registrar_achado(
+            "FUNIL_SEM_PERFIL",
+            "P1",
+            "COBERTURA_AUSENTE",
+            "DB2D1D.DVS_GRDR_FNCO_PF",
+            "Clientes com movimento não possuem perfil financeiro utilizável.",
+            qtd_clientes=sem_perfil,
+            recomendacao="Diagnosticar ausência real de perfil vs falha de janela/join.",
+        )
+
+    if nao_map > 0:
+        registrar_achado(
+            "FUNIL_PERFIL_NAO_MAPEADO",
+            "P1",
+            "DEPARA_AUSENTE",
+            "DB2D1D.DVS_GRDR_FNCO_PF",
+            "Clientes com movimento possuem perfil, porém o código não é mapeado pelo Radar.",
+            qtd_clientes=nao_map,
+            recomendacao="Mapear códigos/nome da origem, principalmente CD_MIC_PRFL_CLI=9.",
+        )
+
+    if score_incompleto > 0 or null_inesp > 0:
+        registrar_achado(
+            "FUNIL_SCORE_OU_VENCEDOR_INESPERADO",
+            "P0",
+            "ERRO_TECNICO",
+            TABELA_ALVO,
+            "Cliente com movimento e perfil mapeado não chegou a score/vencedor completo.",
+            qtd_clientes=score_incompleto + null_inesp,
+            recomendacao="Investigar imediatamente as colunas intermediárias de pontuação.",
+        )
+
+    return mapa
+
+
+RES_FUNIL = executar_etapa("PILAR_8_FUNIL", pilar_funil)
+
+
+# ====================================================================================================
+# 5. PILAR 3 — PERFIL: DE-PARA, CÓDIGOS 9/NULL E ORIGEM DB2
+# ====================================================================================================
+
+secao(5, "Pilar 3 — Perfil financeiro: códigos não mapeados e de-para DB2")
+
+def pilar_perfil_final():
+    rows = spark.sql(f"""
+    SELECT
+        CD_MAC_PRFL_CLI,
+        NM_MAC_PRFL_CLI,
+        CD_MIC_PRFL_CLI,
+        NM_MIC_PRFL_CLI,
+        NM_PRFL_FIN,
+        COUNT(*) AS QTD
+    FROM {VIEW_BASE}
+    GROUP BY
+        CD_MAC_PRFL_CLI,
+        NM_MAC_PRFL_CLI,
+        CD_MIC_PRFL_CLI,
+        NM_MIC_PRFL_CLI,
+        NM_PRFL_FIN
+    ORDER BY
+        CASE WHEN NM_PRFL_FIN = 'CODIGO NAO MAPEADO' THEN 0
+             WHEN NM_PRFL_FIN IS NULL THEN 1
+             ELSE 2 END,
+        QTD DESC
+    """).collect()
+
+    tabela_print(
+        ["CD_MAC", "NM_MAC", "CD_MIC", "NM_MIC", "NM_PRFL_FIN", "Clientes"],
+        [
+            [
+                r["CD_MAC_PRFL_CLI"], r["NM_MAC_PRFL_CLI"],
+                r["CD_MIC_PRFL_CLI"], r["NM_MIC_PRFL_CLI"],
+                r["NM_PRFL_FIN"], fmt_int(r["QTD"])
+            ]
+            for r in rows
+        ],
+        ["D", "E", "D", "E", "E", "D"],
+        max_width=35,
+    )
+
+    nao_map = sum(int(r["QTD"]) for r in rows if r["NM_PRFL_FIN"] == "CODIGO NAO MAPEADO")
+    mic9 = sum(int(r["QTD"]) for r in rows if r["CD_MIC_PRFL_CLI"] == 9)
+
+    print("\n  Não mapeado total:", fmt_int(nao_map))
+    print("  CD_MIC=9 total   :", fmt_int(mic9))
+
+    if nao_map > 0:
+        registrar_achado(
+            "PERFIL_CODIGO_NAO_MAPEADO_FINAL",
+            "P1",
+            "DEPARA_AUSENTE",
+            TABELA_ALVO,
+            "NM_PRFL_FIN='CODIGO NAO MAPEADO'.",
+            qtd_clientes=nao_map,
+            recomendacao="Comparar os códigos crus com a origem DB2 e atualizar o de-para.",
+        )
+
+    if mic9 > 0:
+        registrar_achado(
+            "PERFIL_MICRO_9_PRESENTE",
+            "P1",
+            "DEPARA_AUSENTE",
+            "DB2D1D.DVS_GRDR_FNCO_PF",
+            "CD_MIC_PRFL_CLI=9 existe na saída, mas a V15 só nomeia códigos 1–8.",
+            qtd_clientes=mic9,
+            recomendacao="Definir oficialmente o significado do código 9 e sua pontuação.",
+        )
+
+    return {"nao_map": nao_map, "mic9": mic9, "rows": rows}
+
+
+RES_PERFIL_FINAL = executar_etapa("PERFIL_FINAL", pilar_perfil_final)
+
+
+def pilar_perfil_db2():
+    if not ATIVAR_PERFIL_DB2:
+        print("ATIVAR_PERFIL_DB2=False")
+        return None
+    if CON_DB2 is None:
+        raise RuntimeError("Conector DB2 indisponível.")
+
+    # Agrega no DB2 para devolver apenas poucas combinações.
+    sql = f"""
+    SELECT
+        INTEGER(CD_MAC_PRFL_CLI) AS CD_MAC_PRFL_CLI,
+        VARCHAR(TRIM(NM_MAC_PRFL_CLI), 80) AS NM_MAC_PRFL_CLI,
+        INTEGER(CD_MIC_PRFL_CLI) AS CD_MIC_PRFL_CLI,
+        VARCHAR(TRIM(NM_MIC_PRFL_CLI), 120) AS NM_MIC_PRFL_CLI,
+        BIGINT(COUNT(*)) AS QT_REG
+    FROM DB2D1D.DVS_GRDR_FNCO_PF
+    WHERE DT_REF >= DATE('{DATA_PERFIL_INI}')
+      AND DT_REF <= DATE('{DATA_EXEA}')
+    GROUP BY
+        CD_MAC_PRFL_CLI,
+        NM_MAC_PRFL_CLI,
+        CD_MIC_PRFL_CLI,
+        NM_MIC_PRFL_CLI
+    """
+
+    df = CON_DB2.sql(sql, fetchsize=10_000, query_timeout=15*60)
+    rows = df.orderBy(F.desc("QT_REG")).collect()
+
+    tabela_print(
+        ["CD_MAC", "Nome macro origem", "CD_MIC", "Nome micro origem", "Registros 12m"],
+        [
+            [
+                r["CD_MAC_PRFL_CLI"], r["NM_MAC_PRFL_CLI"],
+                r["CD_MIC_PRFL_CLI"], r["NM_MIC_PRFL_CLI"],
+                fmt_int(r["QT_REG"])
+            ]
+            for r in rows
+        ],
+        ["D", "E", "D", "E", "D"],
+        max_width=42,
+    )
+
+    code9 = [r for r in rows if r["CD_MIC_PRFL_CLI"] == 9]
+    nulls = [r for r in rows if r["CD_MAC_PRFL_CLI"] is None or r["CD_MIC_PRFL_CLI"] is None]
+
+    if code9:
+        subsecao("Origem DB2 — combinações com CD_MIC_PRFL_CLI=9")
+        tabela_print(
+            ["CD_MAC", "Nome macro", "CD_MIC", "Nome micro", "Registros"],
+            [
+                [
+                    r["CD_MAC_PRFL_CLI"], r["NM_MAC_PRFL_CLI"],
+                    r["CD_MIC_PRFL_CLI"], r["NM_MIC_PRFL_CLI"],
+                    fmt_int(r["QT_REG"])
+                ]
+                for r in code9
+            ],
+            ["D", "E", "D", "E", "D"],
+        )
+
+    if nulls:
+        registrar_achado(
+            "PERFIL_ORIGEM_CODIGO_NULL",
+            "P1",
+            "DADO_ORIGEM_INVALIDO",
+            "DB2D1D.DVS_GRDR_FNCO_PF",
+            "Existem combinações do perfil com código macro ou micro NULL na origem.",
+            qtd_registros=sum(int(r["QT_REG"]) for r in nulls),
+            recomendacao="Validar contrato de dados do perfil financeiro.",
+        )
+
+    return rows
+
+
+RES_PERFIL_DB2 = executar_etapa("PERFIL_DB2_DEPARA", pilar_perfil_db2)
+
+
+# ====================================================================================================
+# 6. PILAR 6 — CATÁLOGO OFICIAL x MAPA HARDCODED RADAR
+# ====================================================================================================
+
+secao(6, "Pilar 6 — Catálogo oficial DB2 x mapa hardcoded Radar")
+
+df_mapa_radar = spark.createDataFrame(RADAR_MAP_ROWS, RADAR_MAP_SCHEMA)
+df_mapa_radar.createOrReplaceTempView("vw_aud_mapa_radar")
+
+print("Regras executáveis embutidas da V15:", df_mapa_radar.count())
+
+def pilar_catalogo_db2():
+    if not ATIVAR_CATALOGO_DB2:
+        print("ATIVAR_CATALOGO_DB2=False")
+        return None
+    if CON_DB2 is None:
+        raise RuntimeError("Conector DB2 indisponível.")
+
+    sql_cat = """
+    SELECT
+        INTEGER(CD_CTGR_TRAN) AS CD_CTGR_TRAN,
+        SMALLINT(CD_GR_CTGR_TRAN) AS CD_GR_CTGR_TRAN,
+        VARCHAR(TRIM(CD_NTZ_CTB_TRAN), 10) AS CD_NTZ_CTB_TRAN,
+        VARCHAR(TRIM(TX_DCR_CTGR_TRAN), 150) AS TX_DCR_CTGR_TRAN,
+        SMALLINT(CD_TRAN_IR) AS CD_TRAN_IR
+    FROM DB2GFP.CTGR_TRAN_OPB
+    WHERE IN_CTGR_PDRO_SIS = 'S'
+    """
+
+    sql_gr = """
+    SELECT
+        SMALLINT(CD_GR_CTGR_TRAN) AS CD_GR_CTGR_TRAN,
+        VARCHAR(TRIM(TX_DCR_GR_CTGR), 120) AS TX_DCR_GR_CTGR
+    FROM DB2GFP.GR_CTGR_TRAN
+    """
+
+    df_cat = CON_DB2.sql(sql_cat, fetchsize=10_000, query_timeout=15*60)
+    df_gr = CON_DB2.sql(sql_gr, fetchsize=10_000, query_timeout=15*60)
+
+    df_cat.createOrReplaceTempView("vw_aud_cat_oficial")
+    df_gr.createOrReplaceTempView("vw_aud_gr_oficial")
+
+    resumo = spark.sql("""
+    SELECT
+        COUNT(*) AS QT_OFICIAL,
+        SUM(CASE WHEN COALESCE(TRIM(CD_NTZ_CTB_TRAN),'') = '' THEN 1 ELSE 0 END) AS QT_NATUREZA_VAZIA,
+        SUM(CASE WHEN TRIM(CD_NTZ_CTB_TRAN) NOT IN ('C','D') AND COALESCE(TRIM(CD_NTZ_CTB_TRAN),'') <> '' THEN 1 ELSE 0 END) AS QT_NATUREZA_FORA_CD
+    FROM vw_aud_cat_oficial
+    """).first()
+
+    print("Categorias oficiais sistema :", fmt_int(resumo["QT_OFICIAL"]))
+    print("Natureza vazia              :", fmt_int(resumo["QT_NATUREZA_VAZIA"]))
+    print("Natureza fora C/D           :", fmt_int(resumo["QT_NATUREZA_FORA_CD"]))
+
+    faltantes = spark.sql("""
+    SELECT
+        o.CD_CTGR_TRAN,
+        o.CD_GR_CTGR_TRAN,
+        g.TX_DCR_GR_CTGR,
+        o.CD_NTZ_CTB_TRAN,
+        o.TX_DCR_CTGR_TRAN
+    FROM vw_aud_cat_oficial o
+    LEFT JOIN vw_aud_gr_oficial g
+      ON o.CD_GR_CTGR_TRAN = g.CD_GR_CTGR_TRAN
+    LEFT ANTI JOIN vw_aud_mapa_radar r
+      ON TRIM(o.CD_NTZ_CTB_TRAN) = r.CD_NTZ_CTB_TRAN
+     AND o.CD_CTGR_TRAN = r.CD_CTGR_TRAN_OGNL
+    ORDER BY o.CD_GR_CTGR_TRAN, o.CD_CTGR_TRAN
+    """).collect()
+
+    excedentes = spark.sql("""
+    SELECT
+        r.CD_NTZ_CTB_TRAN,
+        r.CD_CTGR_TRAN_OGNL,
+        r.CD_GRUPO_RADAR,
+        r.TX_GRUPO_RADAR,
+        r.TX_CATEGORIA_RADAR,
+        r.CD_CLASS_RADAR,
+        r.IN_PARTICIPA
+    FROM vw_aud_mapa_radar r
+    LEFT ANTI JOIN vw_aud_cat_oficial o
+      ON r.CD_NTZ_CTB_TRAN = TRIM(o.CD_NTZ_CTB_TRAN)
+     AND r.CD_CTGR_TRAN_OGNL = o.CD_CTGR_TRAN
+    ORDER BY r.CD_CTGR_TRAN_OGNL
+    """).collect()
+
+    diverg_grupo = spark.sql("""
+    SELECT
+        r.CD_NTZ_CTB_TRAN,
+        r.CD_CTGR_TRAN_OGNL,
+        r.CD_GRUPO_RADAR,
+        o.CD_GR_CTGR_TRAN AS CD_GRUPO_OFICIAL,
+        r.TX_GRUPO_RADAR,
+        g.TX_DCR_GR_CTGR AS TX_GRUPO_OFICIAL,
+        r.TX_CATEGORIA_RADAR,
+        o.TX_DCR_CTGR_TRAN AS TX_CATEGORIA_OFICIAL
+    FROM vw_aud_mapa_radar r
+    INNER JOIN vw_aud_cat_oficial o
+      ON r.CD_NTZ_CTB_TRAN = TRIM(o.CD_NTZ_CTB_TRAN)
+     AND r.CD_CTGR_TRAN_OGNL = o.CD_CTGR_TRAN
+    LEFT JOIN vw_aud_gr_oficial g
+      ON o.CD_GR_CTGR_TRAN = g.CD_GR_CTGR_TRAN
+    WHERE r.CD_GRUPO_RADAR <> o.CD_GR_CTGR_TRAN
+    ORDER BY r.CD_CTGR_TRAN_OGNL
+    """).collect()
+
+    subsecao("Categorias oficiais sem regra executável Radar")
+    tabela_print(
+        ["Categoria", "Grupo", "Nome grupo", "Natureza", "Descrição oficial"],
+        [
+            [
+                r["CD_CTGR_TRAN"], r["CD_GR_CTGR_TRAN"], r["TX_DCR_GR_CTGR"],
+                r["CD_NTZ_CTB_TRAN"], r["TX_DCR_CTGR_TRAN"]
+            ]
+            for r in faltantes[:TOP_N]
+        ],
+        ["D", "D", "E", "E", "E"],
+        max_width=45,
+    )
+    print("Total faltantes:", fmt_int(len(faltantes)))
+
+    subsecao("Regras Radar sem correspondência oficial C/D")
+    tabela_print(
+        ["Nat", "Categoria", "Grupo Radar", "Grupo", "Categoria Radar", "Classe", "Participa"],
+        [
+            [
+                r["CD_NTZ_CTB_TRAN"], r["CD_CTGR_TRAN_OGNL"], r["CD_GRUPO_RADAR"],
+                r["TX_GRUPO_RADAR"], r["TX_CATEGORIA_RADAR"], r["CD_CLASS_RADAR"], r["IN_PARTICIPA"]
+            ]
+            for r in excedentes[:TOP_N]
+        ],
+        ["E", "D", "D", "E", "E", "D", "D"],
+        max_width=42,
+    )
+    print("Total excedentes:", fmt_int(len(excedentes)))
+
+    subsecao("Divergências de grupo oficial x grupo Radar")
+    tabela_print(
+        ["Nat", "Cat", "Grupo Radar", "Grupo Oficial", "Nome Radar", "Nome Oficial", "Categoria"],
+        [
+            [
+                r["CD_NTZ_CTB_TRAN"], r["CD_CTGR_TRAN_OGNL"],
+                r["CD_GRUPO_RADAR"], r["CD_GRUPO_OFICIAL"],
+                r["TX_GRUPO_RADAR"], r["TX_GRUPO_OFICIAL"], r["TX_CATEGORIA_RADAR"]
+            ]
+            for r in diverg_grupo[:TOP_N]
+        ],
+        ["E", "D", "D", "D", "E", "E", "E"],
+        max_width=35,
+    )
+    print("Total divergências grupo:", fmt_int(len(diverg_grupo)))
+
+    if faltantes:
+        registrar_achado(
+            "CATALOGO_OFICIAL_SEM_DEPARA_RADAR",
+            "P1",
+            "DEPARA_AUSENTE",
+            "DB2GFP.CTGR_TRAN_OPB",
+            "Há categorias padrão oficiais sem regra C/D executável no Radar.",
+            qtd_registros=len(faltantes),
+            recomendacao="Classificar explicitamente ou documentar exclusão.",
+        )
+
+    if diverg_grupo:
+        registrar_achado(
+            "CATALOGO_GRUPO_DIVERGENTE",
+            "P1",
+            "DEPARA_AUSENTE",
+            "DB2GFP.CTGR_TRAN_OPB",
+            "Grupo Radar diverge do grupo oficial da categoria.",
+            qtd_registros=len(diverg_grupo),
+            recomendacao="Reconciliar dicionário hardcoded com catálogo oficial.",
+        )
+
+    classes = (
+        df_mapa_radar
+        .groupBy("CD_CLASS_RADAR", "TX_CLASS_RADAR")
+        .agg(
+            F.count("*").alias("QT_REGRAS"),
+            F.sum("IN_PARTICIPA").alias("QT_PARTICIPANTES")
+        )
+        .orderBy("CD_CLASS_RADAR")
+        .collect()
+    )
+
+    subsecao("Cobertura das classes pelo mapa executável")
+    tabela_print(
+        ["Classe", "Nome", "Regras", "Regras participantes"],
+        [
+            [r["CD_CLASS_RADAR"], r["TX_CLASS_RADAR"], fmt_int(r["QT_REGRAS"]), fmt_int(r["QT_PARTICIPANTES"])]
+            for r in classes
+        ],
+        ["D", "E", "D", "D"],
+    )
+
+    cod_classes = {int(r["CD_CLASS_RADAR"]) for r in classes}
+    if 4 not in cod_classes:
+        registrar_achado(
+            "CLASSE_4_SEM_CATEGORIA_EXECUTAVEL",
+            "P1",
+            "DEPARA_AUSENTE",
+            "Mapa V15",
+            "A classe 4 (Crédito Tomado) não possui nenhuma regra C/D executável.",
+            recomendacao="Confirmar se é classe futura/reservada ou completar o catálogo.",
+        )
+
+    if 0 not in cod_classes:
+        registrar_achado(
+            "CLASSE_0_SEM_CATEGORIA_EXECUTAVEL",
+            "P1",
+            "DEPARA_AUSENTE",
+            "Mapa V15",
+            "A classe 0 (Outras Entradas) não possui regra C/D executável.",
+            recomendacao="Confirmar o tratamento de categorias 0/83 com natureza vazia.",
+        )
+
+    return {
+        "faltantes": faltantes,
+        "excedentes": excedentes,
+        "diverg_grupo": diverg_grupo,
+        "classes": classes,
+    }
+
+
+RES_CATALOGO = executar_etapa("PILAR_6_CATALOGO_DB2", pilar_catalogo_db2)
+
+
+# ====================================================================================================
+# 7. PILAR 5 — SENTINELAS DE RENDA NA TABELA FINAL
+# ====================================================================================================
+
+secao(7, "Pilar 5 — Sentinelas e cobertura de renda na tabela final")
+
+def pilar_renda_final():
+    rows = spark.sql(f"""
+    SELECT
+        CASE
+            WHEN VL_REN_PRES = -1 THEN '-1 SEM_MODELO_ESCOLHIDO'
+            WHEN VL_REN_PRES = -2 THEN '-2 CPF_INVALIDO'
+            WHEN VL_REN_PRES = -3 THEN '-3 NAO_PF'
+            WHEN VL_REN_PRES = -4 THEN '-4 IDENTIDADE_AMBIGUA'
+            WHEN VL_REN_PRES = -5 THEN '-5 DUPLICIDADE_MODELO'
+            WHEN VL_REN_PRES = -6 THEN '-6 RENDA_NULL_ORIGEM'
+            WHEN VL_REN_PRES = -7 THEN '-7 RENDA_NEGATIVA_ORIGEM'
+            WHEN VL_REN_PRES = 0 THEN '0 RENDA_ZERO'
+            WHEN VL_REN_PRES > 0 THEN '>0 RENDA_POSITIVA'
+            ELSE 'OUTRO'
+        END AS STATUS_RENDA,
+        COUNT(*) AS QTD,
+        SUM(CASE WHEN QT_TRANS_TOTAL > 0 THEN 1 ELSE 0 END) AS COM_MOV,
+        SUM(CASE WHEN CD_TEMA_VENCEDOR IS NOT NULL THEN 1 ELSE 0 END) AS COM_VENCEDOR
+    FROM {VIEW_BASE}
+    GROUP BY 1
+    ORDER BY QTD DESC
+    """).collect()
+
+    tabela_print(
+        ["Status renda", "Clientes", "% Base", "Com movimento", "Com vencedor"],
+        [
+            [
+                r["STATUS_RENDA"], fmt_int(r["QTD"]),
+                fmt_pct(r["QTD"] / TOTAL_BASE),
+                fmt_int(r["COM_MOV"]), fmt_int(r["COM_VENCEDOR"])
+            ]
+            for r in rows
+        ],
+        ["E", "D", "D", "D", "D"],
+    )
+
+    sem_modelo = sum(int(r["QTD"]) for r in rows if r["STATUS_RENDA"].startswith("-1"))
+    renda_nao_pos_com_vencedor = spark.sql(f"""
+        SELECT COUNT(*) AS QTD
+        FROM {VIEW_BASE}
+        WHERE VL_REN_PRES <= 0
+          AND CD_TEMA_VENCEDOR IS NOT NULL
+    """).first()["QTD"]
+
+    if sem_modelo > 0:
+        registrar_achado(
+            "RENDA_SENTINELA_MENOS_1",
+            "P1",
+            "COBERTURA_AUSENTE",
+            "HIVE_D1Q.RDPR_PF",
+            "Clientes receberam -1 porque nenhum modelo Behaviour/Bureau foi escolhido para o CPF.",
+            qtd_clientes=sem_modelo,
+            recomendacao="Separar ausência real de modelo de efeito da seleção de partição.",
+        )
+
+    if renda_nao_pos_com_vencedor > 0:
+        registrar_achado(
+            "RENDA_NAO_POSITIVA_COM_VENCEDOR",
+            "P1",
+            "REGRA_NEGOCIO_DISCUSSIVEL",
+            TABELA_ALVO,
+            "Cliente sem renda positiva continua elegível a tema por orçamento/perfil.",
+            qtd_clientes=int(renda_nao_pos_com_vencedor),
+            recomendacao="Definir oficialmente Radar completo vs Radar parcial sem renda.",
+        )
+
+    return rows
+
+
+RES_RENDA_FINAL = executar_etapa("RENDA_FINAL_SENTINELAS", pilar_renda_final)
+
+
+# ====================================================================================================
+# 8. PILAR 2 + PILAR 5 — RECONSTRUÇÃO DO PÚBLICO: CPF E CAUSA EXATA DO CICLO
+# ====================================================================================================
+
+secao(8, "Pilar 2/5 — Reconstrução controlada de CPF e causa do ciclo no DB2")
+
+PUBLICO_AUDIT_CTX = {}
+
+def pilar_publico_cpf_ciclo_db2():
+    if not ATIVAR_PUBLICO_CPF_CICLO_DB2:
+        print("ATIVAR_PUBLICO_CPF_CICLO_DB2=False")
+        return None
+    if CON_DB2 is None:
+        raise RuntimeError("Conector DB2 indisponível.")
+
+    # ----------------------------------------------------------------------------------------------
+    # 1. Uma única leitura do público para reaproveitar CPF + conta/ciclo.
+    # ----------------------------------------------------------------------------------------------
+    dfs = []
+    for ptc_min, ptc_max, rotulo in FAIXAS_PTC:
+        sql = f"""
+        SELECT
+            SMALLINT(NR_PTC) AS NR_PTC,
+            INTEGER(CD_CLI) AS CD_CLI,
+            DECIMAL(NR_MCA_PCT_OPB, 11, 0) AS NR_MCA_PCT_OPB,
+            SMALLINT(CD_PRD) AS CD_PRD,
+            SMALLINT(NR_AG_TITR) AS NR_AG_TITR,
+            VARCHAR(CD_CT_TITR, 30) AS CD_CT_TITR,
+            TIMESTAMP(TS_ATL_TRAN) AS TS_ATL_TRAN,
+            DECIMAL(NR_CPF_CNPJ_TITR, 14, 0) AS NR_CPF_ORIGEM
+        FROM DB2GFP.TRAN_RLZD_INST_PCT
+        WHERE NR_PTC BETWEEN {ptc_min} AND {ptc_max}
+          AND CD_EST_TRAN_INST = 0
+          AND CD_TIP_PSS = 1
+          AND DT_TRAN >= DATE('{DATA_PUBLICO_INI}')
+          AND DT_TRAN <= DATE('{DATA_PUBLICO_FIM}')
+          AND TS_ATL_TRAN >= TIMESTAMP('{DATA_PUBLICO_INI} 00:00:00')
+          AND TS_ATL_TRAN < TIMESTAMP('{DATA_PUBLICO_FIM + datetime.timedelta(days=1)} 00:00:00')
+        """
+        df_b = (
+            CON_DB2.sql(
+                sql,
+                fetchsize=10_000,
+                query_timeout=15*60,
+                partition_column="NR_PTC",
+                lower_bound=ptc_min,
+                upper_bound=ptc_max + 1,
+                num_partitions=4,
+            )
+            .drop("NR_PTC")
+        )
+        dfs.append(df_b)
+
+    df_raw = dfs[0]
+    for d in dfs[1:]:
+        df_raw = df_raw.unionByName(d)
+
+    # Redução por conta reproduz a V15 e evita manter o bruto em memória.
+    df_reduz = spark.sql("""
+    SELECT
+        CD_CLI,
+        NR_MCA_PCT_OPB,
+        CD_PRD,
+        NR_AG_TITR,
+        CD_CT_TITR,
+        MAX(TS_ATL_TRAN) AS TS_ATL_TRAN_CONTA,
+        MIN(NR_CPF_ORIGEM) AS NR_CPF_ORIG_MIN_CONTA,
+        MAX(NR_CPF_ORIGEM) AS NR_CPF_ORIG_MAX_CONTA,
+        MIN(CASE WHEN NR_CPF_ORIGEM BETWEEN 1 AND 99999999999 THEN NR_CPF_ORIGEM END) AS NR_CPF_MIN_CONTA,
+        MAX(CASE WHEN NR_CPF_ORIGEM BETWEEN 1 AND 99999999999 THEN NR_CPF_ORIGEM END) AS NR_CPF_MAX_CONTA,
+        CASE
+            WHEN NR_MCA_PCT_OPB = 999999999
+             AND CD_PRD = 6
+             AND NR_AG_TITR IS NOT NULL
+             AND CD_CT_TITR IS NOT NULL
+             AND TRIM(CD_CT_TITR) <> ''
+            THEN 1 ELSE 0
+        END AS IN_CONTA_ELEGIVEL
+    FROM vw_aud_publico_raw_tmp
+    GROUP BY CD_CLI, NR_MCA_PCT_OPB, CD_PRD, NR_AG_TITR, CD_CT_TITR
+    """) if False else None
+
+    # Para usar SQL, registra o raw.
+    df_raw.createOrReplaceTempView("vw_aud_publico_raw_tmp")
+
+    df_reduz = spark.sql("""
+    SELECT
+        CD_CLI,
+        NR_MCA_PCT_OPB,
+        CD_PRD,
+        NR_AG_TITR,
+        CD_CT_TITR,
+        MAX(TS_ATL_TRAN) AS TS_ATL_TRAN_CONTA,
+        MIN(NR_CPF_ORIGEM) AS NR_CPF_ORIG_MIN_CONTA,
+        MAX(NR_CPF_ORIGEM) AS NR_CPF_ORIG_MAX_CONTA,
+        MIN(CASE WHEN NR_CPF_ORIGEM BETWEEN 1 AND 99999999999 THEN NR_CPF_ORIGEM END) AS NR_CPF_MIN_CONTA,
+        MAX(CASE WHEN NR_CPF_ORIGEM BETWEEN 1 AND 99999999999 THEN NR_CPF_ORIGEM END) AS NR_CPF_MAX_CONTA,
+        CASE
+            WHEN NR_MCA_PCT_OPB = 999999999
+             AND CD_PRD = 6
+             AND NR_AG_TITR IS NOT NULL
+             AND CD_CT_TITR IS NOT NULL
+             AND TRIM(CD_CT_TITR) <> ''
+            THEN 1 ELSE 0
+        END AS IN_CONTA_ELEGIVEL
+    FROM vw_aud_publico_raw_tmp
+    GROUP BY CD_CLI, NR_MCA_PCT_OPB, CD_PRD, NR_AG_TITR, CD_CT_TITR
+    """).persist(StorageLevel.MEMORY_AND_DISK)
+
+    df_reduz.createOrReplaceTempView("vw_aud_publico_contas_reduz")
+
+    qt_reduz = df_reduz.count()
+    print("Contas/chaves reduzidas:", fmt_int(qt_reduz))
+
+    df_cliente = spark.sql("""
+    SELECT
+        CD_CLI,
+        MAX(TS_ATL_TRAN_CONTA) AS TS_ATL_TRAN,
+        MIN(NR_CPF_ORIG_MIN_CONTA) AS NR_CPF_ORIG_MIN,
+        MAX(NR_CPF_ORIG_MAX_CONTA) AS NR_CPF_ORIG_MAX,
+        MIN(NR_CPF_MIN_CONTA) AS NR_CPF_MIN,
+        MAX(NR_CPF_MAX_CONTA) AS NR_CPF_MAX
+    FROM vw_aud_publico_contas_reduz
+    GROUP BY CD_CLI
+    """).persist(StorageLevel.MEMORY_AND_DISK)
+
+    df_cliente = (
+        df_cliente
+        .withColumn(
+            "QT_CPF_ORIG_DIST",
+            F.when(F.col("NR_CPF_ORIG_MAX").isNull(), F.lit(0))
+             .when(F.col("NR_CPF_ORIG_MIN") == F.col("NR_CPF_ORIG_MAX"), F.lit(1))
+             .otherwise(F.lit(2))
+        )
+        .withColumn(
+            "QT_CPF_VALIDO_DIST",
+            F.when(F.col("NR_CPF_MAX").isNull(), F.lit(0))
+             .when(F.col("NR_CPF_MIN") == F.col("NR_CPF_MAX"), F.lit(1))
+             .otherwise(F.lit(2))
+        )
+        .withColumn("NR_CPF", F.col("NR_CPF_MAX").cast("decimal(11,0)"))
+        .withColumn(
+            "CD_STS_CPF",
+            F.when(F.col("QT_CPF_ORIG_DIST") > 1, F.lit(-4))
+             .when(F.col("QT_CPF_ORIG_DIST") == 0, F.lit(-2))
+             .when(F.col("QT_CPF_VALIDO_DIST") == 0, F.lit(-2))
+             .otherwise(F.lit(0))
+             .cast("smallint")
+        )
+    )
+
+    df_cliente.createOrReplaceTempView("vw_aud_publico_cpf")
+    qt_cli = df_cliente.count()
+    print("Clientes público reconstruído:", fmt_int(qt_cli))
+
+    status_cpf = (
+        df_cliente
+        .groupBy("CD_STS_CPF")
+        .count()
+        .orderBy("CD_STS_CPF")
+        .collect()
+    )
+    subsecao("Status CPF reconstruído")
+    tabela_print(
+        ["CD_STS_CPF", "Clientes"],
+        [[r["CD_STS_CPF"], fmt_int(r["count"])] for r in status_cpf],
+        ["D", "D"],
+    )
+
+    # ----------------------------------------------------------------------------------------------
+    # 2. CT_GRDR para causa do ciclo.
+    # ----------------------------------------------------------------------------------------------
+    sql_ct = """
+    SELECT
+        INTEGER(CD_UOR_CC) AS CD_UOR_CC,
+        DECIMAL(NR_CC, 11, 0) AS NR_CC,
+        SMALLINT(DD_INC_MM_CLC_BLC) AS DD_INC_MM_CLC_BLC
+    FROM DB2GFP.CT_GRDR_FNCO
+    WHERE CD_UOR_CC IS NOT NULL
+      AND NR_CC IS NOT NULL
+    """
+
+    df_ct = CON_DB2.sql(
+        sql_ct,
+        fetchsize=10_000,
+        query_timeout=15*60,
+        partition_column="CD_UOR_CC",
+        lower_bound=1,
+        upper_bound=10_000,
+        num_partitions=16,
+    )
+    df_ct.createOrReplaceTempView("vw_aud_ct_grdr")
+
+    # Origem CT_GRDR: domínio.
+    dom_ct = spark.sql("""
+    SELECT
+        COUNT(*) AS QT,
+        SUM(CASE WHEN DD_INC_MM_CLC_BLC IS NULL THEN 1 ELSE 0 END) AS DD_NULL,
+        SUM(CASE WHEN DD_INC_MM_CLC_BLC IS NOT NULL AND DD_INC_MM_CLC_BLC NOT BETWEEN 1 AND 31 THEN 1 ELSE 0 END) AS DD_FORA_1_31
+    FROM vw_aud_ct_grdr
+    """).first()
+    print("\nCT_GRDR linhas           :", fmt_int(dom_ct["QT"]))
+    print("CT_GRDR DD NULL         :", fmt_int(dom_ct["DD_NULL"]))
+    print("CT_GRDR DD fora 1..31   :", fmt_int(dom_ct["DD_FORA_1_31"]))
+
+    if dom_ct["DD_NULL"] > 0:
+        registrar_achado(
+            "CT_GRDR_CICLO_NULL_ORIGEM",
+            "P2",
+            "DADO_ORIGEM_INVALIDO",
+            "DB2GFP.CT_GRDR_FNCO",
+            "Existem contas com DD_INC_MM_CLC_BLC NULL na tabela de ciclo.",
+            qtd_registros=int(dom_ct["DD_NULL"]),
+            recomendacao="Quantificar impacto nos clientes que recebem código 999.",
+        )
+
+    # Reproduz conta elegível e status final.
+    df_ciclo_recalc = spark.sql("""
+    WITH e0 AS (
+        SELECT
+            CD_CLI,
+            CAST(NR_AG_TITR AS INT) AS CD_UOR_CC,
+            TRIM(CD_CT_TITR) AS CD_CT_TITR_TRIM
+        FROM vw_aud_publico_contas_reduz
+        WHERE IN_CONTA_ELEGIVEL = 1
+    ),
+    e AS (
+        SELECT
+            CD_CLI,
+            CD_UOR_CC,
+            CASE
+                WHEN CD_CT_TITR_TRIM RLIKE '^[0-9]+$'
+                 AND LENGTH(REGEXP_REPLACE(CD_CT_TITR_TRIM, '^0+', '')) <= 11
+                THEN CAST(REGEXP_REPLACE(CD_CT_TITR_TRIM, '^0+', '') AS DECIMAL(11,0))
+                ELSE NULL
+            END AS NR_CC
+        FROM e0
+    ),
+    c AS (
+        SELECT
+            e.CD_CLI,
+            COUNT(*) AS QT_CONTA_ELEGIVEL,
+            MAX(t.DD_INC_MM_CLC_BLC) AS DD_CONTA,
+            SUM(CASE WHEN e.NR_CC IS NULL THEN 1 ELSE 0 END) AS QT_CONTA_NUMERO_INVALIDO,
+            SUM(CASE WHEN t.CD_UOR_CC IS NULL THEN 1 ELSE 0 END) AS QT_SEM_MATCH_CT_GRDR
+        FROM e
+        LEFT JOIN vw_aud_ct_grdr t
+          ON e.CD_UOR_CC = t.CD_UOR_CC
+         AND e.NR_CC = t.NR_CC
+        GROUP BY e.CD_CLI
+    )
+    SELECT
+        p.CD_CLI,
+        COALESCE(c.QT_CONTA_ELEGIVEL,0) AS QT_CONTA_ELEGIVEL,
+        COALESCE(c.QT_CONTA_NUMERO_INVALIDO,0) AS QT_CONTA_NUMERO_INVALIDO,
+        COALESCE(c.QT_SEM_MATCH_CT_GRDR,0) AS QT_SEM_MATCH_CT_GRDR,
+        c.DD_CONTA,
+        CAST(
+            CASE
+                WHEN COALESCE(c.QT_CONTA_ELEGIVEL,0)=0 THEN 997
+                WHEN c.QT_CONTA_ELEGIVEL>1 THEN 996
+                WHEN c.DD_CONTA IS NULL THEN 999
+                ELSE c.DD_CONTA
+            END AS SMALLINT
+        ) AS DD_RECALC
+    FROM vw_aud_publico_cpf p
+    LEFT JOIN c ON p.CD_CLI=c.CD_CLI
+    """).persist(StorageLevel.MEMORY_AND_DISK)
+
+    df_ciclo_recalc.createOrReplaceTempView("vw_aud_ciclo_recalc")
+    df_ciclo_recalc.count()
+
+    df_comp = (
+        df_base.select("CD_CLI", "DD_INC_MM_CLC_BLC")
+        .join(df_ciclo_recalc, "CD_CLI", "left")
+    )
+    df_comp.createOrReplaceTempView("vw_aud_ciclo_compara")
+
+    ciclo = spark.sql("""
+    SELECT
+        CASE
+            WHEN DD_INC_MM_CLC_BLC BETWEEN 1 AND 31 THEN 'REGULAR'
+            WHEN DD_INC_MM_CLC_BLC=996 THEN '996_MULTIPLAS_CONTAS'
+            WHEN DD_INC_MM_CLC_BLC=997 THEN '997_SEM_CONTA_ELEGIVEL'
+            WHEN DD_INC_MM_CLC_BLC=999 THEN '999_SEM_CICLO'
+            ELSE 'OUTRO'
+        END AS STATUS_FINAL,
+        COUNT(*) AS QTD,
+        SUM(CASE WHEN DD_RECALC <> DD_INC_MM_CLC_BLC OR DD_RECALC IS NULL THEN 1 ELSE 0 END) AS DIVERGENCIA,
+        SUM(QT_CONTA_NUMERO_INVALIDO) AS CONTAS_NUMERO_INVALIDO,
+        SUM(QT_SEM_MATCH_CT_GRDR) AS CONTAS_SEM_MATCH_CT_GRDR
+    FROM vw_aud_ciclo_compara
+    GROUP BY 1
+    ORDER BY QTD DESC
+    """).collect()
+
+    subsecao("Causa e reconciliação do ciclo")
+    tabela_print(
+        ["Status final", "Clientes", "Divergência", "Conta número inválido", "Sem match CT_GRDR"],
+        [
+            [
+                r["STATUS_FINAL"], fmt_int(r["QTD"]), fmt_int(r["DIVERGENCIA"]),
+                fmt_int(r["CONTAS_NUMERO_INVALIDO"]), fmt_int(r["CONTAS_SEM_MATCH_CT_GRDR"])
+            ]
+            for r in ciclo
+        ],
+        ["E", "D", "D", "D", "D"],
+    )
+
+    div = sum(int(r["DIVERGENCIA"] or 0) for r in ciclo)
+    if div > 0:
+        registrar_achado(
+            "CICLO_RECALC_DIVERGE_FINAL",
+            "P0",
+            "ERRO_TECNICO",
+            "Público/Ciclo",
+            "Reprodução da regra de ciclo divergiu da coluna persistida.",
+            qtd_clientes=div,
+            recomendacao="Comparar versão do pipeline e filtros da origem.",
+        )
+
+    # Guarda para RDPR.
+    PUBLICO_AUDIT_CTX["df_cliente"] = df_cliente
+    PUBLICO_AUDIT_CTX["df_reduz"] = df_reduz
+    PUBLICO_AUDIT_CTX["df_ciclo_recalc"] = df_ciclo_recalc
+
+    return {
+        "df_cliente": df_cliente,
+        "df_reduz": df_reduz,
+        "df_ciclo_recalc": df_ciclo_recalc,
+        "status_cpf": status_cpf,
+        "ciclo": ciclo,
+    }
+
+
+RES_PUBLICO = executar_etapa("PILAR_2_PUBLICO_CPF_CICLO", pilar_publico_cpf_ciclo_db2)
+
+
+# ====================================================================================================
+# 9. PILAR 5 — RDPR: ÚLTIMA PARTIÇÃO x LOOKBACK
+# ====================================================================================================
+
+secao(9, "Pilar 5 — RDPR: cobertura real, partições e recuperação no lookback")
+
+def pilar_rdpr():
+    if not ATIVAR_RDPR_HIVE:
+        print("ATIVAR_RDPR_HIVE=False")
+        return None
+
+    if not spark.catalog.tableExists("hive_d1q.rdpr_pf"):
+        raise RuntimeError("Tabela hive_d1q.rdpr_pf não encontrada.")
+
+    # Metadados de partição usando apenas colunas de partição.
+    particoes = spark.sql(f"""
+    SELECT
+        tx_ctgr_mod,
+        dt_ref,
+        COUNT(*) AS QT_LINHAS
+    FROM hive_d1q.rdpr_pf
+    WHERE dt_ref <= DATE('{DATA_EXEA}')
+      AND dt_ref >= DATE_SUB(DATE('{DATA_EXEA}'), {RDPR_LOOKBACK_DIAS})
+      AND LOWER(TRIM(tx_ctgr_mod)) IN ('behaviour','bureau')
+    GROUP BY tx_ctgr_mod, dt_ref
+    ORDER BY tx_ctgr_mod, dt_ref DESC
+    """).collect()
+
+    if not particoes:
+        raise RuntimeError("Nenhuma partição behaviour/bureau localizada no lookback.")
+
+    # Mostra as 10 últimas por modelo.
+    por_modelo = {}
+    for r in particoes:
+        por_modelo.setdefault(str(r["tx_ctgr_mod"]).strip().lower(), []).append(r)
+
+    for modelo, arr in por_modelo.items():
+        subsecao(f"Últimas partições: {modelo}")
+        tabela_print(
+            ["DT_REF", "Linhas"],
+            [[r["dt_ref"], fmt_int(r["QT_LINHAS"])] for r in arr[:10]],
+            ["E", "D"],
+        )
+
+    latest_beh = max((r["dt_ref"] for r in particoes if str(r["tx_ctgr_mod"]).strip().lower()=="behaviour"), default=None)
+    latest_bur = max((r["dt_ref"] for r in particoes if str(r["tx_ctgr_mod"]).strip().lower()=="bureau"), default=None)
+
+    print("\nPartição latest behaviour:", latest_beh)
+    print("Partição latest bureau   :", latest_bur)
+
+    # Estatística da origem por partição latest.
+    stats_latest = spark.sql(f"""
+    SELECT
+        LOWER(TRIM(tx_ctgr_mod)) AS MODELO,
+        dt_ref,
+        COUNT(*) AS QT_REG,
+        APPROX_COUNT_DISTINCT(nr_cpf) AS QT_CPF_APROX,
+        SUM(CASE WHEN nr_cpf IS NULL THEN 1 ELSE 0 END) AS CPF_NULL,
+        SUM(CASE WHEN vl_rdpr IS NULL THEN 1 ELSE 0 END) AS RENDA_NULL,
+        SUM(CASE WHEN vl_rdpr < 0 THEN 1 ELSE 0 END) AS RENDA_NEG,
+        SUM(CASE WHEN cd_in_utzo <> -1 OR cd_in_utzo IS NULL THEN 1 ELSE 0 END) AS FORA_CD_IN_UTZO
+    FROM hive_d1q.rdpr_pf
+    WHERE (
+        (LOWER(TRIM(tx_ctgr_mod))='behaviour' AND dt_ref=DATE('{latest_beh}'))
+        OR
+        (LOWER(TRIM(tx_ctgr_mod))='bureau' AND dt_ref=DATE('{latest_bur}'))
+    )
+    GROUP BY LOWER(TRIM(tx_ctgr_mod)), dt_ref
+    ORDER BY MODELO
+    """).collect()
+
+    subsecao("Qualidade das partições latest")
+    tabela_print(
+        ["Modelo", "DT_REF", "Registros", "~CPFs", "CPF NULL", "Renda NULL", "Renda <0", "cd_in_utzo != -1"],
+        [
+            [
+                r["MODELO"], r["dt_ref"], fmt_int(r["QT_REG"]), fmt_int(r["QT_CPF_APROX"]),
+                fmt_int(r["CPF_NULL"]), fmt_int(r["RENDA_NULL"]), fmt_int(r["RENDA_NEG"]),
+                fmt_int(r["FORA_CD_IN_UTZO"])
+            ]
+            for r in stats_latest
+        ],
+        ["E", "E", "D", "D", "D", "D", "D", "D"],
+    )
+
+    if "df_cliente" not in PUBLICO_AUDIT_CTX:
+        print(
+            "\n[AVISO] Público/CPF não foi reconstruído. "
+            "Será impossível medir cobertura RDPR exata contra os clientes do Radar."
+        )
+        registrar_achado(
+            "RDPR_COBERTURA_PUBLICO_NAO_MEDIDA",
+            "P3",
+            "DIAGNOSTICO_INDISPONIVEL",
+            "HIVE_D1Q.RDPR_PF",
+            "Não houve mapa CD_CLI→CPF disponível nesta sessão.",
+            recomendacao="Executar ATIVAR_PUBLICO_CPF_CICLO_DB2=True.",
+        )
+        return {"particoes": particoes, "latest": stats_latest}
+
+    df_cliente = PUBLICO_AUDIT_CTX["df_cliente"]
+
+    # Somente CPF válido e único.
+    df_cpf = (
+        df_cliente
+        .where((F.col("CD_STS_CPF") == 0) & F.col("NR_CPF").isNotNull())
+        .select(
+            "CD_CLI",
+            F.col("NR_CPF").cast("decimal(11,0)").alias("NR_CPF")
+        )
+        .dropDuplicates(["CD_CLI"])
+        .persist(StorageLevel.MEMORY_AND_DISK)
+    )
+    df_cpf.createOrReplaceTempView("vw_aud_cpf_valido")
+    qt_cpf = df_cpf.count()
+    print("\nClientes com CPF válido reconstruído:", fmt_int(qt_cpf))
+
+    # Latest exact.
+    df_latest = spark.sql(f"""
+    SELECT
+        CAST(nr_cpf AS DECIMAL(11,0)) AS NR_CPF,
+        LOWER(TRIM(tx_ctgr_mod)) AS MODELO,
+        CAST(vl_rdpr AS DECIMAL(15,2)) AS VL_RDPR,
+        CAST(cd_in_utzo AS SMALLINT) AS CD_IN_UTZO,
+        dt_ref
+    FROM hive_d1q.rdpr_pf
+    WHERE cd_in_utzo=-1
+      AND (
+        (LOWER(TRIM(tx_ctgr_mod))='behaviour' AND dt_ref=DATE('{latest_beh}'))
+        OR
+        (LOWER(TRIM(tx_ctgr_mod))='bureau' AND dt_ref=DATE('{latest_bur}'))
+      )
+      AND nr_cpf IS NOT NULL
+    """)
+
+    # Consolida duplicidade por CPF/modelo.
+    df_latest_c = (
+        df_latest
+        .groupBy("NR_CPF", "MODELO")
+        .agg(
+            F.count("*").alias("QT_REG_MODELO"),
+            F.max("VL_RDPR").alias("VL_RDPR_MAX"),
+            F.min("VL_RDPR").alias("VL_RDPR_MIN"),
+            F.sum(F.when(F.col("VL_RDPR").isNull(),1).otherwise(0)).alias("QT_NULL"),
+            F.sum(F.when(F.col("VL_RDPR") < 0,1).otherwise(0)).alias("QT_NEG"),
+        )
+        .persist(StorageLevel.MEMORY_AND_DISK)
+    )
+    df_latest_c.createOrReplaceTempView("vw_aud_rdpr_latest_c")
+    df_latest_c.count()
+
+    # Pivot modelo.
+    df_piv = (
+        df_latest_c
+        .groupBy("NR_CPF")
+        .agg(
+            F.max(F.when(F.col("MODELO")=="behaviour", F.lit(1)).otherwise(F.lit(0))).alias("TEM_BEH"),
+            F.max(F.when(F.col("MODELO")=="bureau", F.lit(1)).otherwise(F.lit(0))).alias("TEM_BUR"),
+            F.max(F.when((F.col("MODELO")=="behaviour") & (F.col("QT_REG_MODELO")>1), 1).otherwise(0)).alias("DUP_BEH"),
+            F.max(F.when((F.col("MODELO")=="bureau") & (F.col("QT_REG_MODELO")>1), 1).otherwise(0)).alias("DUP_BUR"),
+            F.max(F.when((F.col("MODELO")=="behaviour") & (F.col("QT_NULL")>0), 1).otherwise(0)).alias("NULL_BEH"),
+            F.max(F.when((F.col("MODELO")=="bureau") & (F.col("QT_NULL")>0), 1).otherwise(0)).alias("NULL_BUR"),
+            F.max(F.when((F.col("MODELO")=="behaviour") & (F.col("QT_NEG")>0), 1).otherwise(0)).alias("NEG_BEH"),
+            F.max(F.when((F.col("MODELO")=="bureau") & (F.col("QT_NEG")>0), 1).otherwise(0)).alias("NEG_BUR"),
+        )
+    )
+
+    df_cov = df_cpf.join(df_piv, "NR_CPF", "left").fillna(0)
+    df_cov = df_cov.join(
+        df_base.select("CD_CLI", "VL_REN_PRES"),
+        "CD_CLI",
+        "left"
+    )
+
+    cov = df_cov.agg(
+        F.count("*").alias("BASE_CPF"),
+        F.sum(F.when(F.col("TEM_BEH")==1,1).otherwise(0)).alias("COM_BEH"),
+        F.sum(F.when(F.col("TEM_BUR")==1,1).otherwise(0)).alias("COM_BUR"),
+        F.sum(F.when((F.col("TEM_BEH")==0)&(F.col("TEM_BUR")==0),1).otherwise(0)).alias("SEM_AMBOS"),
+        F.sum(F.when((F.col("DUP_BEH")==1)|(F.col("DUP_BUR")==1),1).otherwise(0)).alias("DUP_MODELO"),
+        F.sum(F.when((F.col("NULL_BEH")==1)|(F.col("NULL_BUR")==1),1).otherwise(0)).alias("NULL_RENDA"),
+        F.sum(F.when((F.col("NEG_BEH")==1)|(F.col("NEG_BUR")==1),1).otherwise(0)).alias("NEG_RENDA"),
+        F.sum(F.when((F.col("VL_REN_PRES")==-1)&(F.col("TEM_BEH")==0)&(F.col("TEM_BUR")==0),1).otherwise(0)).alias("MENOS1_SEM_LATEST"),
+        F.sum(F.when((F.col("VL_REN_PRES")==-1)&((F.col("TEM_BEH")==1)|(F.col("TEM_BUR")==1)),1).otherwise(0)).alias("MENOS1_MAS_TEM_LATEST"),
+    ).first()
+
+    subsecao("Cobertura latest contra CPF público")
+    for k, v in cov.asDict().items():
+        print(f"  {k:<24}: {fmt_int(v)}")
+
+    if cov["MENOS1_MAS_TEM_LATEST"] > 0:
+        registrar_achado(
+            "RDPR_MENOS1_APESAR_MODELO_LATEST",
+            "P0",
+            "ERRO_TECNICO",
+            "HIVE_D1Q.RDPR_PF",
+            "Cliente terminou -1 apesar de possuir Behaviour/Bureau na partição latest usada pelo estudo.",
+            qtd_clientes=int(cov["MENOS1_MAS_TEM_LATEST"]),
+            recomendacao="Comparar regras de duplicidade/null/negativo e prioridade Behaviour.",
+        )
+
+    # Lookback: responde se latest é snapshot ou incremental.
+    data_lb = DATA_EXEA - datetime.timedelta(days=RDPR_LOOKBACK_DIAS)
+
+    df_lb = spark.sql(f"""
+    SELECT
+        CAST(nr_cpf AS DECIMAL(11,0)) AS NR_CPF,
+        LOWER(TRIM(tx_ctgr_mod)) AS MODELO,
+        CAST(vl_rdpr AS DECIMAL(15,2)) AS VL_RDPR,
+        CAST(cd_in_utzo AS SMALLINT) AS CD_IN_UTZO,
+        dt_ref
+    FROM hive_d1q.rdpr_pf
+    WHERE dt_ref >= DATE('{data_lb}')
+      AND dt_ref <= DATE('{DATA_EXEA}')
+      AND LOWER(TRIM(tx_ctgr_mod)) IN ('behaviour','bureau')
+      AND cd_in_utzo=-1
+      AND nr_cpf IS NOT NULL
+    """)
+
+    # Reduz antes do join: última data disponível por CPF/modelo no lookback.
+    w = Window.partitionBy("NR_CPF", "MODELO").orderBy(F.col("dt_ref").desc())
+    df_lb_ult = (
+        df_lb
+        .withColumn("_rn", F.row_number().over(w))
+        .where(F.col("_rn")==1)
+        .select("NR_CPF", "MODELO", "dt_ref", "VL_RDPR")
+    )
+
+    df_lb_piv = (
+        df_lb_ult
+        .groupBy("NR_CPF")
+        .agg(
+            F.max(F.when(F.col("MODELO")=="behaviour",1).otherwise(0)).alias("TEM_BEH_LB"),
+            F.max(F.when(F.col("MODELO")=="bureau",1).otherwise(0)).alias("TEM_BUR_LB"),
+            F.max("dt_ref").alias("DT_ULT_MODELO_LB"),
+        )
+    )
+
+    df_lb_cov = (
+        df_cpf
+        .join(df_lb_piv, "NR_CPF", "left")
+        .fillna(0, subset=["TEM_BEH_LB","TEM_BUR_LB"])
+        .join(df_base.select("CD_CLI","VL_REN_PRES"), "CD_CLI", "left")
+    )
+
+    lb = df_lb_cov.agg(
+        F.count("*").alias("BASE_CPF"),
+        F.sum(F.when((F.col("TEM_BEH_LB")==1)|(F.col("TEM_BUR_LB")==1),1).otherwise(0)).alias("COM_MODELO_LOOKBACK"),
+        F.sum(F.when((F.col("VL_REN_PRES")==-1)&((F.col("TEM_BEH_LB")==1)|(F.col("TEM_BUR_LB")==1)),1).otherwise(0)).alias("MENOS1_RECUPERAVEL_LOOKBACK"),
+        F.sum(F.when((F.col("VL_REN_PRES")==-1)&(F.col("TEM_BEH_LB")==0)&(F.col("TEM_BUR_LB")==0),1).otherwise(0)).alias("MENOS1_SEM_MODELO_LOOKBACK"),
+    ).first()
+
+    subsecao(f"Cobertura acumulada no lookback de {RDPR_LOOKBACK_DIAS} dias")
+    for k, v in lb.asDict().items():
+        print(f"  {k:<30}: {fmt_int(v)}")
+
+    if lb["MENOS1_RECUPERAVEL_LOOKBACK"] > 0:
+        registrar_achado(
+            "RDPR_MODELO_EXISTE_EM_PARTICAO_ANTERIOR",
+            "P1",
+            "COBERTURA_AUSENTE",
+            "HIVE_D1Q.RDPR_PF",
+            "Clientes com -1 possuem modelo em partição anterior do lookback, indicando possível natureza incremental das partições.",
+            qtd_clientes=int(lb["MENOS1_RECUPERAVEL_LOOKBACK"]),
+            recomendacao="Avaliar selecionar último registro por CPF em vez de apenas MAX(DT_REF) global.",
+        )
+
+    # Cleanup local.
+    df_cpf.unpersist()
+    df_latest_c.unpersist()
+
+    return {
+        "particoes": particoes,
+        "stats_latest": stats_latest,
+        "coverage_latest": cov,
+        "coverage_lookback": lb,
+    }
+
+
+RES_RDPR = executar_etapa("PILAR_5_RDPR", pilar_rdpr)
+
+
+# ====================================================================================================
+# 10. PILAR 6/7 — TRANSAÇÕES: PERDA SILENCIOSA, NÃO MAPEADAS, NULL, MOEDA, VALOR
+# ====================================================================================================
+
+secao(10, "Pilar 6/7 — Transações: mapa, perdas silenciosas, nulls, valores e moedas")
+
+def pilar_transacoes_db2():
+    if not ATIVAR_TRANSACOES_DB2:
+        print("ATIVAR_TRANSACOES_DB2=False")
+        return None
+    if CON_DB2 is None:
+        raise RuntimeError("Conector DB2 indisponível.")
+
+    # IMPORTANTE:
+    # Este diagnóstico é por ENVELOPE GLOBAL da competência, não por janela individual do cliente.
+    # Fazemos isso deliberadamente para evitar reproduzir o ETL inteiro só para descobrir categorias problemáticas.
+    # Os totais desta seção NÃO devem ser comparados 1:1 com VL_TRANS_* da tabela final.
+    print(
+        "ESCOPO: origem transacional no envelope global",
+        DATA_REF_MIN, "a", DATA_REF_MAX,
+        "(não restrito à janela individual de cada CD_CLI)."
+    )
+
+    dfs = []
+    for ptc_min, ptc_max, rotulo in FAIXAS_PTC:
+        sql = f"""
+        SELECT
+            VARCHAR(TRIM(CD_NTZ_CTB_TRAN), 10) AS CD_NTZ_CTB_TRAN,
+            INTEGER(CD_CTGR_TRAN_OGNL) AS CD_CTGR_TRAN_OGNL,
+            VARCHAR(TRIM(CD_TIP_MOE_CRR), 20) AS CD_TIP_MOE_CRR,
+            BIGINT(COUNT(*)) AS QT_TRANS,
+            BIGINT(SUM(CASE WHEN VL_TRAN IS NULL THEN 1 ELSE 0 END)) AS QT_VL_NULL,
+            BIGINT(SUM(CASE WHEN VL_TRAN < 0 THEN 1 ELSE 0 END)) AS QT_VL_NEG,
+            BIGINT(SUM(CASE WHEN VL_TRAN = 0 THEN 1 ELSE 0 END)) AS QT_VL_ZERO,
+            DECIMAL(SUM(COALESCE(VL_TRAN,0)), 31, 2) AS VL_LIQ,
+            DECIMAL(SUM(ABS(COALESCE(VL_TRAN,0))), 31, 2) AS VL_ABS,
+            DECIMAL(MIN(VL_TRAN), 31, 2) AS VL_MIN,
+            DECIMAL(MAX(VL_TRAN), 31, 2) AS VL_MAX
+        FROM DB2GFP.TRAN_RLZD_INST_PCT
+        WHERE NR_PTC BETWEEN {ptc_min} AND {ptc_max}
+          AND CD_EST_TRAN_INST = 0
+          AND CD_TIP_PSS = 1
+          AND DT_TRAN >= DATE('{DATA_REF_MIN}')
+          AND DT_TRAN <= DATE('{DATA_REF_MAX}')
+        GROUP BY
+            CD_NTZ_CTB_TRAN,
+            CD_CTGR_TRAN_OGNL,
+            CD_TIP_MOE_CRR
+        """
+
+        d = CON_DB2.sql(sql, fetchsize=10_000, query_timeout=15*60)
+        dfs.append(d)
+
+    df_src = dfs[0]
+    for d in dfs[1:]:
+        df_src = df_src.unionByName(d)
+
+    # Consolida os 4 blocos.
+    df_src = (
+        df_src
+        .groupBy("CD_NTZ_CTB_TRAN", "CD_CTGR_TRAN_OGNL", "CD_TIP_MOE_CRR")
+        .agg(
+            F.sum("QT_TRANS").alias("QT_TRANS"),
+            F.sum("QT_VL_NULL").alias("QT_VL_NULL"),
+            F.sum("QT_VL_NEG").alias("QT_VL_NEG"),
+            F.sum("QT_VL_ZERO").alias("QT_VL_ZERO"),
+            F.sum("VL_LIQ").alias("VL_LIQ"),
+            F.sum("VL_ABS").alias("VL_ABS"),
+            F.min("VL_MIN").alias("VL_MIN"),
+            F.max("VL_MAX").alias("VL_MAX"),
+        )
+    )
+
+    df_diag = (
+        df_src.alias("t")
+        .join(
+            df_mapa_radar.alias("m"),
+            (F.trim(F.col("t.CD_NTZ_CTB_TRAN")) == F.col("m.CD_NTZ_CTB_TRAN"))
+            & (F.col("t.CD_CTGR_TRAN_OGNL") == F.col("m.CD_CTGR_TRAN_OGNL")),
+            "left"
+        )
+        .withColumn(
+            "STATUS_MAPA",
+            F.when(
+                ~F.coalesce(F.trim(F.col("t.CD_NTZ_CTB_TRAN")), F.lit("")).isin("C","D"),
+                F.lit("NATUREZA_INVALIDA")
+            )
+            .when(F.col("m.CD_CTGR_TRAN_OGNL").isNull(), F.lit("NAO_MAPEADA"))
+            .when(F.col("m.IN_PARTICIPA") == 0, F.lit("MAPEADA_NAO_PARTICIPA"))
+            .otherwise(F.lit("MAPEADA_PARTICIPA"))
+        )
+        .persist(StorageLevel.MEMORY_AND_DISK)
+    )
+    df_diag.count()
+
+    resumo = (
+        df_diag
+        .groupBy("STATUS_MAPA")
+        .agg(
+            F.sum("QT_TRANS").alias("QT_TRANS"),
+            F.sum("VL_ABS").alias("VL_ABS"),
+            F.sum("QT_VL_NULL").alias("QT_VL_NULL"),
+            F.sum("QT_VL_NEG").alias("QT_VL_NEG"),
+            F.sum("QT_VL_ZERO").alias("QT_VL_ZERO"),
+        )
+        .orderBy(F.desc("QT_TRANS"))
+        .collect()
+    )
+
+    subsecao("Resumo de mapeamento no envelope global")
+    tabela_print(
+        ["Status", "Transações", "Valor absoluto", "VL NULL", "VL <0", "VL=0"],
+        [
+            [
+                r["STATUS_MAPA"], fmt_int(r["QT_TRANS"]), fmt_money(r["VL_ABS"]),
+                fmt_int(r["QT_VL_NULL"]), fmt_int(r["QT_VL_NEG"]), fmt_int(r["QT_VL_ZERO"])
+            ]
+            for r in resumo
+        ],
+        ["E", "D", "D", "D", "D", "D"],
+    )
+
+    top_nao = (
+        df_diag
+        .where(F.col("STATUS_MAPA")=="NAO_MAPEADA")
+        .groupBy("CD_NTZ_CTB_TRAN", "CD_CTGR_TRAN_OGNL")
+        .agg(
+            F.sum("QT_TRANS").alias("QT_TRANS"),
+            F.sum("VL_ABS").alias("VL_ABS"),
+            F.min("VL_MIN").alias("VL_MIN"),
+            F.max("VL_MAX").alias("VL_MAX"),
+        )
+        .orderBy(F.desc("QT_TRANS"))
+        .limit(TOP_N)
+        .collect()
+    )
+
+    subsecao(f"Top {TOP_N} categorias/naturezas NÃO MAPEADAS")
+    tabela_print(
+        ["Natureza", "Categoria", "Transações", "Valor abs", "Mínimo", "Máximo"],
+        [
+            [
+                r["CD_NTZ_CTB_TRAN"], r["CD_CTGR_TRAN_OGNL"], fmt_int(r["QT_TRANS"]),
+                fmt_money(r["VL_ABS"]), fmt_money(r["VL_MIN"]), fmt_money(r["VL_MAX"])
+            ]
+            for r in top_nao
+        ],
+        ["E", "D", "D", "D", "D", "D"],
+    )
+
+    top_nao_part = (
+        df_diag
+        .where(F.col("STATUS_MAPA")=="MAPEADA_NAO_PARTICIPA")
+        .groupBy(
+            "CD_NTZ_CTB_TRAN", "CD_CTGR_TRAN_OGNL",
+            "TX_CATEGORIA_RADAR", "TX_CLASS_RADAR"
+        )
+        .agg(
+            F.sum("QT_TRANS").alias("QT_TRANS"),
+            F.sum("VL_ABS").alias("VL_ABS")
+        )
+        .orderBy(F.desc("QT_TRANS"))
+        .limit(TOP_N)
+        .collect()
+    )
+
+    subsecao(f"Top {TOP_N} categorias MAPEADAS mas NÃO PARTICIPANTES")
+    tabela_print(
+        ["Nat", "Categoria", "Descrição Radar", "Classe", "Transações", "Valor abs excluído"],
+        [
+            [
+                r["CD_NTZ_CTB_TRAN"], r["CD_CTGR_TRAN_OGNL"],
+                r["TX_CATEGORIA_RADAR"], r["TX_CLASS_RADAR"],
+                fmt_int(r["QT_TRANS"]), fmt_money(r["VL_ABS"])
+            ]
+            for r in top_nao_part
+        ],
+        ["E", "D", "E", "E", "D", "D"],
+        max_width=42,
+    )
+
+    moeda = (
+        df_src
+        .groupBy("CD_TIP_MOE_CRR")
+        .agg(
+            F.sum("QT_TRANS").alias("QT_TRANS"),
+            F.sum("VL_ABS").alias("VL_ABS")
+        )
+        .orderBy(F.desc("QT_TRANS"))
+        .limit(TOP_N)
+        .collect()
+    )
+
+    subsecao("Moedas na origem — atenção ao NULL/blank")
+    tabela_print(
+        ["Moeda", "Transações", "Valor abs"],
+        [[r["CD_TIP_MOE_CRR"], fmt_int(r["QT_TRANS"]), fmt_money(r["VL_ABS"])] for r in moeda],
+        ["E", "D", "D"],
+    )
+
+    # Métricas para scorecard.
+    m = {r["STATUS_MAPA"]: r for r in resumo}
+    qt_nao = int(m.get("NAO_MAPEADA", {}).get("QT_TRANS", 0) or 0) if isinstance(m.get("NAO_MAPEADA"), dict) else 0
+    # Row não é dict em algumas versões; extrai explicitamente:
+    qt_nao = 0
+    vl_nao = Decimal("0")
+    qt_inv = 0
+    qt_nao_part = 0
+    vl_nao_part = Decimal("0")
+    for r in resumo:
+        st = r["STATUS_MAPA"]
+        if st == "NAO_MAPEADA":
+            qt_nao = int(r["QT_TRANS"] or 0)
+            vl_nao = r["VL_ABS"] or Decimal("0")
+        elif st == "NATUREZA_INVALIDA":
+            qt_inv = int(r["QT_TRANS"] or 0)
+        elif st == "MAPEADA_NAO_PARTICIPA":
+            qt_nao_part = int(r["QT_TRANS"] or 0)
+            vl_nao_part = r["VL_ABS"] or Decimal("0")
+
+    if qt_nao > 0:
+        registrar_achado(
+            "TRANSACAO_CATEGORIA_NAO_MAPEADA",
+            "P1",
+            "DEPARA_AUSENTE",
+            "DB2GFP.TRAN_RLZD_INST_PCT",
+            "Transações do envelope global não encontram o par natureza+categoria no mapa executável.",
+            qtd_registros=qt_nao,
+            valor_impactado=float(vl_nao),
+            recomendacao="Priorizar categorias pelo volume e valor e completar de-para.",
+        )
+
+    if qt_inv > 0:
+        registrar_achado(
+            "TRANSACAO_NATUREZA_INVALIDA",
+            "P0",
+            "DADO_ORIGEM_INVALIDO",
+            "DB2GFP.TRAN_RLZD_INST_PCT",
+            "Natureza contábil diferente de C/D na origem do envelope.",
+            qtd_registros=qt_inv,
+            recomendacao="Validar contrato de CD_NTZ_CTB_TRAN.",
+        )
+
+    if qt_nao_part > 0:
+        registrar_achado(
+            "TRANSACAO_MAPEADA_NAO_PARTICIPA",
+            "P2",
+            "REGRA_NEGOCIO_DISCUSSIVEL",
+            "Mapa V15",
+            "Transações são reconhecidas pelo mapa, mas deliberadamente excluídas do valor financeiro Radar.",
+            qtd_registros=qt_nao_part,
+            valor_impactado=float(vl_nao_part),
+            recomendacao="Validar se exclusões como Agro/Fatura continuam corretas.",
+        )
+
+    # Moeda NULL/blank é tratada como não-BRL pela V15.
+    qt_moeda_vazia = sum(
+        int(r["QT_TRANS"] or 0)
+        for r in moeda
+        if r["CD_TIP_MOE_CRR"] is None or str(r["CD_TIP_MOE_CRR"]).strip()==""
+    )
+    if qt_moeda_vazia > 0:
+        registrar_achado(
+            "MOEDA_NULL_OU_VAZIA",
+            "P1",
+            "DADO_ORIGEM_INVALIDO",
+            "DB2GFP.TRAN_RLZD_INST_PCT",
+            "Moeda NULL/vazia existe; a V15 a trata como diferente de BRL e marca multimoeda.",
+            qtd_registros=qt_moeda_vazia,
+            recomendacao="Separar moeda ausente de moeda estrangeira.",
+        )
+
+    df_diag.unpersist()
+
+    return {
+        "resumo": resumo,
+        "top_nao": top_nao,
+        "top_nao_part": top_nao_part,
+        "moeda": moeda,
+    }
+
+
+RES_TRANS = executar_etapa("PILAR_6_7_TRANSACOES_DB2", pilar_transacoes_db2)
+
+
+# ====================================================================================================
+# 11. ESTADOS CONTRAINTUITIVOS — EXEMPLOS AGREGADOS, SEM CLIENTE INDIVIDUAL
+# ====================================================================================================
+
+secao(11, "Estados contraintuitivos — quantificação e extremos")
+
+def pilar_contraintuitivos():
+    r = spark.sql(f"""
+    SELECT
+        COUNT(*) AS BASE,
+
+        SUM(CASE WHEN QT_TRANS_TOTAL > 0 AND VL_ENT_TOTAL=0 AND VL_SAI_TOTAL>0 THEN 1 ELSE 0 END) AS Q_ENT0_SAIPOS,
+        SUM(CASE WHEN QT_TRANS_TOTAL > 0 AND VL_ENT_TOTAL=0 AND VL_SAI_TOTAL>0 AND CD_FAIXA_ORC=4 THEN 1 ELSE 0 END) AS Q_ENT0_SUPER,
+        MIN(CASE WHEN QT_TRANS_TOTAL > 0 AND VL_ENT_TOTAL=0 AND VL_SAI_TOTAL>0 THEN VL_RES_ORC END) AS PIOR_RESULTADO_ENT0,
+        MAX(CASE WHEN QT_TRANS_TOTAL > 0 AND VL_ENT_TOTAL=0 AND VL_SAI_TOTAL>0 THEN VL_SAI_TOTAL END) AS MAIOR_SAIDA_ENT0,
+
+        SUM(CASE WHEN QT_TRANS_TOTAL > 0 AND VL_ENT_TOTAL=0 AND VL_SAI_TOTAL=0 THEN 1 ELSE 0 END) AS Q_MOV_SEM_VALOR,
+
+        SUM(CASE WHEN VL_REN_PRES <= 0 AND CD_TEMA_VENCEDOR IS NOT NULL THEN 1 ELSE 0 END) AS Q_SEM_RENDA_COM_VENCEDOR,
+
+        SUM(CASE WHEN NM_PRFL_FIN='CODIGO NAO MAPEADO' THEN 1 ELSE 0 END) AS Q_PERFIL_NAO_MAP,
+
+        SUM(CASE WHEN DD_INC_MM_CLC_BLC IN (996,997,999) THEN 1 ELSE 0 END) AS Q_CICLO_FALLBACK,
+
+        SUM(CASE WHEN FL_MULT_MOE='S' THEN 1 ELSE 0 END) AS Q_MULT_MOE,
+        SUM(CASE WHEN FL_TEM_MOV_AGRO='S' THEN 1 ELSE 0 END) AS Q_AGRO
+
+    FROM {VIEW_BASE}
+    """).first()
+
+    linhas = [
+        ["Entrada=0 e Saída>0", r["Q_ENT0_SAIPOS"], fmt_pct(r["Q_ENT0_SAIPOS"]/TOTAL_BASE), "P0"],
+        ["Entrada=0 classificado Superavitário", r["Q_ENT0_SUPER"], fmt_pct(r["Q_ENT0_SUPER"]/TOTAL_BASE), "P0"],
+        ["Movimento sem valor participante", r["Q_MOV_SEM_VALOR"], fmt_pct(r["Q_MOV_SEM_VALOR"]/TOTAL_BASE), "P1"],
+        ["Renda<=0 com vencedor", r["Q_SEM_RENDA_COM_VENCEDOR"], fmt_pct(r["Q_SEM_RENDA_COM_VENCEDOR"]/TOTAL_BASE), "P1"],
+        ["Perfil não mapeado", r["Q_PERFIL_NAO_MAP"], fmt_pct(r["Q_PERFIL_NAO_MAP"]/TOTAL_BASE), "P1"],
+        ["Ciclo fallback 996/997/999", r["Q_CICLO_FALLBACK"], fmt_pct(r["Q_CICLO_FALLBACK"]/TOTAL_BASE), "P2"],
+        ["Multimoeda", r["Q_MULT_MOE"], fmt_pct(r["Q_MULT_MOE"]/TOTAL_BASE), "INFO"],
+        ["Agro", r["Q_AGRO"], fmt_pct(r["Q_AGRO"]/TOTAL_BASE), "INFO"],
+    ]
+
+    tabela_print(
+        ["Condição", "Clientes", "% Base", "Prioridade"],
+        [[x[0], fmt_int(x[1]), x[2], x[3]] for x in linhas],
+        ["E", "D", "D", "E"],
+    )
+
+    print("\nPior resultado com entrada zero :", fmt_money(r["PIOR_RESULTADO_ENT0"]))
+    print("Maior saída com entrada zero    :", fmt_money(r["MAIOR_SAIDA_ENT0"]))
+
+    return r
+
+
+RES_CONTRA = executar_etapa("CONTRAINTUITIVOS", pilar_contraintuitivos)
+
+
+# ====================================================================================================
+# 12. SCORECARD FINAL DE SEVERIDADE
+# ====================================================================================================
+
+secao(12, "Scorecard final — problemas catalogados e priorizados")
+
+ordem_sev = {"P0": 0, "P1": 1, "P2": 2, "P3": 3}
+
+achados_ordenados = sorted(
+    achados,
+    key=lambda x: (
+        ordem_sev.get(x["SEV"], 9),
+        -(x["CLIENTES"] or 0),
+        -(x["REGISTROS"] or 0),
+        x["CODIGO"],
+    )
+)
+
+tabela_print(
+    ["Sev", "Código", "Tipo", "Origem", "Clientes", "Registros", "Valor impactado", "Descrição"],
+    [
+        [
+            a["SEV"], a["CODIGO"], a["TIPO"], a["ORIGEM"],
+            fmt_int(a["CLIENTES"]) if a["CLIENTES"] is not None else "-",
+            fmt_int(a["REGISTROS"]) if a["REGISTROS"] is not None else "-",
+            fmt_money(a["VALOR"]) if a["VALOR"] is not None else "-",
+            a["DESCRICAO"],
+        ]
+        for a in achados_ordenados
+    ],
+    ["E", "E", "E", "E", "D", "D", "D", "E"],
+    max_width=42,
+)
+
+subsecao("Recomendações por achado")
+for a in achados_ordenados:
+    print(f"[{a['SEV']}] {a['CODIGO']}")
+    print("  Origem       :", a["ORIGEM"])
+    print("  Tipo         :", a["TIPO"])
+    print("  Recomendação :", a["RECOMENDACAO"])
+    print()
+
+
+# ====================================================================================================
+# 13. STATUS DAS ETAPAS / FALHAS DE DIAGNÓSTICO
+# ====================================================================================================
+
+secao(13, "Status de execução das etapas")
+
+tabela_print(
+    ["Etapa", "Status", "Duração (s)", "Erro"],
+    [
+        [nome, status, f"{dur:.2f}", erro]
+        for nome, status, dur, erro in etapas
+    ],
+    ["E", "E", "D", "E"],
+    max_width=55,
+)
+
+if falhas_execucao:
+    print("\nATENÇÃO: algumas fontes/etapas não puderam ser auditadas:")
+    for nome, erro in falhas_execucao:
+        print("  -", nome, "=>", erro)
+        registrar_achado(
+            f"DIAG_INDISPONIVEL_{nome}",
+            "P3",
+            "DIAGNOSTICO_INDISPONIVEL",
+            nome,
+            "A etapa falhou e não produziu diagnóstico.",
+            recomendacao="Reexecutar apenas a etapa após corrigir acesso/sintaxe da fonte.",
+        )
+else:
+    print("\nTodas as etapas habilitadas concluíram sem falha de execução.")
+
+
+# ====================================================================================================
+# 14. RESUMO EXECUTIVO FINAL
+# ====================================================================================================
+
+secao(14, "Resumo executivo final")
+
+q_p0 = sum(1 for a in achados if a["SEV"] == "P0")
+q_p1 = sum(1 for a in achados if a["SEV"] == "P1")
+q_p2 = sum(1 for a in achados if a["SEV"] == "P2")
+q_p3 = sum(1 for a in achados if a["SEV"] == "P3")
+
+print("Tabela                  :", TABELA_ALVO)
+print("Competência             :", COMPETENCIA)
+print("Clientes                :", fmt_int(TOTAL_BASE))
+print("Achados P0              :", q_p0)
+print("Achados P1              :", q_p1)
+print("Achados P2              :", q_p2)
+print("Achados P3              :", q_p3)
+print("Falhas de diagnóstico   :", len(falhas_execucao))
+print("Tempo total estudo (s)  :", round(time.time() - inicio_total, 2))
+
+print("\nINTERPRETAÇÃO:")
+print("  P0 > 0 : existem regras/erros que podem produzir resultado de negócio incorreto.")
+print("  P1 > 0 : existem perdas relevantes de cobertura, de-para ou qualidade.")
+print("  P2 > 0 : existem fallbacks/exclusões que precisam de validação de negócio.")
+print("  P3     : itens informativos, esperados ou diagnósticos indisponíveis.")
+
+print("\nPRIORIDADE SUGERIDA DE LEITURA DO OUTPUT:")
+print("  1. Scorecard P0/P1")
+print("  2. Perfil CD_MIC=9 e nomes da origem")
+print("  3. RDPR latest x lookback")
+print("  4. Categorias oficiais sem mapa + transações não mapeadas")
+print("  5. Entrada zero / saída positiva")
+print("  6. Causas 996/997/999")
+print("  7. Matriz das 72 colunas")
+
+
+# ====================================================================================================
+# 15. CLEANUP
+# ====================================================================================================
+
+for nome_df in ["df_base"]:
+    try:
+        obj = globals().get(nome_df)
+        if obj is not None:
+            obj.unpersist()
+    except Exception:
+        pass
+
+for chave in ["df_cliente", "df_reduz", "df_ciclo_recalc"]:
+    try:
+        obj = PUBLICO_AUDIT_CTX.get(chave)
+        if obj is not None:
+            obj.unpersist()
+    except Exception:
+        pass
+
+print("\n" + linha("="))
+print(" FIM — AUDITORIA FINAL DE ERROS DO RADAR")
+print(" Envie TODO o output desta célula para a próxima avaliação.")
+print(linha("="))
+
