@@ -1,0 +1,1613 @@
+%%spark
+
+# ====================================================================================================
+# ESTUDO FINAL V15 — RAIO-X GLOBAL + AUDITORIA INDEPENDENTE DE REGRAS + CLIENTE REPRESENTATIVO
+# Tabela: sbx_t2i2016.ana_edu_fin_cli
+#
+# ESCOPO:
+#   - Somente leitura Spark/Hive.
+#   - Não altera spark.conf.
+#   - Não grava nem altera a tabela.
+#   - Trabalha por competência para não confundir histórico com duplicidade de chave.
+#   - Recalcula independentemente as regras derivadas da V15.
+#   - Quantifica casos críticos/contraintuitivos.
+#   - Seleciona automaticamente clientes ricos para auditoria individual.
+#
+# IMPORTANTE:
+#   PC_REF_IND/ESS/NAO_ESS/FUT/OBR são REFERÊNCIAS INTERNAS DO RADAR implementadas na V15.
+#   Este estudo não as denomina "metas oficiais de mercado".
+# ====================================================================================================
+
+import datetime
+from decimal import Decimal
+
+from pyspark import StorageLevel
+from pyspark.sql import functions as F
+
+
+# ====================================================================================================
+# 0. PARÂMETROS
+# ====================================================================================================
+
+TABELA_ALVO = "sbx_t2i2016.ana_edu_fin_cli"
+COMPETENCIA = "2026-08-01"
+
+VIEW_BASE = "vw_estudo_final_radar"
+VIEW_RECALC = "vw_estudo_final_radar_recalc"
+
+
+# ====================================================================================================
+# 0.1 HELPERS DE APRESENTAÇÃO
+# ====================================================================================================
+
+def linha_div(char="=", tam=126):
+    return char * tam
+
+
+def titulo_secao(num, titulo):
+    print("\n" + linha_div("="))
+    print(f" [{num:02d}] {titulo.upper()}")
+    print(linha_div("="))
+
+
+def subtitulo(titulo):
+    print("\n" + linha_div("-"))
+    print(" " + titulo)
+    print(linha_div("-"))
+
+
+def format_num(val):
+    if val is None:
+        return "-"
+    try:
+        return f"{int(val):,}".replace(",", ".")
+    except Exception:
+        return str(val)
+
+
+def format_moeda(val):
+    if val is None:
+        return "-"
+    try:
+        v = float(val)
+        return f"R$ {v:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    except Exception:
+        return str(val)
+
+
+def format_pct(val):
+    if val is None:
+        return "-"
+    try:
+        return f"{float(val) * 100:.2f}%".replace(".", ",")
+    except Exception:
+        return str(val)
+
+
+def format_decimal(val, casas=6):
+    if val is None:
+        return "-"
+    try:
+        return f"{float(val):.{casas}f}".replace(".", ",")
+    except Exception:
+        return str(val)
+
+
+def exibir_tabela_formatada(colunas, linhas, alinhamentos=None):
+    if not linhas:
+        print("  (Nenhum dado encontrado)")
+        return
+
+    linhas_txt = []
+    for lin in linhas:
+        linhas_txt.append(["-" if v is None else str(v) for v in lin])
+
+    larguras = [len(str(c)) for c in colunas]
+    for lin in linhas_txt:
+        for i, val in enumerate(lin):
+            larguras[i] = max(larguras[i], len(val))
+
+    if alinhamentos is None:
+        alinhamentos = ["E"] * len(colunas)
+
+    header = " | ".join(
+        f"{str(c):<{larguras[i]}}" if alinhamentos[i] == "E"
+        else f"{str(c):>{larguras[i]}}"
+        for i, c in enumerate(colunas)
+    )
+    print("  " + header)
+    print("  " + "-+-".join("-" * w for w in larguras))
+
+    for lin in linhas_txt:
+        texto = " | ".join(
+            f"{lin[i]:<{larguras[i]}}" if alinhamentos[i] == "E"
+            else f"{lin[i]:>{larguras[i]}}"
+            for i in range(len(colunas))
+        )
+        print("  " + texto)
+
+
+def imprimir_dict_vertical(titulo, dados, ordem=None):
+    subtitulo(titulo)
+    if ordem is None:
+        ordem = list(dados.keys())
+    largura = max(len(str(k)) for k in ordem) if ordem else 1
+    for k in ordem:
+        print(f"  {k:<{largura}} : {dados.get(k)}")
+
+
+inicio_estudo = datetime.datetime.now()
+
+print("\n" + linha_div("="))
+print(" ESTUDO FINAL V15 — RADAR FINANCEIRO")
+print(linha_div("="))
+print(" Tabela      :", TABELA_ALVO)
+print(" Competência :", COMPETENCIA)
+print(" Início      :", inicio_estudo)
+
+
+# ====================================================================================================
+# 1. CARGA DA COMPETÊNCIA E CONTRATO FÍSICO
+# ====================================================================================================
+
+titulo_secao(1, "Carga da competência e contrato físico")
+
+if not spark.catalog.tableExists(TABELA_ALVO):
+    raise RuntimeError(f"Tabela não encontrada: {TABELA_ALVO}")
+
+spark.catalog.refreshTable(TABELA_ALVO)
+
+df_tabela = spark.table(TABELA_ALVO)
+
+print("  Colunas físicas da tabela:", len(df_tabela.columns))
+print("  Partições Spark da leitura:", df_tabela.rdd.getNumPartitions())
+
+if len(df_tabela.columns) != 72:
+    print("  [ATENÇÃO] A V15 possui contrato esperado de 72 colunas físicas.")
+
+competencias = [
+    str(r["DT_MES_EXEA"])
+    for r in spark.sql(
+        f"SELECT DISTINCT DT_MES_EXEA FROM {TABELA_ALVO} ORDER BY DT_MES_EXEA"
+    ).collect()
+]
+print("  Competências encontradas :", competencias)
+
+if COMPETENCIA not in competencias:
+    raise RuntimeError(
+        f"Competência {COMPETENCIA} não encontrada em {TABELA_ALVO}. "
+        f"Disponíveis: {competencias}"
+    )
+
+df_base = (
+    df_tabela
+    .where(F.col("DT_MES_EXEA") == F.to_date(F.lit(COMPETENCIA)))
+    .persist(StorageLevel.MEMORY_AND_DISK)
+)
+
+df_base.createOrReplaceTempView(VIEW_BASE)
+total_linhas = df_base.count()
+
+print("  Linhas materializadas da competência:", format_num(total_linhas))
+print("  Storage level:", df_base.storageLevel)
+
+if total_linhas == 0:
+    df_base.unpersist()
+    raise RuntimeError("Competência sem registros.")
+
+print("\nSCHEMA FÍSICO:")
+df_base.printSchema()
+
+
+# ====================================================================================================
+# 2. VISÃO GERAL — CHAVE, DATAS, JANELA E MOVIMENTO
+# ====================================================================================================
+
+titulo_secao(2, "Visão geral, chave, datas, janela e movimento")
+
+geral = spark.sql(f"""
+SELECT
+    COUNT(*) AS TOTAL_REGISTROS,
+    COUNT(DISTINCT CD_CLI) AS CLIENTES_DISTINTOS,
+    COUNT(*) - COUNT(DISTINCT CD_CLI) AS DUPLICIDADES_CD_CLI,
+
+    SUM(CASE WHEN CD_CLI IS NULL THEN 1 ELSE 0 END) AS CD_CLI_NULO,
+
+    MIN(DT_EXEA) AS MIN_DT_EXEA,
+    MAX(DT_EXEA) AS MAX_DT_EXEA,
+    MIN(DT_MES_EXEA) AS MIN_DT_MES_EXEA,
+    MAX(DT_MES_EXEA) AS MAX_DT_MES_EXEA,
+
+    MIN(DT_REF_INI) AS MIN_DT_REF_INI,
+    MAX(DT_REF_INI) AS MAX_DT_REF_INI,
+    MIN(DT_REF_FIM) AS MIN_DT_REF_FIM,
+    MAX(DT_REF_FIM) AS MAX_DT_REF_FIM,
+
+    MIN(DATEDIFF(DT_REF_FIM, DT_REF_INI) + 1) AS MIN_DIAS_JANELA,
+    MAX(DATEDIFF(DT_REF_FIM, DT_REF_INI) + 1) AS MAX_DIAS_JANELA,
+
+    SUM(CASE WHEN DT_REF_INI IS NULL THEN 1 ELSE 0 END) AS DT_REF_INI_NULA,
+    SUM(CASE WHEN DT_REF_FIM IS NULL THEN 1 ELSE 0 END) AS DT_REF_FIM_NULA,
+    SUM(CASE WHEN DT_REF_INI > DT_REF_FIM THEN 1 ELSE 0 END) AS JANELA_INVERTIDA,
+
+    SUM(CASE WHEN QT_TRANS_TOTAL = 0 THEN 1 ELSE 0 END) AS CLI_SEM_MOVIMENTO,
+    SUM(CASE WHEN QT_TRANS_TOTAL > 0 THEN 1 ELSE 0 END) AS CLI_COM_MOVIMENTO,
+
+    SUM(CASE
+            WHEN QT_TRANS_TOTAL > 0
+             AND QT_TRANS_TOTAL > COALESCE(QT_TRANS_ENT,0) + COALESCE(QT_TRANS_SAI,0)
+            THEN 1 ELSE 0
+        END) AS CLI_COM_NATUREZA_FORA_C_D,
+
+    SUM(CASE
+            WHEN QT_TRANS_TOTAL > 0
+            THEN QT_TRANS_TOTAL - COALESCE(QT_TRANS_ENT,0) - COALESCE(QT_TRANS_SAI,0)
+            ELSE 0
+        END) AS QT_TRANS_NATUREZA_FORA_C_D
+
+FROM {VIEW_BASE}
+""").first()
+
+for k, v in geral.asDict().items():
+    print(f"  • {k:<34}: {v}")
+
+if geral["DUPLICIDADES_CD_CLI"] == 0:
+    print("\n  STATUS CHAVE: OK — 1 linha por CD_CLI dentro da competência.")
+else:
+    print("\n  [FALHA] Existem duplicidades de CD_CLI dentro da competência.")
+
+print(
+    "  Clientes com movimento:",
+    format_num(geral["CLI_COM_MOVIMENTO"]),
+    f"({format_pct(geral['CLI_COM_MOVIMENTO'] / total_linhas)})"
+)
+print(
+    "  Clientes sem movimento:",
+    format_num(geral["CLI_SEM_MOVIMENTO"]),
+    f"({format_pct(geral['CLI_SEM_MOVIMENTO'] / total_linhas)})"
+)
+
+
+# ====================================================================================================
+# 3. RENDA PRESUMIDA — SENTINELAS E DISTRIBUIÇÃO POSITIVA
+# ====================================================================================================
+
+titulo_secao(3, "Renda presumida — sentinelas, zero e renda positiva utilizável")
+
+renda_sentinelas = spark.sql(f"""
+SELECT
+    CASE
+        WHEN VL_REN_PRES = -1.00 THEN '[-1] Sem escoragem Behaviour/Bureau'
+        WHEN VL_REN_PRES = -2.00 THEN '[-2] CPF inválido'
+        WHEN VL_REN_PRES = -3.00 THEN '[-3] Não PF'
+        WHEN VL_REN_PRES = -4.00 THEN '[-4] Identidade ambígua'
+        WHEN VL_REN_PRES = -5.00 THEN '[-5] Duplicidade no modelo'
+        WHEN VL_REN_PRES = -6.00 THEN '[-6] Renda nula na origem'
+        WHEN VL_REN_PRES = -7.00 THEN '[-7] Renda negativa na origem'
+        WHEN VL_REN_PRES = 0.00  THEN '[0] Modelo válido, renda zero'
+        WHEN VL_REN_PRES > 0.00  THEN '[>0] Renda positiva utilizável'
+        ELSE '[OUTROS] Valor/código não previsto'
+    END AS DIAGNOSTICO,
+    COUNT(*) AS QTD,
+    ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER(), 4) AS PCT
+FROM {VIEW_BASE}
+GROUP BY 1
+ORDER BY QTD DESC
+""").collect()
+
+exibir_tabela_formatada(
+    ["Diagnóstico", "Clientes", "% Base"],
+    [
+        [r["DIAGNOSTICO"], format_num(r["QTD"]), f"{r['PCT']:.4f}%".replace(".", ",")]
+        for r in renda_sentinelas
+    ],
+    ["E", "D", "D"]
+)
+
+stats_renda = spark.sql(f"""
+SELECT
+    COUNT(*) AS N,
+    MIN(VL_REN_PRES) AS MINIMO,
+    PERCENTILE_APPROX(VL_REN_PRES, 0.01) AS P01,
+    PERCENTILE_APPROX(VL_REN_PRES, 0.10) AS P10,
+    PERCENTILE_APPROX(VL_REN_PRES, 0.25) AS P25,
+    PERCENTILE_APPROX(VL_REN_PRES, 0.50) AS P50,
+    PERCENTILE_APPROX(VL_REN_PRES, 0.75) AS P75,
+    PERCENTILE_APPROX(VL_REN_PRES, 0.90) AS P90,
+    PERCENTILE_APPROX(VL_REN_PRES, 0.99) AS P99,
+    MAX(VL_REN_PRES) AS MAXIMO,
+    AVG(VL_REN_PRES) AS MEDIA,
+    STDDEV(VL_REN_PRES) AS DESVIO
+FROM {VIEW_BASE}
+WHERE VL_REN_PRES > 0
+""").first()
+
+print("\n  Estatísticas apenas de VL_REN_PRES > 0:")
+for k, v in stats_renda.asDict().items():
+    if k == "N":
+        print(f"  • {k:<8}: {format_num(v)}")
+    else:
+        print(f"  • {k:<8}: {format_moeda(v)}")
+
+
+# ====================================================================================================
+# 4. CICLOS FINANCEIROS
+# ====================================================================================================
+
+titulo_secao(4, "Ciclos financeiros — DD_INC_MM_CLC_BLC")
+
+ciclos = spark.sql(f"""
+SELECT
+    CASE
+        WHEN DD_INC_MM_CLC_BLC BETWEEN 1 AND 31 THEN 'Dia regular 01–31'
+        WHEN DD_INC_MM_CLC_BLC = 996 THEN '[996] Múltiplas contas elegíveis'
+        WHEN DD_INC_MM_CLC_BLC = 997 THEN '[997] Sem conta corrente elegível'
+        WHEN DD_INC_MM_CLC_BLC = 999 THEN '[999] Conta sem data cadastrada'
+        WHEN DD_INC_MM_CLC_BLC IS NULL THEN '[NULL] Sem código'
+        ELSE '[OUTROS] Fora do domínio'
+    END AS GRUPO,
+    COUNT(*) AS QTD,
+    ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER(), 4) AS PCT
+FROM {VIEW_BASE}
+GROUP BY 1
+ORDER BY QTD DESC
+""").collect()
+
+exibir_tabela_formatada(
+    ["Grupo do ciclo", "Clientes", "% Base"],
+    [[r["GRUPO"], format_num(r["QTD"]), f"{r['PCT']:.4f}%".replace(".", ",")] for r in ciclos],
+    ["E", "D", "D"]
+)
+
+
+# ====================================================================================================
+# 5. PERFIS FINANCEIROS
+# ====================================================================================================
+
+titulo_secao(5, "Perfis financeiros — macro, micro e unificado")
+
+perfis = spark.sql(f"""
+SELECT
+    COALESCE(NM_MAC_PRFL_CLI, 'Sem macroperfil') AS MACRO,
+    COALESCE(NM_PRFL_FIN, 'Sem perfil') AS PERFIL,
+    COUNT(*) AS QTD,
+    ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER(), 4) AS PCT_BASE,
+    AVG(CASE WHEN VL_REN_PRES > 0 THEN VL_REN_PRES END) AS RENDA_MEDIA_POSITIVA,
+    AVG(VL_SAI_TOTAL) AS SAIDA_MEDIA
+FROM {VIEW_BASE}
+GROUP BY 1, 2
+ORDER BY MACRO, QTD DESC
+""").collect()
+
+exibir_tabela_formatada(
+    ["Macroperfil", "Perfil unificado", "Clientes", "% Base", "Renda média (>0)", "Saída média"],
+    [
+        [
+            r["MACRO"],
+            r["PERFIL"],
+            format_num(r["QTD"]),
+            f"{r['PCT_BASE']:.4f}%".replace(".", ","),
+            format_moeda(r["RENDA_MEDIA_POSITIVA"]),
+            format_moeda(r["SAIDA_MEDIA"]),
+        ]
+        for r in perfis
+    ],
+    ["E", "E", "D", "D", "D", "D"]
+)
+
+
+# ====================================================================================================
+# 6. FLUXO TRANSACIONAL — ENTRADAS E SAÍDAS
+# ====================================================================================================
+
+titulo_secao(6, "Fluxo transacional e decomposição financeira")
+
+fluxo = spark.sql(f"""
+SELECT
+    SUM(QT_TRANS_TOTAL) AS QT_TRANS_TOTAL,
+    SUM(QT_TRANS_ENT) AS QT_TRANS_ENT,
+    SUM(QT_TRANS_SAI) AS QT_TRANS_SAI,
+
+    SUM(VL_TRANS_ENT) AS VL_TRANS_ENT,
+    SUM(VL_TRANS_SAI) AS VL_TRANS_SAI,
+
+    SUM(VL_ENT_REN) AS VL_ENT_REN,
+    SUM(VL_ENT_EST) AS VL_ENT_EST,
+    SUM(VL_ENT_RESG) AS VL_ENT_RESG,
+    SUM(VL_ENT_OUT) AS VL_ENT_OUT,
+    SUM(VL_ENT_CRED) AS VL_ENT_CRED,
+    SUM(VL_ENT_TOTAL) AS VL_ENT_TOTAL,
+
+    SUM(VL_SAI_IND) AS VL_SAI_IND,
+    SUM(VL_SAI_ESS) AS VL_SAI_ESS,
+    SUM(VL_SAI_NAO_ESS) AS VL_SAI_NAO_ESS,
+    SUM(VL_SAI_FUT) AS VL_SAI_FUT,
+    SUM(VL_SAI_OBR) AS VL_SAI_OBR,
+    SUM(VL_SAI_TOTAL) AS VL_SAI_TOTAL
+
+FROM {VIEW_BASE}
+""").first()
+
+print("  QT_TRANS_TOTAL:", format_num(fluxo["QT_TRANS_TOTAL"]))
+print("  QT_TRANS_ENT  :", format_num(fluxo["QT_TRANS_ENT"]))
+print("  QT_TRANS_SAI  :", format_num(fluxo["QT_TRANS_SAI"]))
+
+print("\n  ENTRADAS:")
+total_ent = float(fluxo["VL_ENT_TOTAL"] or 0)
+entradas_rows = []
+for nome, col in [
+    ("Classe 1 — Renda/Salário/Benefícios", "VL_ENT_REN"),
+    ("Classe 2 — Estornos/Devoluções", "VL_ENT_EST"),
+    ("Classe 3 — Resgates", "VL_ENT_RESG"),
+    ("Classe 0 — Outras Entradas", "VL_ENT_OUT"),
+    ("Classe 4 — Crédito Tomado", "VL_ENT_CRED"),
+]:
+    valor = float(fluxo[col] or 0)
+    pct = valor / total_ent if total_ent else None
+    entradas_rows.append([nome, format_moeda(valor), format_pct(pct)])
+
+exibir_tabela_formatada(
+    ["Classe", "Volume", "% VL_ENT_TOTAL"],
+    entradas_rows,
+    ["E", "D", "D"]
+)
+
+print("\n  SAÍDAS:")
+total_sai = float(fluxo["VL_SAI_TOTAL"] or 0)
+saidas_rows = []
+for nome, col in [
+    ("Classe 5 — Indeterminada", "VL_SAI_IND"),
+    ("Classe 6 — Essencial", "VL_SAI_ESS"),
+    ("Classe 7 — Não Essencial", "VL_SAI_NAO_ESS"),
+    ("Classe 8 — Futuro/Reserva", "VL_SAI_FUT"),
+    ("Classe 9 — Obrigações", "VL_SAI_OBR"),
+]:
+    valor = float(fluxo[col] or 0)
+    pct = valor / total_sai if total_sai else None
+    saidas_rows.append([nome, format_moeda(valor), format_pct(pct)])
+
+exibir_tabela_formatada(
+    ["Classe", "Volume", "% VL_SAI_TOTAL"],
+    saidas_rows,
+    ["E", "D", "D"]
+)
+
+print("\n  Controle VL_TRANS_* x somatório das classes participantes:")
+print("  • VL_TRANS_ENT:", format_moeda(fluxo["VL_TRANS_ENT"]))
+print("  • VL_ENT_TOTAL:", format_moeda(fluxo["VL_ENT_TOTAL"]))
+print("  • VL_TRANS_SAI:", format_moeda(fluxo["VL_TRANS_SAI"]))
+print("  • VL_SAI_TOTAL:", format_moeda(fluxo["VL_SAI_TOTAL"]))
+
+
+# ====================================================================================================
+# 7. ORÇAMENTO — DISTRIBUIÇÃO DAS FAIXAS
+# ====================================================================================================
+
+titulo_secao(7, "Orçamento — distribuição das faixas implementadas na V15")
+
+faixas = spark.sql(f"""
+SELECT
+    CD_FAIXA_ORC,
+    COALESCE(TX_STS_FINAL, 'Sem movimento') AS TX_STS_FINAL,
+    COUNT(*) AS QTD,
+    ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER(), 4) AS PCT_BASE,
+    AVG(PC_SAI_ENT) AS PC_SAI_ENT_MEDIO,
+    AVG(VL_RES_ORC) AS VL_RES_ORC_MEDIO
+FROM {VIEW_BASE}
+GROUP BY CD_FAIXA_ORC, TX_STS_FINAL
+ORDER BY CD_FAIXA_ORC NULLS LAST
+""").collect()
+
+exibir_tabela_formatada(
+    ["Faixa", "Status", "Clientes", "% Base", "PC_SAI_ENT médio", "Resultado médio"],
+    [
+        [
+            r["CD_FAIXA_ORC"],
+            r["TX_STS_FINAL"],
+            format_num(r["QTD"]),
+            f"{r['PCT_BASE']:.4f}%".replace(".", ","),
+            format_decimal(r["PC_SAI_ENT_MEDIO"]),
+            format_moeda(r["VL_RES_ORC_MEDIO"]),
+        ]
+        for r in faixas
+    ],
+    ["D", "E", "D", "D", "D", "D"]
+)
+
+
+# ====================================================================================================
+# 8. REFERÊNCIAS INTERNAS DO RADAR
+# ====================================================================================================
+
+titulo_secao(8, "Referências internas do Radar — parâmetros e aderência")
+
+refs = spark.sql(f"""
+SELECT
+    MIN(PC_REF_IND) AS MIN_REF_IND, MAX(PC_REF_IND) AS MAX_REF_IND,
+    MIN(PC_REF_ESS) AS MIN_REF_ESS, MAX(PC_REF_ESS) AS MAX_REF_ESS,
+    MIN(PC_REF_NAO_ESS) AS MIN_REF_NAO_ESS, MAX(PC_REF_NAO_ESS) AS MAX_REF_NAO_ESS,
+    MIN(PC_REF_FUT) AS MIN_REF_FUT, MAX(PC_REF_FUT) AS MAX_REF_FUT,
+    MIN(PC_REF_OBR) AS MIN_REF_OBR, MAX(PC_REF_OBR) AS MAX_REF_OBR,
+
+    SUM(CASE WHEN PC_REF_IND <> 0.750000 THEN 1 ELSE 0 END) AS ERR_REF_IND,
+    SUM(CASE WHEN PC_REF_ESS <> 0.500000 THEN 1 ELSE 0 END) AS ERR_REF_ESS,
+    SUM(CASE WHEN PC_REF_NAO_ESS <> 0.300000 THEN 1 ELSE 0 END) AS ERR_REF_NAO_ESS,
+    SUM(CASE WHEN PC_REF_FUT <> 0.200000 THEN 1 ELSE 0 END) AS ERR_REF_FUT,
+    SUM(CASE WHEN PC_REF_OBR <> 0.300000 THEN 1 ELSE 0 END) AS ERR_REF_OBR
+FROM {VIEW_BASE}
+""").first()
+
+print("  Esperado pela V15: IND=0,75 | ESS=0,50 | NÃO_ESS=0,30 | FUT=0,20 | OBR=0,30")
+for k, v in refs.asDict().items():
+    print(f"  • {k:<18}: {v}")
+
+aderencia = spark.sql(f"""
+SELECT
+    COUNT(*) AS BASE,
+
+    AVG(PC_SAI_IND) AS MEDIA_IND,
+    AVG(PC_SAI_ESS) AS MEDIA_ESS,
+    AVG(PC_SAI_NAO_ESS) AS MEDIA_NAO_ESS,
+    AVG(PC_SAI_FUT) AS MEDIA_FUT,
+    AVG(PC_SAI_OBR) AS MEDIA_OBR,
+
+    SUM(CASE WHEN PC_SAI_IND <= PC_REF_IND THEN 1 ELSE 0 END) AS ADEQ_IND,
+    SUM(CASE WHEN PC_SAI_ESS <= PC_REF_ESS THEN 1 ELSE 0 END) AS ADEQ_ESS,
+    SUM(CASE WHEN PC_SAI_NAO_ESS <= PC_REF_NAO_ESS THEN 1 ELSE 0 END) AS ADEQ_NAO_ESS,
+    SUM(CASE WHEN PC_SAI_FUT >= PC_REF_FUT THEN 1 ELSE 0 END) AS ADEQ_FUT,
+    SUM(CASE WHEN PC_SAI_OBR <= PC_REF_OBR THEN 1 ELSE 0 END) AS ADEQ_OBR
+
+FROM {VIEW_BASE}
+WHERE VL_REN_PRES > 0
+  AND QT_TRANS_TOTAL > 0
+""").first()
+
+base_ader = float(aderencia["BASE"] or 0)
+linhas_ader = []
+for nome, media_col, adeq_col, ref_txt in [
+    ("Indeterminada", "MEDIA_IND", "ADEQ_IND", "<= 75%"),
+    ("Essencial", "MEDIA_ESS", "ADEQ_ESS", "<= 50%"),
+    ("Não Essencial", "MEDIA_NAO_ESS", "ADEQ_NAO_ESS", "<= 30%"),
+    ("Futuro/Reserva", "MEDIA_FUT", "ADEQ_FUT", ">= 20%"),
+    ("Obrigações", "MEDIA_OBR", "ADEQ_OBR", "<= 30%"),
+]:
+    q = aderencia[adeq_col] or 0
+    linhas_ader.append([
+        nome,
+        ref_txt,
+        format_pct(aderencia[media_col]),
+        format_num(q),
+        format_pct(q / base_ader if base_ader else None)
+    ])
+
+print("\n  Base: VL_REN_PRES > 0 e QT_TRANS_TOTAL > 0 =", format_num(aderencia["BASE"]))
+exibir_tabela_formatada(
+    ["Dimensão", "Referência interna", "% médio", "Clientes aderentes", "% aderente"],
+    linhas_ader,
+    ["E", "D", "D", "D", "D"]
+)
+
+
+# ====================================================================================================
+# 9. PONTUAÇÕES, VENCEDORES E EMPATES
+# ====================================================================================================
+
+titulo_secao(9, "Pontuações finais, vencedor e empates")
+
+pont = spark.sql(f"""
+SELECT
+    AVG(NR_PONT_IND_FIM) AS AVG_IND, MIN(NR_PONT_IND_FIM) AS MIN_IND, MAX(NR_PONT_IND_FIM) AS MAX_IND,
+    AVG(NR_PONT_ESS_FIM) AS AVG_ESS, MIN(NR_PONT_ESS_FIM) AS MIN_ESS, MAX(NR_PONT_ESS_FIM) AS MAX_ESS,
+    AVG(NR_PONT_NAO_ESS_FIM) AS AVG_NAO_ESS, MIN(NR_PONT_NAO_ESS_FIM) AS MIN_NAO_ESS, MAX(NR_PONT_NAO_ESS_FIM) AS MAX_NAO_ESS,
+    AVG(NR_PONT_FUT_FIM) AS AVG_FUT, MIN(NR_PONT_FUT_FIM) AS MIN_FUT, MAX(NR_PONT_FUT_FIM) AS MAX_FUT,
+    AVG(NR_PONT_OBR_FIM) AS AVG_OBR, MIN(NR_PONT_OBR_FIM) AS MIN_OBR, MAX(NR_PONT_OBR_FIM) AS MAX_OBR
+FROM {VIEW_BASE}
+WHERE QT_TRANS_TOTAL > 0
+""").first()
+
+exibir_tabela_formatada(
+    ["Tema", "Média", "Mínimo", "Máximo"],
+    [
+        ["T1 Categorização", format_decimal(pont["AVG_IND"], 2), pont["MIN_IND"], pont["MAX_IND"]],
+        ["T2 Orçamento", format_decimal(pont["AVG_ESS"], 2), pont["MIN_ESS"], pont["MAX_ESS"]],
+        ["T3 Consumo", format_decimal(pont["AVG_NAO_ESS"], 2), pont["MIN_NAO_ESS"], pont["MAX_NAO_ESS"]],
+        ["T4 Reserva", format_decimal(pont["AVG_FUT"], 2), pont["MIN_FUT"], pont["MAX_FUT"]],
+        ["T5 Crédito", format_decimal(pont["AVG_OBR"], 2), pont["MIN_OBR"], pont["MAX_OBR"]],
+    ],
+    ["E", "D", "D", "D"]
+)
+
+temas = spark.sql(f"""
+SELECT
+    CD_TEMA_VENCEDOR,
+    COALESCE(TX_TEMA_VENCEDOR, 'Sem vencedor') AS TEMA,
+    COUNT(*) AS QTD,
+    ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER(), 4) AS PCT
+FROM {VIEW_BASE}
+GROUP BY CD_TEMA_VENCEDOR, TX_TEMA_VENCEDOR
+ORDER BY QTD DESC
+""").collect()
+
+print("\n  Distribuição dos vencedores:")
+exibir_tabela_formatada(
+    ["Código", "Tema", "Clientes", "% Base"],
+    [
+        [r["CD_TEMA_VENCEDOR"], r["TEMA"], format_num(r["QTD"]), f"{r['PCT']:.4f}%".replace(".", ",")]
+        for r in temas
+    ],
+    ["D", "E", "D", "D"]
+)
+
+empates = spark.sql(f"""
+SELECT
+    CONCAT_WS(
+        ' == ',
+        CASE WHEN NR_PONT_IND_FIM = GREATEST(NR_PONT_IND_FIM, NR_PONT_ESS_FIM, NR_PONT_NAO_ESS_FIM, NR_PONT_FUT_FIM, NR_PONT_OBR_FIM) THEN 'T1 Categorização' END,
+        CASE WHEN NR_PONT_ESS_FIM = GREATEST(NR_PONT_IND_FIM, NR_PONT_ESS_FIM, NR_PONT_NAO_ESS_FIM, NR_PONT_FUT_FIM, NR_PONT_OBR_FIM) THEN 'T2 Orçamento' END,
+        CASE WHEN NR_PONT_NAO_ESS_FIM = GREATEST(NR_PONT_IND_FIM, NR_PONT_ESS_FIM, NR_PONT_NAO_ESS_FIM, NR_PONT_FUT_FIM, NR_PONT_OBR_FIM) THEN 'T3 Consumo' END,
+        CASE WHEN NR_PONT_FUT_FIM = GREATEST(NR_PONT_IND_FIM, NR_PONT_ESS_FIM, NR_PONT_NAO_ESS_FIM, NR_PONT_FUT_FIM, NR_PONT_OBR_FIM) THEN 'T4 Reserva' END,
+        CASE WHEN NR_PONT_OBR_FIM = GREATEST(NR_PONT_IND_FIM, NR_PONT_ESS_FIM, NR_PONT_NAO_ESS_FIM, NR_PONT_FUT_FIM, NR_PONT_OBR_FIM) THEN 'T5 Crédito' END
+    ) AS COMBINACAO,
+    COUNT(*) AS QTD
+FROM {VIEW_BASE}
+WHERE CD_TEMA_VENCEDOR = 9
+GROUP BY 1
+ORDER BY QTD DESC
+LIMIT 10
+""").collect()
+
+if empates:
+    print("\n  Top combinações de empate:")
+    exibir_tabela_formatada(
+        ["Combinação", "Casos"],
+        [[r["COMBINACAO"], format_num(r["QTD"])] for r in empates],
+        ["E", "D"]
+    )
+
+
+# ====================================================================================================
+# 10. PERFIL x TEMA VENCEDOR
+# ====================================================================================================
+
+titulo_secao(10, "Matriz perfil financeiro x tema vencedor")
+
+matriz = spark.sql(f"""
+SELECT
+    COALESCE(NM_PRFL_FIN, 'Sem perfil') AS PERFIL,
+    COUNT(*) AS TOTAL,
+    SUM(CASE WHEN CD_TEMA_VENCEDOR = 1 THEN 1 ELSE 0 END) AS T1,
+    SUM(CASE WHEN CD_TEMA_VENCEDOR = 2 THEN 1 ELSE 0 END) AS T2,
+    SUM(CASE WHEN CD_TEMA_VENCEDOR = 3 THEN 1 ELSE 0 END) AS T3,
+    SUM(CASE WHEN CD_TEMA_VENCEDOR = 4 THEN 1 ELSE 0 END) AS T4,
+    SUM(CASE WHEN CD_TEMA_VENCEDOR = 5 THEN 1 ELSE 0 END) AS T5,
+    SUM(CASE WHEN CD_TEMA_VENCEDOR = 9 THEN 1 ELSE 0 END) AS T9,
+    SUM(CASE WHEN CD_TEMA_VENCEDOR IS NULL THEN 1 ELSE 0 END) AS SEM_VENC
+FROM {VIEW_BASE}
+GROUP BY 1
+ORDER BY TOTAL DESC
+""").collect()
+
+exibir_tabela_formatada(
+    ["Perfil", "Total", "T1", "T2", "T3", "T4", "T5", "T9", "Sem vencedor"],
+    [
+        [
+            r["PERFIL"], format_num(r["TOTAL"]),
+            format_num(r["T1"]), format_num(r["T2"]), format_num(r["T3"]),
+            format_num(r["T4"]), format_num(r["T5"]), format_num(r["T9"]),
+            format_num(r["SEM_VENC"])
+        ]
+        for r in matriz
+    ],
+    ["E", "D", "D", "D", "D", "D", "D", "D", "D"]
+)
+
+
+# ====================================================================================================
+# 11. FLAGS E CASOS CRÍTICOS/CONTRAINTUITIVOS
+# ====================================================================================================
+
+titulo_secao(11, "Flags e casos críticos/contraintuitivos")
+
+criticos = spark.sql(f"""
+SELECT
+    SUM(CASE WHEN FL_TEM_MOV_AGRO = 'S' THEN 1 ELSE 0 END) AS CLI_AGRO,
+    SUM(CASE WHEN FL_MULT_MOE = 'S' THEN 1 ELSE 0 END) AS CLI_MULT_MOE,
+    SUM(CASE WHEN FL_PARTICIPA_RADAR IS NOT NULL THEN 1 ELSE 0 END) AS FL_PARTICIPA_PREENCHIDA,
+
+    SUM(CASE
+            WHEN QT_TRANS_TOTAL > 0
+             AND VL_ENT_TOTAL = 0
+             AND VL_SAI_TOTAL > 0
+            THEN 1 ELSE 0
+        END) AS SEM_ENTRADA_COM_SAIDA,
+
+    SUM(CASE
+            WHEN QT_TRANS_TOTAL > 0
+             AND VL_ENT_TOTAL = 0
+             AND VL_SAI_TOTAL > 0
+             AND CD_FAIXA_ORC = 4
+            THEN 1 ELSE 0
+        END) AS SEM_ENTRADA_CLASSIF_SUPERAVIT_ACENT,
+
+    SUM(CASE
+            WHEN QT_TRANS_TOTAL > 0
+             AND VL_ENT_TOTAL = 0
+             AND VL_SAI_TOTAL = 0
+            THEN 1 ELSE 0
+        END) AS MOVIMENTO_SEM_VALOR_PARTICIPANTE,
+
+    SUM(CASE
+            WHEN VL_REN_PRES <= 0
+             AND CD_TEMA_VENCEDOR IS NOT NULL
+            THEN 1 ELSE 0
+        END) AS RENDA_NAO_POSITIVA_COM_VENCEDOR,
+
+    SUM(CASE
+            WHEN VL_REN_PRES > 0
+             AND QT_TRANS_TOTAL > 0
+             AND NM_PRFL_FIN IS NOT NULL
+             AND NM_PRFL_FIN <> 'CODIGO NAO MAPEADO'
+             AND CD_TEMA_VENCEDOR IS NULL
+            THEN 1 ELSE 0
+        END) AS ELEGIVEL_APARENTE_SEM_VENCEDOR,
+
+    SUM(CASE
+            WHEN QT_TRANS_TOTAL = 0
+             AND CD_TEMA_VENCEDOR IS NOT NULL
+            THEN 1 ELSE 0
+        END) AS SEM_MOVIMENTO_COM_VENCEDOR,
+
+    SUM(CASE
+            WHEN CD_TEMA_VENCEDOR IS NOT NULL
+             AND CD_TEMA_VENCEDOR NOT IN (1,2,3,4,5,9)
+            THEN 1 ELSE 0
+        END) AS TEMA_FORA_DOMINIO
+
+FROM {VIEW_BASE}
+""").first()
+
+for k, v in criticos.asDict().items():
+    print(f"  • {k:<42}: {format_num(v)}")
+
+
+# ====================================================================================================
+# 12. RECONSTRUÇÃO INDEPENDENTE DAS REGRAS DERIVADAS
+# ====================================================================================================
+
+titulo_secao(12, "Reconstrução independente das regras derivadas da V15")
+
+print("  Esta etapa recalcula as regras a partir das colunas-base já persistidas.")
+print("  Ela valida a lógica derivada da tabela; não substitui auditoria posterior nas fontes DB2/Hive.")
+
+spark.sql(f"""
+CREATE OR REPLACE TEMP VIEW {VIEW_RECALC} AS
+
+WITH r1 AS (
+    SELECT
+        b.*,
+
+        CASE
+            WHEN CD_MAC_PRFL_CLI IS NULL THEN NULL
+            WHEN CD_MAC_PRFL_CLI = 1 THEN 'Endividado'
+            WHEN CD_MAC_PRFL_CLI = 2 THEN 'Equilibrista'
+            WHEN CD_MAC_PRFL_CLI = 3 THEN 'Investidor'
+            ELSE 'CODIGO NAO MAPEADO'
+        END AS EXP_NM_MAC_PRFL_CLI,
+
+        CASE
+            WHEN CD_MIC_PRFL_CLI IS NULL THEN NULL
+            WHEN CD_MIC_PRFL_CLI = 1 THEN 'Inadimplente'
+            WHEN CD_MIC_PRFL_CLI = 2 THEN 'Acrobata'
+            WHEN CD_MIC_PRFL_CLI = 3 THEN 'Iminente'
+            WHEN CD_MIC_PRFL_CLI = 4 THEN 'Consciente'
+            WHEN CD_MIC_PRFL_CLI = 5 THEN 'Equilibrista'
+            WHEN CD_MIC_PRFL_CLI = 6 THEN 'Acelerado'
+            WHEN CD_MIC_PRFL_CLI = 7 THEN 'Precavido'
+            WHEN CD_MIC_PRFL_CLI = 8 THEN 'Despreocupado'
+            ELSE 'CODIGO NAO MAPEADO'
+        END AS EXP_NM_MIC_PRFL_CLI,
+
+        CAST(
+              COALESCE(VL_ENT_REN, 0)
+            + COALESCE(VL_ENT_EST, 0)
+            + COALESCE(VL_ENT_RESG, 0)
+            + COALESCE(VL_ENT_OUT, 0)
+            + COALESCE(VL_ENT_CRED, 0)
+            AS DECIMAL(18,2)
+        ) AS EXP_VL_ENT_TOTAL,
+
+        CAST(
+              COALESCE(VL_SAI_IND, 0)
+            + COALESCE(VL_SAI_ESS, 0)
+            + COALESCE(VL_SAI_NAO_ESS, 0)
+            + COALESCE(VL_SAI_FUT, 0)
+            + COALESCE(VL_SAI_OBR, 0)
+            AS DECIMAL(18,2)
+        ) AS EXP_VL_SAI_TOTAL
+
+    FROM {VIEW_BASE} b
+),
+
+r2 AS (
+    SELECT
+        r1.*,
+
+        CASE
+            WHEN EXP_NM_MAC_PRFL_CLI IS NULL OR EXP_NM_MIC_PRFL_CLI IS NULL THEN NULL
+            WHEN EXP_NM_MAC_PRFL_CLI = 'CODIGO NAO MAPEADO'
+              OR EXP_NM_MIC_PRFL_CLI = 'CODIGO NAO MAPEADO' THEN 'CODIGO NAO MAPEADO'
+            WHEN EXP_NM_MAC_PRFL_CLI = 'Equilibrista'
+             AND EXP_NM_MIC_PRFL_CLI = 'Equilibrista' THEN 'Equilibrista'
+            ELSE CONCAT(EXP_NM_MAC_PRFL_CLI, ' ', EXP_NM_MIC_PRFL_CLI)
+        END AS EXP_NM_PRFL_FIN,
+
+        CAST(
+            CASE
+                WHEN QT_TRANS_TOTAL = 0 THEN NULL
+                ELSE EXP_VL_ENT_TOTAL - EXP_VL_SAI_TOTAL
+            END AS DECIMAL(18,2)
+        ) AS EXP_VL_RES_ORC,
+
+        CAST(
+            COALESCE(EXP_VL_SAI_TOTAL / NULLIF(EXP_VL_ENT_TOTAL, 0), 0)
+            AS DECIMAL(9,6)
+        ) AS EXP_PC_SAI_ENT
+
+    FROM r1
+),
+
+r3 AS (
+    SELECT
+        r2.*,
+
+        CAST(
+            CASE
+                WHEN QT_TRANS_TOTAL = 0 THEN NULL
+                WHEN EXP_PC_SAI_ENT BETWEEN 0.950000 AND 1.050000 THEN 0
+                WHEN EXP_PC_SAI_ENT > 1.050000 AND EXP_PC_SAI_ENT <= 1.250000 THEN 1
+                WHEN EXP_PC_SAI_ENT > 1.250000 THEN 2
+                WHEN EXP_PC_SAI_ENT >= 0.750000 AND EXP_PC_SAI_ENT < 0.950000 THEN 3
+                ELSE 4
+            END AS INT
+        ) AS EXP_CD_FAIXA_ORC,
+
+        CAST(CASE WHEN VL_REN_PRES > 0 THEN COALESCE(VL_SAI_IND / VL_REN_PRES, 0) ELSE 0 END AS DECIMAL(9,6)) AS EXP_PC_SAI_IND,
+        CAST(CASE WHEN VL_REN_PRES > 0 THEN COALESCE(VL_SAI_ESS / VL_REN_PRES, 0) ELSE 0 END AS DECIMAL(9,6)) AS EXP_PC_SAI_ESS,
+        CAST(CASE WHEN VL_REN_PRES > 0 THEN COALESCE(VL_SAI_NAO_ESS / VL_REN_PRES, 0) ELSE 0 END AS DECIMAL(9,6)) AS EXP_PC_SAI_NAO_ESS,
+        CAST(CASE WHEN VL_REN_PRES > 0 THEN COALESCE(VL_SAI_FUT / VL_REN_PRES, 0) ELSE 0 END AS DECIMAL(9,6)) AS EXP_PC_SAI_FUT,
+        CAST(CASE WHEN VL_REN_PRES > 0 THEN COALESCE(VL_SAI_OBR / VL_REN_PRES, 0) ELSE 0 END AS DECIMAL(9,6)) AS EXP_PC_SAI_OBR
+
+    FROM r2
+),
+
+r4 AS (
+    SELECT
+        r3.*,
+
+        CAST(
+            CASE
+                WHEN EXP_CD_FAIXA_ORC IS NULL THEN NULL
+                WHEN EXP_CD_FAIXA_ORC = 0 THEN 0
+                WHEN EXP_CD_FAIXA_ORC IN (3,4) THEN 1
+                ELSE 2
+            END AS INT
+        ) AS EXP_CD_RES_ORC,
+
+        CASE
+            WHEN EXP_CD_FAIXA_ORC IS NULL THEN NULL
+            WHEN EXP_CD_FAIXA_ORC = 0 THEN 'Neutro'
+            WHEN EXP_CD_FAIXA_ORC IN (3,4) THEN 'Superavitário'
+            ELSE 'Deficitário'
+        END AS EXP_TX_RES_ORC,
+
+        CASE
+            WHEN EXP_CD_FAIXA_ORC IS NULL OR EXP_CD_FAIXA_ORC = 0 THEN NULL
+            WHEN EXP_CD_FAIXA_ORC IN (2,4) THEN 'Acentuado'
+            ELSE 'Moderado'
+        END AS EXP_TX_STS_RES,
+
+        CASE
+            WHEN EXP_CD_FAIXA_ORC IS NULL THEN NULL
+            WHEN EXP_CD_FAIXA_ORC = 0 THEN 'Neutro'
+            WHEN EXP_CD_FAIXA_ORC = 1 THEN 'Deficitário Moderado'
+            WHEN EXP_CD_FAIXA_ORC = 2 THEN 'Deficitário Acentuado'
+            WHEN EXP_CD_FAIXA_ORC = 3 THEN 'Superavitário Moderado'
+            ELSE 'Superavitário Acentuado'
+        END AS EXP_TX_STS_FINAL,
+
+        CAST(
+            CASE
+                WHEN QT_TRANS_TOTAL = 0 THEN NULL
+                WHEN VL_REN_PRES <= 0 THEN 0
+                WHEN EXP_PC_SAI_IND > 0.750000 THEN 99
+                ELSE 0
+            END AS INT
+        ) AS EXP_NR_PONT_CONC_IND,
+
+        CAST(
+            CASE
+                WHEN QT_TRANS_TOTAL = 0 THEN NULL
+                WHEN VL_REN_PRES <= 0 THEN 0
+                WHEN EXP_PC_SAI_ESS < 0.500000 THEN 0
+                WHEN EXP_PC_SAI_ESS < 0.750000 THEN 1
+                ELSE 2
+            END AS INT
+        ) AS EXP_NR_PONT_CONC_ESS,
+
+        CAST(
+            CASE
+                WHEN QT_TRANS_TOTAL = 0 THEN NULL
+                WHEN VL_REN_PRES <= 0 THEN 0
+                WHEN EXP_PC_SAI_NAO_ESS < 0.300000 THEN 0
+                WHEN EXP_PC_SAI_NAO_ESS < 0.450000 THEN 1
+                ELSE 2
+            END AS INT
+        ) AS EXP_NR_PONT_CONC_NAO_ESS,
+
+        CAST(
+            CASE
+                WHEN QT_TRANS_TOTAL = 0 THEN NULL
+                WHEN VL_REN_PRES <= 0 THEN 0
+                WHEN EXP_PC_SAI_FUT >= 0.300000 THEN 0
+                WHEN EXP_PC_SAI_FUT >= 0.200000 THEN 1
+                ELSE 2
+            END AS INT
+        ) AS EXP_NR_PONT_CONC_FUT,
+
+        CAST(
+            CASE
+                WHEN QT_TRANS_TOTAL = 0 THEN NULL
+                WHEN VL_REN_PRES <= 0 THEN 0
+                WHEN EXP_PC_SAI_OBR < 0.300000 THEN 0
+                WHEN EXP_PC_SAI_OBR < 0.450000 THEN 1
+                ELSE 2
+            END AS INT
+        ) AS EXP_NR_PONT_CONC_OBR
+
+    FROM r3
+),
+
+r5 AS (
+    SELECT
+        r4.*,
+
+        CAST(CASE WHEN QT_TRANS_TOTAL = 0 THEN NULL ELSE 0 END AS INT) AS EXP_NR_PONT_ORC_IND,
+
+        CAST(
+            CASE
+                WHEN QT_TRANS_TOTAL = 0 OR EXP_CD_FAIXA_ORC IS NULL THEN NULL
+                WHEN EXP_CD_FAIXA_ORC = 2 THEN 2
+                WHEN EXP_CD_FAIXA_ORC IN (0,1) THEN 1
+                ELSE 0
+            END AS INT
+        ) AS EXP_NR_PONT_ORC_ESS,
+
+        CAST(
+            CASE
+                WHEN QT_TRANS_TOTAL = 0 OR EXP_CD_FAIXA_ORC IS NULL THEN NULL
+                WHEN EXP_CD_FAIXA_ORC = 2 THEN 2
+                WHEN EXP_CD_FAIXA_ORC IN (0,1) THEN 1
+                ELSE 0
+            END AS INT
+        ) AS EXP_NR_PONT_ORC_NAO_ESS,
+
+        CAST(
+            CASE
+                WHEN QT_TRANS_TOTAL = 0 OR EXP_CD_FAIXA_ORC IS NULL THEN NULL
+                WHEN EXP_CD_FAIXA_ORC = 4 THEN 2
+                WHEN EXP_CD_FAIXA_ORC IN (0,3) THEN 1
+                ELSE 0
+            END AS INT
+        ) AS EXP_NR_PONT_ORC_FUT,
+
+        CAST(
+            CASE
+                WHEN QT_TRANS_TOTAL = 0 OR EXP_CD_FAIXA_ORC IS NULL THEN NULL
+                WHEN EXP_CD_FAIXA_ORC = 2 THEN 2
+                WHEN EXP_CD_FAIXA_ORC IN (0,1) THEN 1
+                ELSE 0
+            END AS INT
+        ) AS EXP_NR_PONT_ORC_OBR,
+
+        CAST(CASE WHEN QT_TRANS_TOTAL = 0 THEN NULL ELSE 0 END AS INT) AS EXP_NR_PONT_PRFL_IND,
+
+        CAST(
+            CASE
+                WHEN QT_TRANS_TOTAL = 0 OR EXP_NM_PRFL_FIN IS NULL OR EXP_NM_PRFL_FIN = 'CODIGO NAO MAPEADO' THEN NULL
+                WHEN EXP_NM_PRFL_FIN = 'Endividado Acrobata' THEN 2
+                WHEN EXP_NM_PRFL_FIN = 'Endividado Inadimplente'
+                  OR EXP_NM_PRFL_FIN IN ('Equilibrista','Investidor Precavido','Investidor Despreocupado','Investidor Acelerado') THEN 1
+                ELSE 0
+            END AS INT
+        ) AS EXP_NR_PONT_PRFL_ESS,
+
+        CAST(
+            CASE
+                WHEN QT_TRANS_TOTAL = 0 OR EXP_NM_PRFL_FIN IS NULL OR EXP_NM_PRFL_FIN = 'CODIGO NAO MAPEADO' THEN NULL
+                WHEN EXP_NM_PRFL_FIN = 'Endividado Consciente' THEN 2
+                WHEN EXP_NM_PRFL_FIN = 'Endividado Iminente' THEN 1
+                ELSE 0
+            END AS INT
+        ) AS EXP_NR_PONT_PRFL_NAO_ESS,
+
+        CAST(
+            CASE
+                WHEN QT_TRANS_TOTAL = 0 OR EXP_NM_PRFL_FIN IS NULL OR EXP_NM_PRFL_FIN = 'CODIGO NAO MAPEADO' THEN NULL
+                WHEN EXP_NM_PRFL_FIN IN ('Equilibrista','Investidor Precavido','Investidor Despreocupado','Investidor Acelerado') THEN 2
+                WHEN EXP_NM_PRFL_FIN = 'Endividado Consciente' THEN 1
+                ELSE 0
+            END AS INT
+        ) AS EXP_NR_PONT_PRFL_FUT,
+
+        CAST(
+            CASE
+                WHEN QT_TRANS_TOTAL = 0 OR EXP_NM_PRFL_FIN IS NULL OR EXP_NM_PRFL_FIN = 'CODIGO NAO MAPEADO' THEN NULL
+                WHEN EXP_NM_PRFL_FIN IN ('Endividado Iminente','Endividado Inadimplente') THEN 2
+                WHEN EXP_NM_PRFL_FIN = 'Endividado Acrobata' THEN 1
+                ELSE 0
+            END AS INT
+        ) AS EXP_NR_PONT_PRFL_OBR
+
+    FROM r4
+),
+
+r6 AS (
+    SELECT
+        r5.*,
+
+        CAST(EXP_NR_PONT_CONC_IND AS INT) AS EXP_NR_PONT_IND_FIM,
+
+        CAST(
+            CASE
+                WHEN EXP_NR_PONT_CONC_ESS IS NULL OR EXP_NR_PONT_ORC_ESS IS NULL OR EXP_NR_PONT_PRFL_ESS IS NULL THEN NULL
+                ELSE EXP_NR_PONT_CONC_ESS + EXP_NR_PONT_ORC_ESS + EXP_NR_PONT_PRFL_ESS
+            END AS INT
+        ) AS EXP_NR_PONT_ESS_FIM,
+
+        CAST(
+            CASE
+                WHEN EXP_NR_PONT_CONC_NAO_ESS IS NULL OR EXP_NR_PONT_ORC_NAO_ESS IS NULL OR EXP_NR_PONT_PRFL_NAO_ESS IS NULL THEN NULL
+                ELSE EXP_NR_PONT_CONC_NAO_ESS + EXP_NR_PONT_ORC_NAO_ESS + EXP_NR_PONT_PRFL_NAO_ESS
+            END AS INT
+        ) AS EXP_NR_PONT_NAO_ESS_FIM,
+
+        CAST(
+            CASE
+                WHEN EXP_NR_PONT_CONC_FUT IS NULL OR EXP_NR_PONT_ORC_FUT IS NULL OR EXP_NR_PONT_PRFL_FUT IS NULL THEN NULL
+                ELSE EXP_NR_PONT_CONC_FUT + EXP_NR_PONT_ORC_FUT + EXP_NR_PONT_PRFL_FUT
+            END AS INT
+        ) AS EXP_NR_PONT_FUT_FIM,
+
+        CAST(
+            CASE
+                WHEN EXP_NR_PONT_CONC_OBR IS NULL OR EXP_NR_PONT_ORC_OBR IS NULL OR EXP_NR_PONT_PRFL_OBR IS NULL THEN NULL
+                ELSE EXP_NR_PONT_CONC_OBR + EXP_NR_PONT_ORC_OBR + EXP_NR_PONT_PRFL_OBR
+            END AS INT
+        ) AS EXP_NR_PONT_OBR_FIM
+
+    FROM r5
+),
+
+r7 AS (
+    SELECT
+        r6.*,
+        CASE
+            WHEN EXP_NR_PONT_IND_FIM IS NULL
+              OR EXP_NR_PONT_ESS_FIM IS NULL
+              OR EXP_NR_PONT_NAO_ESS_FIM IS NULL
+              OR EXP_NR_PONT_FUT_FIM IS NULL
+              OR EXP_NR_PONT_OBR_FIM IS NULL
+            THEN NULL
+            ELSE GREATEST(
+                EXP_NR_PONT_IND_FIM,
+                EXP_NR_PONT_ESS_FIM,
+                EXP_NR_PONT_NAO_ESS_FIM,
+                EXP_NR_PONT_FUT_FIM,
+                EXP_NR_PONT_OBR_FIM
+            )
+        END AS EXP_NR_PONT_MAX
+    FROM r6
+),
+
+r8 AS (
+    SELECT
+        r7.*,
+
+        CASE
+            WHEN EXP_NR_PONT_MAX IS NULL THEN NULL
+
+            WHEN CAST(EXP_NR_PONT_IND_FIM = EXP_NR_PONT_MAX AS INT)
+               + CAST(EXP_NR_PONT_ESS_FIM = EXP_NR_PONT_MAX AS INT)
+               + CAST(EXP_NR_PONT_NAO_ESS_FIM = EXP_NR_PONT_MAX AS INT)
+               + CAST(EXP_NR_PONT_FUT_FIM = EXP_NR_PONT_MAX AS INT)
+               + CAST(EXP_NR_PONT_OBR_FIM = EXP_NR_PONT_MAX AS INT) > 1
+                THEN 9
+
+            WHEN EXP_NR_PONT_IND_FIM = EXP_NR_PONT_MAX THEN 1
+            WHEN EXP_NR_PONT_ESS_FIM = EXP_NR_PONT_MAX THEN 2
+            WHEN EXP_NR_PONT_NAO_ESS_FIM = EXP_NR_PONT_MAX THEN 3
+            WHEN EXP_NR_PONT_FUT_FIM = EXP_NR_PONT_MAX THEN 4
+            ELSE 5
+        END AS EXP_CD_TEMA_VENCEDOR
+
+    FROM r7
+)
+
+SELECT
+    r8.*,
+
+    CASE EXP_CD_TEMA_VENCEDOR
+        WHEN 1 THEN 'Categorização dos Gastos'
+        WHEN 2 THEN 'Gestão de Orçamento'
+        WHEN 3 THEN 'Consumo Planejado'
+        WHEN 4 THEN 'Formação de Reserva'
+        WHEN 5 THEN 'Uso Consciente do Crédito'
+        WHEN 9 THEN 'Empate'
+    END AS EXP_TX_TEMA_VENCEDOR
+
+FROM r8
+""")
+
+print("  View independente criada:", VIEW_RECALC)
+
+
+# ====================================================================================================
+# 13. RECONCILIAÇÃO CAMPO A CAMPO — PERSISTIDO x RECALCULADO
+# ====================================================================================================
+
+titulo_secao(13, "Reconciliação campo a campo — persistido x recalculado")
+
+recon = spark.sql(f"""
+SELECT
+    COUNT(*) AS BASE,
+
+    SUM(CASE WHEN NOT (NM_MAC_PRFL_CLI <=> EXP_NM_MAC_PRFL_CLI) THEN 1 ELSE 0 END) AS ERR_NM_MAC,
+    SUM(CASE WHEN NOT (NM_MIC_PRFL_CLI <=> EXP_NM_MIC_PRFL_CLI) THEN 1 ELSE 0 END) AS ERR_NM_MIC,
+    SUM(CASE WHEN NOT (NM_PRFL_FIN <=> EXP_NM_PRFL_FIN) THEN 1 ELSE 0 END) AS ERR_NM_PRFL_FIN,
+
+    SUM(CASE WHEN NOT (VL_ENT_TOTAL <=> EXP_VL_ENT_TOTAL) THEN 1 ELSE 0 END) AS ERR_VL_ENT_TOTAL,
+    SUM(CASE WHEN NOT (VL_SAI_TOTAL <=> EXP_VL_SAI_TOTAL) THEN 1 ELSE 0 END) AS ERR_VL_SAI_TOTAL,
+    SUM(CASE WHEN NOT (VL_RES_ORC <=> EXP_VL_RES_ORC) THEN 1 ELSE 0 END) AS ERR_VL_RES_ORC,
+    SUM(CASE WHEN NOT (PC_SAI_ENT <=> EXP_PC_SAI_ENT) THEN 1 ELSE 0 END) AS ERR_PC_SAI_ENT,
+
+    SUM(CASE WHEN NOT (CD_FAIXA_ORC <=> EXP_CD_FAIXA_ORC) THEN 1 ELSE 0 END) AS ERR_CD_FAIXA_ORC,
+    SUM(CASE WHEN NOT (CD_RES_ORC <=> EXP_CD_RES_ORC) THEN 1 ELSE 0 END) AS ERR_CD_RES_ORC,
+    SUM(CASE WHEN NOT (TX_RES_ORC <=> EXP_TX_RES_ORC) THEN 1 ELSE 0 END) AS ERR_TX_RES_ORC,
+    SUM(CASE WHEN NOT (TX_STS_RES <=> EXP_TX_STS_RES) THEN 1 ELSE 0 END) AS ERR_TX_STS_RES,
+    SUM(CASE WHEN NOT (TX_STS_FINAL <=> EXP_TX_STS_FINAL) THEN 1 ELSE 0 END) AS ERR_TX_STS_FINAL,
+
+    SUM(CASE WHEN NOT (PC_SAI_IND <=> EXP_PC_SAI_IND) THEN 1 ELSE 0 END) AS ERR_PC_IND,
+    SUM(CASE WHEN NOT (PC_SAI_ESS <=> EXP_PC_SAI_ESS) THEN 1 ELSE 0 END) AS ERR_PC_ESS,
+    SUM(CASE WHEN NOT (PC_SAI_NAO_ESS <=> EXP_PC_SAI_NAO_ESS) THEN 1 ELSE 0 END) AS ERR_PC_NAO_ESS,
+    SUM(CASE WHEN NOT (PC_SAI_FUT <=> EXP_PC_SAI_FUT) THEN 1 ELSE 0 END) AS ERR_PC_FUT,
+    SUM(CASE WHEN NOT (PC_SAI_OBR <=> EXP_PC_SAI_OBR) THEN 1 ELSE 0 END) AS ERR_PC_OBR,
+
+    SUM(CASE WHEN NOT (NR_PONT_CONC_IND <=> EXP_NR_PONT_CONC_IND) THEN 1 ELSE 0 END) AS ERR_CONC_IND,
+    SUM(CASE WHEN NOT (NR_PONT_CONC_ESS <=> EXP_NR_PONT_CONC_ESS) THEN 1 ELSE 0 END) AS ERR_CONC_ESS,
+    SUM(CASE WHEN NOT (NR_PONT_CONC_NAO_ESS <=> EXP_NR_PONT_CONC_NAO_ESS) THEN 1 ELSE 0 END) AS ERR_CONC_NAO_ESS,
+    SUM(CASE WHEN NOT (NR_PONT_CONC_FUT <=> EXP_NR_PONT_CONC_FUT) THEN 1 ELSE 0 END) AS ERR_CONC_FUT,
+    SUM(CASE WHEN NOT (NR_PONT_CONC_OBR <=> EXP_NR_PONT_CONC_OBR) THEN 1 ELSE 0 END) AS ERR_CONC_OBR,
+
+    SUM(CASE WHEN NOT (NR_PONT_ORC_IND <=> EXP_NR_PONT_ORC_IND) THEN 1 ELSE 0 END) AS ERR_ORC_IND,
+    SUM(CASE WHEN NOT (NR_PONT_ORC_ESS <=> EXP_NR_PONT_ORC_ESS) THEN 1 ELSE 0 END) AS ERR_ORC_ESS,
+    SUM(CASE WHEN NOT (NR_PONT_ORC_NAO_ESS <=> EXP_NR_PONT_ORC_NAO_ESS) THEN 1 ELSE 0 END) AS ERR_ORC_NAO_ESS,
+    SUM(CASE WHEN NOT (NR_PONT_ORC_FUT <=> EXP_NR_PONT_ORC_FUT) THEN 1 ELSE 0 END) AS ERR_ORC_FUT,
+    SUM(CASE WHEN NOT (NR_PONT_ORC_OBR <=> EXP_NR_PONT_ORC_OBR) THEN 1 ELSE 0 END) AS ERR_ORC_OBR,
+
+    SUM(CASE WHEN NOT (NR_PONT_PRFL_IND <=> EXP_NR_PONT_PRFL_IND) THEN 1 ELSE 0 END) AS ERR_PRFL_IND,
+    SUM(CASE WHEN NOT (NR_PONT_PRFL_ESS <=> EXP_NR_PONT_PRFL_ESS) THEN 1 ELSE 0 END) AS ERR_PRFL_ESS,
+    SUM(CASE WHEN NOT (NR_PONT_PRFL_NAO_ESS <=> EXP_NR_PONT_PRFL_NAO_ESS) THEN 1 ELSE 0 END) AS ERR_PRFL_NAO_ESS,
+    SUM(CASE WHEN NOT (NR_PONT_PRFL_FUT <=> EXP_NR_PONT_PRFL_FUT) THEN 1 ELSE 0 END) AS ERR_PRFL_FUT,
+    SUM(CASE WHEN NOT (NR_PONT_PRFL_OBR <=> EXP_NR_PONT_PRFL_OBR) THEN 1 ELSE 0 END) AS ERR_PRFL_OBR,
+
+    SUM(CASE WHEN NOT (NR_PONT_IND_FIM <=> EXP_NR_PONT_IND_FIM) THEN 1 ELSE 0 END) AS ERR_FIM_IND,
+    SUM(CASE WHEN NOT (NR_PONT_ESS_FIM <=> EXP_NR_PONT_ESS_FIM) THEN 1 ELSE 0 END) AS ERR_FIM_ESS,
+    SUM(CASE WHEN NOT (NR_PONT_NAO_ESS_FIM <=> EXP_NR_PONT_NAO_ESS_FIM) THEN 1 ELSE 0 END) AS ERR_FIM_NAO_ESS,
+    SUM(CASE WHEN NOT (NR_PONT_FUT_FIM <=> EXP_NR_PONT_FUT_FIM) THEN 1 ELSE 0 END) AS ERR_FIM_FUT,
+    SUM(CASE WHEN NOT (NR_PONT_OBR_FIM <=> EXP_NR_PONT_OBR_FIM) THEN 1 ELSE 0 END) AS ERR_FIM_OBR,
+
+    SUM(CASE WHEN NOT (CD_TEMA_VENCEDOR <=> EXP_CD_TEMA_VENCEDOR) THEN 1 ELSE 0 END) AS ERR_CD_TEMA,
+    SUM(CASE WHEN NOT (TX_TEMA_VENCEDOR <=> EXP_TX_TEMA_VENCEDOR) THEN 1 ELSE 0 END) AS ERR_TX_TEMA,
+
+    SUM(CASE WHEN NOT (VL_TRANS_ENT <=> VL_ENT_TOTAL) THEN 1 ELSE 0 END) AS ERR_TRANS_ENT_VS_CLASSES,
+    SUM(CASE WHEN NOT (VL_TRANS_SAI <=> VL_SAI_TOTAL) THEN 1 ELSE 0 END) AS ERR_TRANS_SAI_VS_CLASSES
+
+FROM {VIEW_RECALC}
+""").first()
+
+erros_totais = 0
+for k, v in recon.asDict().items():
+    if k == "BASE":
+        print(f"  • {k:<32}: {format_num(v)}")
+        continue
+    valor = int(v or 0)
+    erros_totais += valor
+    status = "OK" if valor == 0 else "DIVERGÊNCIA"
+    print(f"  • {k:<32}: {format_num(valor):>12}  [{status}]")
+
+print("\n  Soma das ocorrências de divergência entre os testes acima:", format_num(erros_totais))
+
+
+# ====================================================================================================
+# 14. AMOSTRAS DOS CASOS CRÍTICOS
+# ====================================================================================================
+
+titulo_secao(14, "Amostras dos casos críticos")
+
+amostras = [
+    (
+        "A) Entrada participante zero + saída positiva → regra atual pode classificar como Superavitário Acentuado",
+        f"""
+        SELECT
+            CD_CLI, VL_ENT_TOTAL, VL_SAI_TOTAL, VL_RES_ORC,
+            PC_SAI_ENT, CD_FAIXA_ORC, TX_STS_FINAL,
+            QT_TRANS_TOTAL, CD_TEMA_VENCEDOR, TX_TEMA_VENCEDOR
+        FROM {VIEW_BASE}
+        WHERE QT_TRANS_TOTAL > 0
+          AND VL_ENT_TOTAL = 0
+          AND VL_SAI_TOTAL > 0
+        ORDER BY VL_SAI_TOTAL DESC
+        LIMIT 5
+        """
+    ),
+    (
+        "B) Renda não positiva com tema vencedor",
+        f"""
+        SELECT
+            CD_CLI, VL_REN_PRES, NM_PRFL_FIN,
+            QT_TRANS_TOTAL, VL_ENT_TOTAL, VL_SAI_TOTAL,
+            CD_TEMA_VENCEDOR, TX_TEMA_VENCEDOR,
+            NR_PONT_IND_FIM, NR_PONT_ESS_FIM, NR_PONT_NAO_ESS_FIM, NR_PONT_FUT_FIM, NR_PONT_OBR_FIM
+        FROM {VIEW_BASE}
+        WHERE VL_REN_PRES <= 0
+          AND CD_TEMA_VENCEDOR IS NOT NULL
+        ORDER BY QT_TRANS_TOTAL DESC
+        LIMIT 5
+        """
+    ),
+    (
+        "C) Movimento existente, mas nenhum valor participante nas dez classes",
+        f"""
+        SELECT
+            CD_CLI, QT_TRANS_TOTAL, QT_TRANS_ENT, QT_TRANS_SAI,
+            VL_TRANS_ENT, VL_TRANS_SAI, VL_ENT_TOTAL, VL_SAI_TOTAL,
+            CD_FAIXA_ORC, TX_STS_FINAL, CD_TEMA_VENCEDOR
+        FROM {VIEW_BASE}
+        WHERE QT_TRANS_TOTAL > 0
+          AND VL_ENT_TOTAL = 0
+          AND VL_SAI_TOTAL = 0
+        ORDER BY QT_TRANS_TOTAL DESC
+        LIMIT 5
+        """
+    ),
+    (
+        "D) Natureza transacional diferente de C/D inferida pelas quantidades",
+        f"""
+        SELECT
+            CD_CLI, QT_TRANS_TOTAL, QT_TRANS_ENT, QT_TRANS_SAI,
+            QT_TRANS_TOTAL - COALESCE(QT_TRANS_ENT,0) - COALESCE(QT_TRANS_SAI,0) AS QT_OUTRA_NATUREZA,
+            VL_ENT_TOTAL, VL_SAI_TOTAL
+        FROM {VIEW_BASE}
+        WHERE QT_TRANS_TOTAL > COALESCE(QT_TRANS_ENT,0) + COALESCE(QT_TRANS_SAI,0)
+        ORDER BY QT_OUTRA_NATUREZA DESC
+        LIMIT 5
+        """
+    ),
+    (
+        "E) Cliente aparentemente apto a pontuar, mas sem vencedor",
+        f"""
+        SELECT
+            CD_CLI, VL_REN_PRES, NM_PRFL_FIN, QT_TRANS_TOTAL,
+            NR_PONT_IND_FIM, NR_PONT_ESS_FIM, NR_PONT_NAO_ESS_FIM, NR_PONT_FUT_FIM, NR_PONT_OBR_FIM,
+            CD_TEMA_VENCEDOR
+        FROM {VIEW_BASE}
+        WHERE VL_REN_PRES > 0
+          AND QT_TRANS_TOTAL > 0
+          AND NM_PRFL_FIN IS NOT NULL
+          AND NM_PRFL_FIN <> 'CODIGO NAO MAPEADO'
+          AND CD_TEMA_VENCEDOR IS NULL
+        ORDER BY QT_TRANS_TOTAL DESC
+        LIMIT 5
+        """
+    ),
+]
+
+for nome, sql in amostras:
+    subtitulo(nome)
+    rows = spark.sql(sql).collect()
+    if not rows:
+        print("  Nenhum caso encontrado.")
+    else:
+        cols = rows[0].asDict().keys()
+        exibir_tabela_formatada(
+            list(cols),
+            [[r[c] for c in cols] for r in rows]
+        )
+
+
+# ====================================================================================================
+# 15. SELEÇÃO AUTOMÁTICA DE CLIENTES RICOS PARA AUDITORIA INDIVIDUAL
+# ====================================================================================================
+
+titulo_secao(15, "Seleção automática de clientes ricos para auditoria individual")
+
+candidatos = spark.sql(f"""
+SELECT
+    CD_CLI,
+    QT_TRANS_TOTAL,
+    VL_REN_PRES,
+    NM_PRFL_FIN,
+    VL_ENT_TOTAL,
+    VL_SAI_TOTAL,
+    VL_SAI_IND,
+    VL_SAI_ESS,
+    VL_SAI_NAO_ESS,
+    VL_SAI_FUT,
+    VL_SAI_OBR,
+    FL_TEM_MOV_AGRO,
+    FL_MULT_MOE,
+    CD_TEMA_VENCEDOR,
+    TX_TEMA_VENCEDOR,
+
+    (
+        CASE WHEN VL_ENT_REN  > 0 THEN 1 ELSE 0 END +
+        CASE WHEN VL_ENT_EST  > 0 THEN 1 ELSE 0 END +
+        CASE WHEN VL_ENT_RESG > 0 THEN 1 ELSE 0 END +
+        CASE WHEN VL_ENT_OUT  > 0 THEN 1 ELSE 0 END +
+        CASE WHEN VL_ENT_CRED > 0 THEN 1 ELSE 0 END +
+        CASE WHEN VL_SAI_IND  > 0 THEN 1 ELSE 0 END +
+        CASE WHEN VL_SAI_ESS  > 0 THEN 1 ELSE 0 END +
+        CASE WHEN VL_SAI_NAO_ESS > 0 THEN 1 ELSE 0 END +
+        CASE WHEN VL_SAI_FUT  > 0 THEN 1 ELSE 0 END +
+        CASE WHEN VL_SAI_OBR  > 0 THEN 1 ELSE 0 END
+    ) AS NR_CLASSES_COM_VALOR,
+
+    (
+        CASE WHEN FL_TEM_MOV_AGRO = 'S' THEN 1 ELSE 0 END +
+        CASE WHEN FL_MULT_MOE = 'S' THEN 1 ELSE 0 END
+    ) AS NR_FLAGS_ESPECIAIS
+
+FROM {VIEW_BASE}
+
+WHERE VL_REN_PRES > 0
+  AND NM_PRFL_FIN IS NOT NULL
+  AND NM_PRFL_FIN <> 'CODIGO NAO MAPEADO'
+  AND QT_TRANS_TOTAL BETWEEN 20 AND 300
+  AND QT_TRANS_ENT > 0
+  AND QT_TRANS_SAI > 0
+  AND VL_ENT_TOTAL > 0
+  AND VL_SAI_TOTAL > 0
+  AND CD_TEMA_VENCEDOR BETWEEN 1 AND 5
+
+ORDER BY
+    NR_CLASSES_COM_VALOR DESC,
+    NR_FLAGS_ESPECIAIS DESC,
+    ABS(QT_TRANS_TOTAL - 100) ASC,
+    CD_CLI ASC
+
+LIMIT 5
+""").collect()
+
+if not candidatos:
+    print("  Nenhum candidato encontrado com o filtro principal.")
+    print("  Ajuste os limites de QT_TRANS_TOTAL se necessário.")
+    cliente_escolhido = None
+else:
+    print("  Top 5 candidatos:")
+    colunas_cand = [
+        "CD_CLI", "QT_TRANS_TOTAL", "VL_REN_PRES", "NM_PRFL_FIN",
+        "VL_ENT_TOTAL", "VL_SAI_TOTAL",
+        "NR_CLASSES_COM_VALOR", "NR_FLAGS_ESPECIAIS",
+        "FL_TEM_MOV_AGRO", "FL_MULT_MOE",
+        "CD_TEMA_VENCEDOR", "TX_TEMA_VENCEDOR"
+    ]
+    exibir_tabela_formatada(
+        colunas_cand,
+        [[r[c] for c in colunas_cand] for r in candidatos]
+    )
+    cliente_escolhido = int(candidatos[0]["CD_CLI"])
+    print("\n  CLIENTE ESCOLHIDO AUTOMATICAMENTE:", cliente_escolhido)
+
+
+# ====================================================================================================
+# 16. RAIO-X VERTICAL DAS 72 COLUNAS DO CLIENTE ESCOLHIDO
+# ====================================================================================================
+
+titulo_secao(16, "Raio-X individual — 72 colunas persistidas")
+
+if cliente_escolhido is None:
+    print("  Etapa ignorada porque não houve candidato.")
+else:
+    row_cliente = (
+        df_base
+        .where(F.col("CD_CLI") == cliente_escolhido)
+        .first()
+    )
+
+    if row_cliente is None:
+        print("  [ERRO] Cliente escolhido não localizado na base.")
+    else:
+        dados_cli = row_cliente.asDict(recursive=True)
+        for i, coluna in enumerate(df_base.columns, start=1):
+            print(f"  {i:02d}. {coluna:<28} = {dados_cli.get(coluna)}")
+
+
+# ====================================================================================================
+# 17. RECONCILIAÇÃO INDIVIDUAL — PERSISTIDO x ESPERADO
+# ====================================================================================================
+
+titulo_secao(17, "Reconciliação individual — persistido x esperado")
+
+if cliente_escolhido is None:
+    print("  Etapa ignorada porque não houve candidato.")
+else:
+    rec_cli = spark.sql(f"""
+        SELECT *
+        FROM {VIEW_RECALC}
+        WHERE CD_CLI = {cliente_escolhido}
+    """).first()
+
+    if rec_cli is None:
+        print("  [ERRO] Cliente não localizado na view recalculada.")
+    else:
+        d = rec_cli.asDict(recursive=True)
+
+        pares = [
+            ("NM_MAC_PRFL_CLI", "EXP_NM_MAC_PRFL_CLI"),
+            ("NM_MIC_PRFL_CLI", "EXP_NM_MIC_PRFL_CLI"),
+            ("NM_PRFL_FIN", "EXP_NM_PRFL_FIN"),
+
+            ("VL_ENT_TOTAL", "EXP_VL_ENT_TOTAL"),
+            ("VL_SAI_TOTAL", "EXP_VL_SAI_TOTAL"),
+            ("VL_RES_ORC", "EXP_VL_RES_ORC"),
+            ("PC_SAI_ENT", "EXP_PC_SAI_ENT"),
+
+            ("CD_FAIXA_ORC", "EXP_CD_FAIXA_ORC"),
+            ("CD_RES_ORC", "EXP_CD_RES_ORC"),
+            ("TX_RES_ORC", "EXP_TX_RES_ORC"),
+            ("TX_STS_RES", "EXP_TX_STS_RES"),
+            ("TX_STS_FINAL", "EXP_TX_STS_FINAL"),
+
+            ("PC_SAI_IND", "EXP_PC_SAI_IND"),
+            ("PC_SAI_ESS", "EXP_PC_SAI_ESS"),
+            ("PC_SAI_NAO_ESS", "EXP_PC_SAI_NAO_ESS"),
+            ("PC_SAI_FUT", "EXP_PC_SAI_FUT"),
+            ("PC_SAI_OBR", "EXP_PC_SAI_OBR"),
+
+            ("NR_PONT_CONC_IND", "EXP_NR_PONT_CONC_IND"),
+            ("NR_PONT_CONC_ESS", "EXP_NR_PONT_CONC_ESS"),
+            ("NR_PONT_CONC_NAO_ESS", "EXP_NR_PONT_CONC_NAO_ESS"),
+            ("NR_PONT_CONC_FUT", "EXP_NR_PONT_CONC_FUT"),
+            ("NR_PONT_CONC_OBR", "EXP_NR_PONT_CONC_OBR"),
+
+            ("NR_PONT_ORC_IND", "EXP_NR_PONT_ORC_IND"),
+            ("NR_PONT_ORC_ESS", "EXP_NR_PONT_ORC_ESS"),
+            ("NR_PONT_ORC_NAO_ESS", "EXP_NR_PONT_ORC_NAO_ESS"),
+            ("NR_PONT_ORC_FUT", "EXP_NR_PONT_ORC_FUT"),
+            ("NR_PONT_ORC_OBR", "EXP_NR_PONT_ORC_OBR"),
+
+            ("NR_PONT_PRFL_IND", "EXP_NR_PONT_PRFL_IND"),
+            ("NR_PONT_PRFL_ESS", "EXP_NR_PONT_PRFL_ESS"),
+            ("NR_PONT_PRFL_NAO_ESS", "EXP_NR_PONT_PRFL_NAO_ESS"),
+            ("NR_PONT_PRFL_FUT", "EXP_NR_PONT_PRFL_FUT"),
+            ("NR_PONT_PRFL_OBR", "EXP_NR_PONT_PRFL_OBR"),
+
+            ("NR_PONT_IND_FIM", "EXP_NR_PONT_IND_FIM"),
+            ("NR_PONT_ESS_FIM", "EXP_NR_PONT_ESS_FIM"),
+            ("NR_PONT_NAO_ESS_FIM", "EXP_NR_PONT_NAO_ESS_FIM"),
+            ("NR_PONT_FUT_FIM", "EXP_NR_PONT_FUT_FIM"),
+            ("NR_PONT_OBR_FIM", "EXP_NR_PONT_OBR_FIM"),
+
+            ("CD_TEMA_VENCEDOR", "EXP_CD_TEMA_VENCEDOR"),
+            ("TX_TEMA_VENCEDOR", "EXP_TX_TEMA_VENCEDOR"),
+        ]
+
+        linhas_check = []
+        divergencias_cli = 0
+
+        for real, esperado in pares:
+            vr = d.get(real)
+            ve = d.get(esperado)
+
+            if vr is None and ve is None:
+                ok = True
+            elif isinstance(vr, Decimal) or isinstance(ve, Decimal):
+                try:
+                    ok = Decimal(str(vr)) == Decimal(str(ve))
+                except Exception:
+                    ok = vr == ve
+            else:
+                ok = vr == ve
+
+            if not ok:
+                divergencias_cli += 1
+
+            linhas_check.append([
+                real,
+                vr,
+                ve,
+                "OK" if ok else "DIVERGENTE"
+            ])
+
+        exibir_tabela_formatada(
+            ["Regra/Campo", "Persistido", "Recalculado", "Status"],
+            linhas_check
+        )
+
+        print("\n  Divergências do cliente:", divergencias_cli)
+
+
+# ====================================================================================================
+# 18. RESUMO DO CLIENTE PARA AUDITORIA POSTERIOR NAS FONTES
+# ====================================================================================================
+
+titulo_secao(18, "Resumo do cliente para próxima auditoria nas fontes")
+
+if cliente_escolhido is None:
+    print("  Nenhum cliente selecionado.")
+else:
+    resumo_cli = spark.sql(f"""
+    SELECT
+        CD_CLI,
+        DT_REF_INI,
+        DT_REF_FIM,
+        TS_ATL_TRAN,
+        DD_INC_MM_CLC_BLC,
+        VL_REN_PRES,
+        CD_MAC_PRFL_CLI,
+        NM_MAC_PRFL_CLI,
+        CD_MIC_PRFL_CLI,
+        NM_MIC_PRFL_CLI,
+        NM_PRFL_FIN,
+        QT_TRANS_TOTAL,
+        QT_TRANS_ENT,
+        QT_TRANS_SAI,
+        VL_ENT_TOTAL,
+        VL_SAI_TOTAL,
+        VL_RES_ORC,
+        PC_SAI_ENT,
+        TX_STS_FINAL,
+        FL_TEM_MOV_AGRO,
+        FL_MULT_MOE,
+        CD_TEMA_VENCEDOR,
+        TX_TEMA_VENCEDOR
+    FROM {VIEW_BASE}
+    WHERE CD_CLI = {cliente_escolhido}
+    """).first()
+
+    if resumo_cli:
+        dres = resumo_cli.asDict()
+        for k, v in dres.items():
+            print(f"  {k:<26}: {v}")
+
+        print("\n  PRÓXIMO PASSO DE AUDITORIA:")
+        print(f"  • CD_CLI     = {dres['CD_CLI']}")
+        print(f"  • DT_REF_INI = {dres['DT_REF_INI']}")
+        print(f"  • DT_REF_FIM = {dres['DT_REF_FIM']}")
+        print("  Usar estes três valores para reconciliar posteriormente as transações e fontes de perfil/renda.")
+
+
+# ====================================================================================================
+# 19. ENCERRAMENTO
+# ====================================================================================================
+
+titulo_secao(19, "Encerramento")
+
+fim_estudo = datetime.datetime.now()
+duracao = (fim_estudo - inicio_estudo).total_seconds()
+
+print("  Tabela estudada              :", TABELA_ALVO)
+print("  Competência                  :", COMPETENCIA)
+print("  Linhas                       :", format_num(total_linhas))
+print("  Divergências globais somadas :", format_num(erros_totais))
+print("  Cliente selecionado          :", cliente_escolhido)
+print("  Início                       :", inicio_estudo)
+print("  Fim                          :", fim_estudo)
+print("  Duração total do estudo (s)  :", round(duracao, 2))
+
+df_base.unpersist()
+
+print("\n" + linha_div("="))
+print(" FIM — ESTUDO FINAL V15")
+print(" Envie TODO o output desta célula para a próxima avaliação.")
+print(linha_div("="))
