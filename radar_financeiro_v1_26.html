@@ -1,0 +1,3040 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Radar Financeiro</title>
+<style>
+
+
+:root{
+  --bg:#F4F7FB;
+  --surface:#FFFFFF;
+  --surface-soft:#F8FAFC;
+  --text:#172033;
+  --muted:#64748B;
+  --line:#E2E8F0;
+  --struct:#163E7A;
+  --accent:#F8D34A;
+  --ess:#2F6BFF;
+  --non:#D97706;
+  --future:#16836B;
+  --obl:#7C3AED;
+  --unknown:#64748B;
+  --attention:#9A5B12;
+  --shadow:0 12px 30px rgba(22,62,122,.08);
+  --radius:18px;
+  --radius-sm:12px;
+  --focus:0 0 0 3px rgba(47,107,255,.22);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  line-height:1.45;
+}
+button,input,select{font:inherit}
+button{color:inherit}
+a{color:inherit}
+.app-shell{max-width:1240px;margin:0 auto;padding:28px 28px 88px}
+.header{
+  display:flex;justify-content:space-between;align-items:flex-end;gap:24px;
+  margin-bottom:22px;
+}
+.brand h1{margin:0;color:var(--struct);font-size:30px;letter-spacing:-.02em}
+.brand p{margin:4px 0 0;color:var(--muted);font-size:15px}
+.period{text-align:right}
+.period-label{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700}
+.period-value{font-size:17px;font-weight:750;color:var(--struct);margin-top:3px}
+.header-actions{display:flex;gap:10px;align-items:center;margin-top:10px;justify-content:flex-end}
+.btn{
+  border:1px solid var(--line);background:var(--surface);border-radius:11px;padding:9px 12px;
+  cursor:pointer;font-weight:700;font-size:13px;transition:.18s ease;
+}
+.btn:hover{border-color:#B9C7DA;transform:translateY(-1px)}
+.btn:focus-visible,.clickable:focus-visible,.tab-btn:focus-visible,.bar-button:focus-visible,
+.drawer-close:focus-visible,.signal-card:focus-visible,.step-card:focus-visible{
+  outline:none;box-shadow:var(--focus)
+}
+.btn-primary{background:var(--struct);border-color:var(--struct);color:#fff}
+.btn-link{border:0;background:transparent;color:var(--struct);padding:4px 0}
+.panel{
+  background:var(--surface);border:1px solid #E7ECF3;border-radius:var(--radius);
+  box-shadow:var(--shadow);margin-bottom:18px;overflow:hidden;
+}
+.panel-inner{padding:25px 26px}
+.panel-title-row{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;margin-bottom:18px}
+.section-kicker{color:var(--struct);font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;margin-bottom:5px}
+.panel h2{margin:0;font-size:22px;letter-spacing:-.015em}
+.panel-desc{margin:6px 0 0;color:var(--muted);font-size:14px}
+.closing-grid{display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:22px;align-items:stretch}
+.flow-strip{
+  display:grid;grid-template-columns:1fr 28px 1fr 28px 1fr;align-items:center;
+  border:1px solid var(--line);background:var(--surface-soft);border-radius:15px;padding:17px 18px;
+}
+.flow-item .label{color:var(--muted);font-size:12px;font-weight:700;margin-bottom:5px}
+.flow-item .value{font-size:23px;font-weight:800;letter-spacing:-.02em;white-space:nowrap}
+.flow-arrow{text-align:center;color:#94A3B8;font-size:18px}
+.future-box{
+  border:1px solid rgba(22,131,107,.22);background:rgba(22,131,107,.06);border-radius:15px;padding:17px 18px;
+  display:flex;flex-direction:column;justify-content:center;cursor:pointer;
+}
+.future-box:hover{border-color:rgba(22,131,107,.45)}
+.future-box .label{font-size:12px;color:#276759;font-weight:800}
+.future-box .value{font-size:26px;color:var(--future);font-weight:850;margin:4px 0 2px}
+.future-box .sub{font-size:12px;color:#52776F}
+.secondary-metrics{
+  margin-top:10px;padding:0 3px;color:var(--muted);font-size:13px;display:flex;gap:18px;flex-wrap:wrap
+}
+.secondary-metrics strong{color:#40516B}
+.chart-split{display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:22px;margin-top:22px;align-items:stretch}
+.chart-box{border:1px solid var(--line);border-radius:15px;padding:16px;background:#fff;min-height:310px}
+.chart-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px}
+.chart-title{font-size:14px;font-weight:800;color:#314158}
+.chart-note{font-size:12px;color:var(--muted)}
+.future-detail{
+  border-radius:15px;background:linear-gradient(160deg,rgba(22,131,107,.08),rgba(22,131,107,.025));
+  border:1px solid rgba(22,131,107,.18);padding:18px;height:100%;
+}
+.future-detail h3{font-size:15px;margin:0 0 10px}
+.future-detail .big{font-size:30px;font-weight:850;color:var(--future)}
+.future-detail .pct{font-size:14px;font-weight:750;color:#276759}
+.future-detail p{font-size:13px;color:var(--muted);margin:12px 0 0}
+.future-detail button{margin-top:12px}
+svg{display:block;width:100%;height:auto;overflow:visible}
+.axis-text{fill:#748197;font-size:11px}
+.chart-label{fill:#2B374A;font-size:12px;font-weight:700}
+.chart-value{fill:#41516A;font-size:11px}
+.ref-panel{display:grid;grid-template-columns:1fr;gap:4px}
+.ref-intro{font-size:13px;color:var(--muted);margin:-7px 0 17px}
+.bullet-row{
+  border-top:1px solid var(--line);padding:16px 0 15px;cursor:pointer;border-radius:8px;
+}
+.bullet-row:first-of-type{border-top:0}
+.bullet-row:hover{background:#FBFCFE}
+.bullet-meta{display:grid;grid-template-columns:minmax(150px,1fr) auto auto;gap:16px;align-items:baseline;margin-bottom:9px}
+.bullet-name{font-weight:800}
+.bullet-value{font-size:13px;color:#4C5C73}
+.bullet-pct{font-weight:850;font-variant-numeric:tabular-nums}
+.bullet-caption{font-size:11px;color:var(--muted);margin-top:5px}
+.bullet-track{
+  height:12px;background:#E9EEF5;border-radius:999px;position:relative;overflow:visible;
+}
+.bullet-fill{height:100%;border-radius:999px;min-width:0;transition:width .3s ease}
+.ref-marker{position:absolute;top:-5px;bottom:-5px;width:2px;background:#27364D;border-radius:2px}
+.ref-marker::after{
+  content:"";position:absolute;top:-4px;left:-3px;width:8px;height:8px;border:2px solid #27364D;background:white;border-radius:50%
+}
+.clarity-line{
+  margin-top:10px;padding:13px 14px;border-radius:12px;background:var(--surface-soft);
+  color:#485870;font-size:13px;display:flex;justify-content:space-between;gap:12px;align-items:center
+}
+.inline-action{color:var(--struct);font-weight:800;cursor:pointer;text-decoration:underline;text-decoration-color:#C8D4E4;text-underline-offset:3px}
+.inline-action:hover{text-decoration-color:var(--struct)}
+.tabs{display:inline-flex;background:#EEF3F8;padding:4px;border-radius:11px;gap:3px}
+.tab-btn{border:0;background:transparent;padding:8px 12px;border-radius:8px;cursor:pointer;font-weight:800;font-size:13px;color:#586980}
+.tab-btn.active{background:white;color:var(--struct);box-shadow:0 2px 8px rgba(22,62,122,.08)}
+.explore-toolbar{display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+.breadcrumb{font-size:13px;color:var(--muted);display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.crumb{border:0;background:transparent;padding:0;color:var(--struct);cursor:pointer;font-weight:750}
+.crumb.current{color:#475569;cursor:default}
+.filter-chip{
+  display:inline-flex;align-items:center;gap:7px;border-radius:999px;background:#EDF3FF;color:var(--struct);padding:6px 10px;font-size:12px;font-weight:800
+}
+.filter-chip button{border:0;background:transparent;cursor:pointer;padding:0;color:var(--struct);font-size:16px;line-height:1}
+.bar-list{display:flex;flex-direction:column;gap:9px}
+.bar-button{
+  width:100%;display:grid;grid-template-columns:minmax(170px,1.05fr) minmax(240px,2.1fr) 118px;
+  gap:15px;align-items:center;border:0;background:transparent;padding:8px 7px;border-radius:10px;cursor:pointer;text-align:left
+}
+.bar-button:hover{background:#F8FAFD}
+.bar-name{font-size:13px;font-weight:800;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-track{height:13px;border-radius:999px;background:#EDF1F6;overflow:hidden}
+.bar-fill{height:100%;border-radius:999px;background:var(--struct);transition:width .25s ease}
+.bar-amount{text-align:right;font-weight:800;font-size:13px;font-variant-numeric:tabular-nums}
+.more-row{text-align:center;margin-top:13px}
+.timeline-wrap{position:relative;min-height:360px}
+.timeline-tooltip{
+  position:absolute;z-index:5;pointer-events:none;background:#15243B;color:white;border-radius:10px;padding:10px 11px;
+  font-size:11px;box-shadow:0 10px 25px rgba(15,23,42,.25);display:none;min-width:220px
+}
+.timeline-tooltip strong{display:block;font-size:12px;margin-bottom:5px}
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin:6px 0 8px;font-size:12px;color:#526177}
+.legend span{display:inline-flex;gap:7px;align-items:center}
+.legend i{width:9px;height:9px;border-radius:50%;display:inline-block}
+.diagnosis-lead{
+  border-left:4px solid var(--accent);background:#FFFBEA;border-radius:0 12px 12px 0;padding:15px 17px;
+  font-size:16px;color:#344258;margin-bottom:18px
+}
+.diagnosis-lead strong{color:var(--struct)}
+.signal-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:22px}
+.signal-card{
+  border:1px solid var(--line);background:white;border-radius:14px;padding:15px;cursor:pointer;text-align:left;
+  transition:.15s ease;min-height:112px
+}
+.signal-card:hover{transform:translateY(-1px);box-shadow:0 8px 18px rgba(15,23,42,.05)}
+.signal-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.signal-name{font-weight:850;font-size:13px}
+.signal-value{font-weight:850;font-size:14px}
+.signal-card p{margin:8px 0 0;color:var(--muted);font-size:12px}
+.subsection-title{font-size:13px;color:#334155;text-transform:uppercase;letter-spacing:.06em;font-weight:850;margin:17px 0 9px}
+.focus-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:13px 14px;background:#F4F7FB;border-radius:12px}
+.focus-tags{display:flex;gap:8px;flex-wrap:wrap}
+.focus-tag{background:white;border:1px solid #D7E0EB;border-radius:999px;padding:7px 10px;font-size:12px;font-weight:800;color:var(--struct)}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.step-card{border:1px solid var(--line);border-radius:14px;padding:14px;cursor:pointer;background:#fff;text-align:left}
+.step-card:hover{border-color:#BCC9D9}
+.step-num{font-size:11px;color:var(--muted);font-weight:800}
+.step-title{font-size:15px;font-weight:850;margin:3px 0 6px;color:var(--struct)}
+.step-card p{font-size:12px;color:var(--muted);margin:0}
+.simulator-toggle{display:flex;align-items:center;justify-content:space-between;gap:20px}
+.simulator-toggle p{margin:4px 0 0;color:var(--muted);font-size:13px}
+.simulator-body{display:none;margin-top:19px;border-top:1px solid var(--line);padding-top:19px}
+.simulator-body.open{display:block}
+.sim-grid{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(310px,.7fr);gap:26px}
+.sim-control{padding:12px 0;border-bottom:1px solid var(--line)}
+.sim-control:last-child{border-bottom:0}
+.sim-control-head{display:grid;grid-template-columns:1fr 132px;gap:12px;align-items:center;margin-bottom:8px}
+.sim-control label{font-weight:800;font-size:13px}
+.money-input{
+  width:132px;border:1px solid #CBD5E1;border-radius:9px;padding:8px 9px;text-align:right;color:#25334A;font-weight:750
+}
+.range{width:100%;accent-color:var(--struct)}
+.sim-note{font-size:12px;color:var(--muted);margin:0 0 12px}
+.sim-results{border:1px solid var(--line);border-radius:15px;overflow:hidden}
+.sim-result-head,.sim-result-row{display:grid;grid-template-columns:1.25fr .9fr .9fr;gap:10px;padding:11px 13px;align-items:center}
+.sim-result-head{background:#F3F6FA;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:850}
+.sim-result-row{border-top:1px solid var(--line);font-size:13px}
+.sim-result-row strong{text-align:right;font-variant-numeric:tabular-nums}
+.sim-actions{margin-top:13px;display:flex;justify-content:flex-end}
+.sticky-actions{
+  position:fixed;bottom:22px;left:50%;transform:translateX(-50%);display:flex;gap:10px;z-index:20;
+  background:rgba(255,255,255,.94);backdrop-filter:blur(10px);padding:8px;border:1px solid #DDE5EE;border-radius:14px;
+  box-shadow:0 15px 35px rgba(15,23,42,.15)
+}
+.drawer-overlay{
+  position:fixed;inset:0;background:rgba(15,23,42,.34);z-index:60;display:none;
+}
+.drawer-overlay.open{display:block}
+.drawer{
+  position:fixed;top:0;right:0;height:100vh;width:min(760px,92vw);background:white;z-index:70;
+  box-shadow:-16px 0 40px rgba(15,23,42,.18);transform:translateX(102%);transition:transform .22s ease;
+  display:flex;flex-direction:column
+}
+.drawer.open{transform:translateX(0)}
+.drawer-head{padding:19px 22px;border-bottom:1px solid var(--line);display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
+.drawer-title{font-size:20px;font-weight:850;color:var(--struct)}
+.drawer-sub{font-size:12px;color:var(--muted);margin-top:3px}
+.drawer-close{border:1px solid var(--line);background:white;border-radius:9px;width:35px;height:35px;cursor:pointer;font-size:18px}
+.drawer-body{padding:18px 22px 28px;overflow:auto;flex:1}
+.drawer-filters{display:grid;grid-template-columns:1.35fr 1fr 1fr 1fr;gap:8px;margin-bottom:13px}
+.drawer-filters input,.drawer-filters select{
+  border:1px solid #CBD5E1;border-radius:9px;padding:8px 9px;background:white;color:#334155;min-width:0
+}
+.context-summary{background:#F4F7FB;border-radius:12px;padding:11px 12px;margin-bottom:12px;font-size:12px;color:#536379}
+.context-summary strong{color:var(--struct)}
+.future-composition{display:flex;gap:7px;flex-wrap:wrap;margin-top:9px}
+.future-chip{border:1px solid rgba(22,131,107,.22);background:white;color:#276759;border-radius:999px;padding:6px 9px;cursor:pointer;font-weight:750;font-size:11px}
+.table-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;min-width:700px;font-size:12px}
+th{position:sticky;top:0;background:#F5F7FA;color:#4C5D74;text-align:left;padding:10px;border-bottom:1px solid var(--line);font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+td{padding:10px;border-bottom:1px solid #EDF1F5;color:#394960;vertical-align:top}
+tr:last-child td{border-bottom:0}
+.amount-pos,.amount-neg{font-weight:850;white-space:nowrap}
+.amount-pos{color:#276759}
+.amount-neg{color:#384A65}
+.badge{display:inline-flex;border-radius:999px;padding:4px 7px;background:#EEF2F6;color:#58687D;font-size:10px;font-weight:800;margin-top:4px}
+.method-section{margin-bottom:22px}
+.method-section h3{font-size:14px;color:var(--struct);margin:0 0 8px}
+.method-section p,.method-section li{font-size:13px;color:#526177}
+.method-section ul{padding-left:18px;margin:7px 0}
+.definition-list{display:grid;gap:9px}
+.definition{border-left:3px solid var(--line);padding-left:11px}
+.definition strong{display:block;font-size:13px;margin-bottom:2px}
+.definition span{font-size:12px;color:var(--muted)}
+.topic-list{display:grid;gap:11px}
+.topic{border:1px solid var(--line);border-radius:12px;padding:13px}
+.topic.focus{border-color:#9EB8EE;background:#F7F9FF}
+.topic h3{font-size:14px;margin:0 0 4px;color:var(--struct)}
+.topic .q{font-size:12px;font-weight:800;color:#43536A;margin:0 0 4px}
+.topic p{font-size:12px;color:var(--muted);margin:0}
+.empty-state,.blocked-state,.validation-fail{
+  border:1px dashed #C7D2DF;border-radius:14px;background:#F8FAFC;padding:24px;text-align:center;color:#526177
+}
+.validation-fail{border-color:#D8B989;background:#FFF9EF;color:#70461E;text-align:left}
+.debug-panel{display:none;background:#0F172A;color:#E2E8F0;border-radius:14px;padding:18px;margin-top:20px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12px;white-space:pre-wrap}
+.debug-panel.show{display:block}
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+@media (max-width:900px){
+  .app-shell{padding:20px 16px 88px}
+  .closing-grid,.chart-split,.sim-grid{grid-template-columns:1fr}
+  .flow-strip{grid-template-columns:1fr;gap:7px}
+  .flow-arrow{transform:rotate(90deg)}
+  .signal-grid,.steps{grid-template-columns:1fr}
+  .bar-button{grid-template-columns:minmax(130px,1fr) minmax(150px,1.4fr) 100px}
+  .drawer-filters{grid-template-columns:1fr 1fr}
+}
+
+
+/* V1.1 — simplificação: sem drawers laterais */
+.header-meta{display:grid;gap:10px;text-align:right}
+.meta-block .period-label{margin-bottom:2px}
+.meta-block + .meta-block{padding-top:8px;border-top:1px solid #E3E9F1}
+.inline-tools{display:flex;gap:10px;align-items:center;justify-content:flex-end;margin-top:10px}
+.fixed-table-panel .panel-inner{padding-bottom:20px}
+.tx-context-bar{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  background:#F4F7FB;border:1px solid #E1E8F0;border-radius:12px;padding:10px 12px;margin-bottom:12px
+}
+.tx-context-bar strong{color:var(--struct)}
+.tx-context-bar.hidden{display:none}
+.fixed-table-wrap{
+  overflow:auto;border:1px solid var(--line);border-radius:12px;max-height:520px;background:#fff
+}
+.fixed-table-wrap table{min-width:900px}
+.inline-details{
+  border:1px solid var(--line);border-radius:14px;background:#fff;margin-top:14px;overflow:hidden
+}
+.inline-details summary{
+  cursor:pointer;padding:14px 16px;font-weight:850;color:var(--struct);list-style:none;
+  display:flex;justify-content:space-between;gap:12px;align-items:center
+}
+.inline-details summary::-webkit-details-marker{display:none}
+.inline-details summary::after{content:"+";font-size:20px;color:#75849A}
+.inline-details[open] summary::after{content:"–"}
+.inline-details-body{border-top:1px solid var(--line);padding:16px}
+.theme-inline-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.theme-mini{border:1px solid var(--line);border-radius:12px;padding:12px;background:#fff}
+.theme-mini.focus{border-color:#9EB8EE;background:#F7F9FF}
+.theme-mini h3{font-size:13px;margin:0 0 5px;color:var(--struct)}
+.theme-mini .q{font-size:11px;font-weight:800;color:#43536A;margin:0 0 5px}
+.theme-mini p{font-size:11px;color:var(--muted);margin:0}
+.waterfall-end-label{font-weight:800}
+.click-text{border:0;background:transparent;color:var(--struct);font-weight:800;cursor:pointer;padding:0;text-decoration:underline;text-decoration-color:#CBD6E5;text-underline-offset:3px}
+.click-text:hover{text-decoration-color:var(--struct)}
+@media (max-width:1050px){
+  .theme-inline-grid{grid-template-columns:repeat(2,1fr)}
+}
+
+
+
+/* V1.2 */
+.header-meta{display:grid;gap:10px;text-align:right}
+.meta-block + .meta-block{padding-top:8px;border-top:1px solid #E3E9F1}
+.header .header-actions,.sticky-actions,.drawer,.drawer-overlay{display:none!important}
+.bar-button{
+  grid-template-columns:minmax(190px,1.05fr) minmax(240px,2fr) 178px;
+}
+.bar-amount{white-space:nowrap}
+.focus-groups{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.focus-group{
+  border:1px solid var(--line);border-radius:14px;padding:15px;background:#F8FAFC;
+}
+.focus-group .name{font-weight:850;color:var(--struct);font-size:14px}
+.focus-group .pct{font-size:24px;font-weight:850;margin:4px 0 2px}
+.focus-group .value{font-size:12px;color:var(--muted)}
+.tx-context-bar{
+  display:flex;justify-content:space-between;align-items:center;gap:12px;
+  background:#F4F7FB;border:1px solid #E1E8F0;border-radius:12px;padding:10px 12px;margin-bottom:12px
+}
+.tx-context-bar.hidden{display:none}
+.fixed-table-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px;max-height:520px;background:#fff}
+.fixed-table-wrap table{min-width:900px}
+.inline-details{
+  border:1px solid var(--line);border-radius:14px;background:#fff;margin-top:16px;overflow:hidden
+}
+.inline-details summary{
+  cursor:pointer;padding:14px 16px;font-weight:850;color:var(--struct);list-style:none;
+  display:flex;justify-content:space-between;gap:12px;align-items:center
+}
+.inline-details summary::-webkit-details-marker{display:none}
+.inline-details summary::after{content:"+";font-size:20px;color:#75849A}
+.inline-details[open] summary::after{content:"–"}
+.inline-details-body{border-top:1px solid var(--line);padding:16px}
+.drill-hint{font-size:12px;color:var(--muted);margin-top:8px}
+.transaction-bar .bar-name{white-space:normal}
+@media (max-width:950px){
+  .focus-groups{grid-template-columns:1fr}
+  .bar-button{grid-template-columns:minmax(150px,1fr) minmax(150px,1.4fr) 150px}
+}
+
+
+/* V1.3 — foco simplificado + drill-down clássico inline */
+.classic-drill{display:flex;flex-direction:column;gap:8px}
+.drill-group{border:1px solid var(--line);border-radius:13px;background:#fff;overflow:hidden}
+.drill-group-btn,
+.drill-category-btn{
+  width:100%;border:0;background:transparent;cursor:pointer;text-align:left;
+  display:grid;align-items:center;gap:14px;border-radius:0
+}
+.drill-group-btn{
+  grid-template-columns:26px minmax(180px,1.05fr) minmax(220px,2fr) 180px;
+  padding:12px 13px
+}
+.drill-category-btn{
+  grid-template-columns:26px minmax(170px,1.05fr) minmax(200px,2fr) 180px;
+  padding:10px 13px 10px 35px;background:#FAFBFD;border-top:1px solid #EDF1F5
+}
+.drill-group-btn:hover,.drill-category-btn:hover{background:#F7F9FC}
+.drill-toggle{
+  width:22px;height:22px;border:1px solid #CBD5E1;border-radius:6px;
+  display:inline-flex;align-items:center;justify-content:center;
+  font-weight:900;color:var(--struct);background:#fff
+}
+.drill-label{font-size:13px;font-weight:850;color:#2F3C52}
+.drill-category-btn .drill-label{font-weight:750}
+.drill-track{height:12px;border-radius:999px;background:#EDF1F6;overflow:hidden}
+.drill-fill{height:100%;border-radius:999px;background:var(--struct)}
+.drill-amount{text-align:right;font-size:13px;font-weight:850;white-space:nowrap}
+.drill-categories{border-top:1px solid #EDF1F5}
+.drill-transactions{background:#F7F9FC;border-top:1px solid #E9EEF4;padding:6px 13px 10px 70px}
+.drill-transaction{
+  display:grid;grid-template-columns:minmax(220px,1fr) 110px 165px;gap:14px;
+  align-items:center;padding:8px 0;border-bottom:1px dashed #DCE4ED;font-size:12px
+}
+.drill-transaction:last-child{border-bottom:0}
+.drill-transaction .desc{color:#40516A}
+.drill-transaction .date{color:var(--muted)}
+.drill-transaction .amount{text-align:right;font-weight:800}
+.drill-empty{padding:18px;color:var(--muted);text-align:center}
+.focus-only{
+  display:flex;gap:10px;flex-wrap:wrap;padding:4px 0 2px
+}
+.winner-theme{
+  border:1px solid #C9D7EF;background:#F6F9FF;border-radius:999px;
+  padding:9px 13px;color:var(--struct);font-size:13px;font-weight:850
+}
+
+
+/* V1.4 — foco do ciclo: tema vencedor + grupo relacionado */
+.focus-theme-list{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.focus-theme-row{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:16px;
+  border:1px solid #D9E3F0;
+  background:#F8FAFD;
+  border-radius:13px;
+  padding:12px 14px;
+}
+.focus-theme-name{
+  color:var(--struct);
+  font-size:14px;
+  font-weight:850;
+}
+.focus-group-label{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  border:1px solid #CFD9E7;
+  background:#FFFFFF;
+  border-radius:999px;
+  padding:7px 10px;
+  color:#44546A;
+  font-size:12px;
+  font-weight:800;
+  white-space:nowrap;
+}
+.focus-group-label strong{
+  color:var(--struct);
+}
+
+
+.bullet-row.static{cursor:default}
+.bullet-row.static:hover{background:transparent}
+
+/* V1.7 — cabeçalho final */
+.header-final{
+  display:block;
+  margin-bottom:24px;
+  padding:4px 2px 2px;
+}
+.header-final .brand{
+  width:100%;
+}
+.header-final .brand h1{
+  margin:0;
+  color:var(--struct);
+  font-size:32px;
+  line-height:1.1;
+  letter-spacing:-.025em;
+}
+.header-final .brand p{
+  margin:7px 0 0;
+  color:#56667D;
+  font-size:15px;
+}
+.title-meta{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  margin-top:14px;
+  padding-top:12px;
+  border-top:1px solid #E2E8F0;
+  font-size:13px;
+  color:#64748B;
+}
+.title-meta > span{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+}
+.title-meta strong{
+  color:#394A62;
+  font-weight:800;
+}
+.title-meta #lastAccessValue,
+.title-meta #periodValue{
+  color:#163E7A;
+  font-weight:750;
+}
+.meta-separator{
+  color:#A7B3C3 !important;
+}
+@media (max-width:700px){
+  .title-meta{
+    align-items:flex-start;
+    flex-direction:column;
+    gap:5px;
+  }
+  .meta-separator{display:none!important}
+}
+
+
+/* V1.8 — todos os contextos como labels no título */
+.title-meta{display:none!important}
+.title-labels{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  margin-top:15px;
+  padding-top:13px;
+  border-top:1px solid #E2E8F0;
+}
+.title-label{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  min-height:32px;
+  padding:6px 10px;
+  border:1px solid #DCE5F0;
+  background:#FFFFFF;
+  border-radius:999px;
+  color:#4B5C74;
+  font-size:12px;
+  line-height:1.2;
+  white-space:nowrap;
+}
+.title-label-key{
+  color:#718096;
+  font-weight:700;
+}
+.title-label strong{
+  color:#163E7A;
+  font-weight:850;
+}
+.title-label.is-active{
+  border-color:#BED0EB;
+  background:#F5F8FD;
+  color:#163E7A;
+  font-weight:800;
+}
+.title-label.is-neutral{
+  background:#F8FAFC;
+  color:#64748B;
+}
+.title-label.is-warning{
+  border-color:#D8B989;
+  background:#FFF9EF;
+  color:#7A5222;
+  font-weight:800;
+}
+@media (max-width:700px){
+  .title-labels{gap:7px}
+  .title-label{white-space:normal}
+}
+
+
+/* V1.10 — temas + grupos no Foco do ciclo */
+.focus-only{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+}
+.winner-theme{
+  display:inline-flex;
+  align-items:center;
+  min-height:34px;
+  padding:7px 11px;
+  border:1px solid #C9D7EF;
+  background:#F6F9FF;
+  color:var(--struct);
+  border-radius:999px;
+  font-size:12px;
+  font-weight:850;
+}
+
+
+/* V1.12 — Focos deste ciclo: tema → classe → grupo → transações */
+.focus-theme-block{
+  border:1px solid #DDE5EF;
+  border-radius:15px;
+  background:#FFFFFF;
+  overflow:hidden;
+  margin-top:12px;
+}
+.focus-theme-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:16px;
+  padding:15px 16px 13px;
+  background:#F8FAFD;
+}
+.focus-theme-title{
+  color:var(--struct);
+  font-size:15px;
+  font-weight:850;
+}
+.focus-theme-class{
+  margin-top:3px;
+  color:#64748B;
+  font-size:12px;
+  font-weight:700;
+}
+.focus-theme-all{
+  border:0;
+  background:transparent;
+  color:var(--struct);
+  font-size:12px;
+  font-weight:850;
+  cursor:pointer;
+  padding:3px 0;
+  text-decoration:underline;
+  text-decoration-color:#C8D4E4;
+  text-underline-offset:3px;
+  white-space:nowrap;
+}
+.focus-theme-all:hover{
+  text-decoration-color:var(--struct);
+}
+.focus-groups-list{
+  border-top:1px solid #E8EDF3;
+}
+.focus-group-row{
+  border-bottom:1px solid #EDF1F5;
+}
+.focus-group-row:last-child{
+  border-bottom:0;
+}
+.focus-group-btn{
+  width:100%;
+  border:0;
+  background:#FFFFFF;
+  cursor:pointer;
+  display:grid;
+  grid-template-columns:28px minmax(180px,1fr) 190px;
+  gap:12px;
+  align-items:center;
+  text-align:left;
+  padding:12px 16px;
+}
+.focus-group-btn:hover{
+  background:#F9FBFD;
+}
+.focus-group-toggle{
+  width:22px;
+  height:22px;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  border:1px solid #CBD5E1;
+  border-radius:6px;
+  background:#fff;
+  color:var(--struct);
+  font-weight:900;
+}
+.focus-group-name{
+  color:#344258;
+  font-size:13px;
+  font-weight:850;
+}
+.focus-group-metric{
+  text-align:right;
+  color:#394B63;
+  font-size:13px;
+  font-weight:850;
+  white-space:nowrap;
+}
+.focus-inline-transactions{
+  background:#F8FAFC;
+  border-top:1px solid #E8EDF3;
+  padding:6px 16px 10px 56px;
+}
+.focus-inline-transaction{
+  display:grid;
+  grid-template-columns:88px minmax(220px,1fr) 130px;
+  gap:12px;
+  align-items:center;
+  padding:8px 0;
+  border-bottom:1px dashed #DDE4EC;
+  font-size:12px;
+}
+.focus-inline-transaction:last-child{
+  border-bottom:0;
+}
+.focus-inline-transaction .date{
+  color:#64748B;
+}
+.focus-inline-transaction .desc{
+  color:#3F4F65;
+}
+.focus-inline-transaction .amount{
+  text-align:right;
+  font-weight:850;
+  color:#334155;
+  white-space:nowrap;
+}
+.focus-all-transactions{
+  border-top:1px solid #E8EDF3;
+  background:#F8FAFC;
+  padding:8px 16px 12px;
+}
+.focus-all-transactions-title{
+  font-size:11px;
+  text-transform:uppercase;
+  letter-spacing:.05em;
+  color:#64748B;
+  font-weight:850;
+  margin-bottom:4px;
+}
+@media (max-width:760px){
+  .focus-theme-head{flex-direction:column}
+  .focus-group-btn{grid-template-columns:28px minmax(120px,1fr) 145px}
+  .focus-inline-transaction{grid-template-columns:78px minmax(140px,1fr) 110px}
+}
+
+
+
+
+/* V1.20 — Sessão 2: Force-directed graph expansível */
+.income-graph-layout{
+  display:grid;
+  grid-template-columns:minmax(0,2.15fr) minmax(300px,.62fr);
+  gap:18px;
+  align-items:stretch;
+}
+.income-graph-box{
+  position:relative;
+  border:1px solid var(--line);
+  border-radius:18px;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(22,62,122,.055), transparent 42%),
+    linear-gradient(180deg,#FCFDFE 0%,#F7FAFE 100%);
+  min-height:680px;
+  height:680px;
+  padding:0;
+  overflow:hidden;
+  user-select:none;
+}
+#incomeGraphSvg{width:100%;height:100%;display:block;touch-action:none}
+.income-side-card{
+  border:1px solid var(--line);
+  border-radius:18px;
+  background:#FFFFFF;
+  padding:20px 18px 18px;
+  min-height:680px;
+  display:flex;
+  flex-direction:column;
+  gap:15px;
+}
+.income-card-head{display:flex;align-items:center;gap:11px;padding-bottom:3px}
+.income-card-dot{width:14px;height:14px;border-radius:50%;flex:0 0 auto}
+.income-card-title{font-size:24px;line-height:1.15;color:var(--struct);font-weight:850;letter-spacing:-.02em}
+.income-card-subtitle{color:var(--muted);font-size:12px;margin-top:4px;font-weight:750;text-transform:uppercase;letter-spacing:.055em}
+.income-card-metrics{display:grid;gap:0;border-top:1px solid #EEF2F6}
+.income-metric-row{display:grid;grid-template-columns:minmax(110px,1fr) minmax(105px,auto);gap:14px;align-items:center;font-size:13px;border-bottom:1px solid #EEF2F6;padding:11px 0}
+.income-metric-label{color:#526177;font-weight:720}
+.income-metric-value{color:#172033;font-weight:850;text-align:right;word-break:break-word}
+.income-evidence-box{margin-top:18px;border:1px solid var(--line);border-radius:16px;background:#FFFFFF;overflow:hidden}
+.income-evidence-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;padding:16px 18px 12px}
+.income-evidence-head h3{margin:0;font-size:16px;color:var(--struct)}
+.income-evidence-head p{margin:4px 0 0;font-size:12px;color:var(--muted)}
+.income-table-wrap{border:0;border-top:1px solid var(--line);border-radius:0}
+.income-table-wrap table{min-width:760px}
+.income-evidence-actions{display:flex;justify-content:center;padding:12px 16px 16px;border-top:1px solid #EEF2F6}
+.income-toggle-btn{border:1px solid var(--line);background:#FFF;border-radius:999px;padding:8px 14px;font-size:12px;font-weight:850;color:var(--struct);cursor:pointer}
+.income-toggle-btn:hover{border-color:#B9C7DA;background:#F8FBFF}
+.income-empty{padding:18px;color:var(--muted);font-size:13px}
+.income-force-link{stroke:#BBC7D6;stroke-width:1.6;stroke-opacity:.62;pointer-events:none}
+.income-force-node{cursor:pointer;outline:none}
+.income-force-node circle{stroke-width:2.4;transition:stroke-width .15s ease,filter .15s ease,fill-opacity .15s ease}
+.income-force-node text{fill:#26354A;font-weight:820;pointer-events:none;paint-order:stroke;stroke:#FFFFFF;stroke-width:3.5px;stroke-linejoin:round}
+.income-force-node.selected circle{stroke-width:4;filter:url(#incomeNodeGlow);fill-opacity:.18}
+.income-force-node:hover circle{stroke-width:3.4;filter:url(#incomeNodeGlow)}
+.income-force-node.level-income text{font-size:23px}
+.income-force-node.level-income{cursor:default}
+.income-force-node.level-group text{font-size:18px}
+.income-force-node.level-class text{font-size:16px}
+.income-force-node.level-category text{font-size:14px}
+.income-force-node.level-category circle{stroke-width:2}
+.income-force-node .income-node-pct{
+  font-size:10.5px;
+  font-weight:900;
+  fill:#526177;
+  stroke:#FFFFFF;
+  stroke-width:3px;
+}
+.income-force-node.level-income .income-node-pct{font-size:16px}
+.income-force-node.level-group .income-node-pct{font-size:14px}
+.income-force-node.level-class .income-node-pct{font-size:13px}
+.income-force-node.level-category .income-node-pct{font-size:12px}
+@media (max-width:1080px){
+  .income-graph-layout{grid-template-columns:minmax(0,1.7fr) minmax(280px,.72fr)}
+  .income-graph-box,.income-side-card{min-height:760px;height:760px}
+}
+@media (max-width:900px){
+  .income-graph-layout{grid-template-columns:1fr}
+  .income-graph-box{min-height:700px;height:700px}
+  .income-side-card{min-height:auto;height:auto}
+}
+@media (max-width:620px){
+  .income-graph-box{min-height:620px;height:620px}
+  .income-metric-row{grid-template-columns:1fr auto}
+}
+
+
+/* V1.25 — Conteúdo funcional hardcoded do catálogo no balão lateral */
+.income-side-card{overflow-y:auto}
+.income-source-info{
+  margin-top:4px;
+  padding-top:15px;
+  border-top:1px solid #E8EDF4;
+}
+.income-source-title{
+  margin:0 0 9px;
+  font-size:11px;
+  line-height:1.2;
+  text-transform:uppercase;
+  letter-spacing:.065em;
+  color:#64748B;
+  font-weight:850;
+}
+.income-source-text{
+  margin:0;
+  color:#3E4D63;
+  font-size:13px;
+  line-height:1.55;
+}
+.income-source-tags{
+  display:flex;
+  flex-wrap:wrap;
+  gap:7px;
+}
+.income-source-tag{
+  display:inline-flex;
+  align-items:center;
+  min-height:28px;
+  padding:5px 9px;
+  border:1px solid #E1E8F1;
+  border-radius:999px;
+  background:#F8FAFC;
+  color:#34445B;
+  font-size:11.5px;
+  font-weight:760;
+  line-height:1.25;
+}
+
+/* V1.16 — Item 2: Classe → Transações inline */
+.bullet-block{
+  border-top:1px solid var(--line);
+}
+.bullet-block:first-child{
+  border-top:0;
+}
+.bullet-block .bullet-row{
+  border-top:0;
+}
+.bullet-inline{
+  margin:0 0 12px 0;
+  padding:0 14px 12px 18px;
+}
+.bullet-inline-card{
+  border:1px solid #E1E8F0;
+  background:#F8FAFC;
+  border-radius:12px;
+  padding:12px 14px;
+}
+.bullet-inline-title{
+  font-size:12px;
+  font-weight:850;
+  color:#334155;
+  margin-bottom:7px;
+}
+.bullet-inline-list{
+  display:flex;
+  flex-direction:column;
+}
+.bullet-inline-tx{
+  display:grid;
+  grid-template-columns:88px minmax(220px,1fr) 130px;
+  gap:12px;
+  align-items:center;
+  padding:8px 0;
+  border-bottom:1px dashed #DCE4ED;
+  font-size:12px;
+}
+.bullet-inline-tx:last-child{
+  border-bottom:0;
+}
+.bullet-inline-tx .date{
+  color:#64748B;
+}
+.bullet-inline-tx .desc{
+  color:#3F4F65;
+}
+.bullet-inline-tx .amount{
+  text-align:right;
+  color:#334155;
+  font-weight:850;
+  white-space:nowrap;
+}
+.bullet-inline-actions{
+  display:flex;
+  justify-content:flex-end;
+  margin-top:9px;
+}
+.bullet-inline-more{
+  border:0;
+  background:transparent;
+  color:var(--struct);
+  font-size:12px;
+  font-weight:850;
+  cursor:pointer;
+  padding:2px 0;
+  text-decoration:underline;
+  text-decoration-color:#C8D4E4;
+  text-underline-offset:3px;
+}
+.bullet-inline-more:hover{
+  text-decoration-color:var(--struct);
+}
+@media (max-width:760px){
+  .bullet-inline-tx{
+    grid-template-columns:76px minmax(140px,1fr) 110px;
+  }
+}
+
+
+/* V1.17 — Waterfall → Classe → Grupo → Categoria */
+.closing-drill-head{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:18px;
+  margin-bottom:12px;
+}
+.closing-breadcrumb{
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:7px;
+  color:#64748B;
+  font-size:13px;
+  font-weight:750;
+}
+.closing-crumb{
+  border:0;
+  background:transparent;
+  color:var(--struct);
+  padding:0;
+  cursor:pointer;
+  font-weight:800;
+}
+.closing-crumb.current{
+  color:#46566D;
+  cursor:default;
+}
+.closing-bars{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  padding:8px 0 2px;
+}
+.closing-bar-row{
+  width:100%;
+  display:grid;
+  grid-template-columns:minmax(190px,1.05fr) minmax(240px,2fr) 180px;
+  gap:15px;
+  align-items:center;
+  border:0;
+  background:transparent;
+  border-radius:10px;
+  padding:10px 8px;
+  text-align:left;
+}
+button.closing-bar-row{
+  cursor:pointer;
+}
+button.closing-bar-row:hover{
+  background:#F8FAFD;
+}
+.closing-bar-name{
+  color:#314158;
+  font-size:13px;
+  font-weight:850;
+}
+.closing-bar-track{
+  height:13px;
+  border-radius:999px;
+  background:#EDF1F6;
+  overflow:hidden;
+}
+.closing-bar-fill{
+  height:100%;
+  border-radius:999px;
+}
+.closing-bar-metric{
+  text-align:right;
+  white-space:nowrap;
+  color:#394B63;
+  font-size:13px;
+  font-weight:850;
+}
+.waterfall-clickable{
+  cursor:pointer;
+}
+.waterfall-clickable:hover rect{
+  opacity:1!important;
+  filter:drop-shadow(0 3px 5px rgba(15,23,42,.14));
+}
+.waterfall-clickable:focus{
+  outline:none;
+}
+.waterfall-clickable:focus rect{
+  stroke:#163E7A;
+  stroke-width:3;
+}
+@media (max-width:850px){
+  .closing-bar-row{
+    grid-template-columns:minmax(150px,1fr) minmax(150px,1.4fr) 150px;
+  }
+}
+
+
+/* V1.18 — Waterfall → Colunas por Grupo → Barras por Categoria */
+.closing-columns-wrap{
+  overflow-x:auto;
+  padding:8px 0 4px;
+}
+.closing-columns{
+  min-width:720px;
+  height:330px;
+  display:flex;
+  align-items:flex-end;
+  gap:18px;
+  padding:24px 18px 56px;
+  border-bottom:1px solid #D7E0EA;
+  position:relative;
+}
+.closing-column-item{
+  flex:1 0 96px;
+  min-width:96px;
+  max-width:150px;
+  height:100%;
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-end;
+  align-items:center;
+  gap:8px;
+  cursor:pointer;
+  border:0;
+  background:transparent;
+  padding:0 4px;
+  position:relative;
+}
+.closing-column-item:hover .closing-column-bar{
+  filter:brightness(1.03);
+  box-shadow:0 8px 18px rgba(15,23,42,.10);
+}
+.closing-column-item:focus-visible{
+  outline:none;
+  box-shadow:var(--focus);
+  border-radius:10px;
+}
+.closing-column-value{
+  font-size:12px;
+  font-weight:850;
+  color:#344258;
+  text-align:center;
+  white-space:nowrap;
+}
+.closing-column-bar{
+  width:56px;
+  min-height:4px;
+  border-radius:8px 8px 3px 3px;
+  transition:.18s ease;
+}
+.closing-column-label{
+  position:absolute;
+  bottom:-44px;
+  left:50%;
+  transform:translateX(-50%);
+  width:118px;
+  text-align:center;
+  font-size:11px;
+  line-height:1.25;
+  font-weight:800;
+  color:#41516A;
+}
+.closing-column-pct{
+  display:block;
+  color:#64748B;
+  font-weight:750;
+  margin-top:2px;
+}
+.closing-level-action{
+  display:flex;
+  justify-content:center;
+  margin-top:12px;
+}
+.closing-category-bars{
+  display:flex;
+  flex-direction:column;
+  gap:9px;
+  padding:10px 0 2px;
+}
+.closing-category-row{
+  display:grid;
+  grid-template-columns:minmax(220px,1.15fr) minmax(260px,2fr) 190px;
+  gap:15px;
+  align-items:center;
+  padding:10px 8px;
+  border-radius:10px;
+}
+.closing-category-name{
+  color:#314158;
+  font-size:13px;
+  font-weight:850;
+}
+.closing-category-track{
+  height:13px;
+  border-radius:999px;
+  background:#EDF1F6;
+  overflow:hidden;
+}
+.closing-category-fill{
+  display:block;
+  height:100%;
+  border-radius:999px;
+}
+.closing-category-metric{
+  text-align:right;
+  white-space:nowrap;
+  color:#394B63;
+  font-size:13px;
+  font-weight:850;
+}
+@media (max-width:850px){
+  .closing-columns{
+    min-width:640px;
+  }
+  .closing-category-row{
+    grid-template-columns:minmax(170px,1fr) minmax(170px,1.4fr) 160px;
+  }
+}
+
+</style>
+
+</head>
+<body>
+<div class="app-shell">
+  <header class="header header-final">
+    <div class="brand">
+      <h1>Radar Financeiro</h1>
+      <p>Uma visão do seu momento financeiro</p>
+
+      <div class="title-labels" aria-label="Contexto do ciclo">
+        <span class="title-label">
+          <span class="title-label-key">Última atualização</span>
+          <strong id="lastAccessValue">—</strong>
+        </span>
+
+        <span class="title-label">
+          <span class="title-label-key">Período analisado</span>
+          <strong id="periodValue">—</strong>
+        </span>
+
+        <span class="title-label">
+          <span class="title-label-key">Movimentações</span>
+          <strong id="transactionCountLabel">—</strong>
+        </span>
+
+        <span class="title-label">
+          <span class="title-label-key">Ciclo</span>
+          <strong id="cycleDayLabel">—</strong>
+        </span>
+
+        <span class="title-label" id="agroLabel">—</span>
+        <span class="title-label" id="currencyLabel">—</span>
+        <span class="title-label" id="participationLabel">—</span>
+      </div>
+    </div>
+  </header>
+
+  <div id="gate"></div>
+
+  <main id="dashboard" style="display:none">
+    <section class="panel">
+      <div class="panel-inner">
+        <div class="panel-title-row">
+          <div>
+            <div class="section-kicker">1 · Fechamento do ciclo</div>
+            <h2>Como o período fechou?</h2>
+          </div>
+        </div>
+
+        <div class="closing-grid">
+          <div>
+            <div class="flow-strip">
+              <div class="flow-item">
+                <div class="label">Renda Presumida</div>
+                <div class="value" id="kpiIncome">—</div>
+              </div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-item">
+                <div class="label">Saídas do Orçamento</div>
+                <div class="value" id="kpiBudgetOut">—</div>
+              </div>
+              <div class="flow-arrow">→</div>
+              <div class="flow-item">
+                <div class="label">Resultado do Orçamento</div>
+                <div class="value" id="kpiBudgetResult">—</div>
+              </div>
+            </div>
+
+            <div class="secondary-metrics">
+              <span>Saídas Financeiras Totais: <strong id="secondaryTotalOut">—</strong></span>
+              <span>Resultado Financeiro Total: <strong id="secondaryTotalResult">—</strong></span>
+            </div>
+          </div>
+
+          <button class="future-box clickable" id="futureTop" aria-label="Ver transações da Destinação ao Futuro">
+            <span class="label">Destinação ao Futuro</span>
+            <span class="value" id="kpiFuture">—</span>
+            <span class="sub" id="kpiFuturePct">—</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="referenceSection">
+      <div class="panel-inner">
+        <div class="panel-title-row">
+          <div>
+            <div class="section-kicker">2 · Como sua renda foi utilizada</div>
+            <h2>Mapa financeiro expansível</h2>
+            <p class="panel-desc" id="incomeReferenceNote">Renda → Grupo → Classificação → Categoria. Clique nas bolhas para expandir ou recolher.</p>
+          </div>
+        </div>
+        <div class="income-graph-layout">
+          <div class="income-graph-box">
+            <svg id="incomeGraphSvg" viewBox="0 0 1280 820" role="img" aria-label="Mapa financeiro expansível da renda presumida"></svg>
+          </div>
+          <aside class="income-side-card" id="incomeSideCard"></aside>
+        </div>
+
+        <div class="income-evidence-box">
+          <div class="income-evidence-head">
+            <div>
+              <h3>Evidências da seleção</h3>
+              <p id="incomeEvidenceNote">Até 10 transações são exibidas inicialmente.</p>
+            </div>
+          </div>
+          <div class="table-wrap income-table-wrap">
+            <table aria-label="Transações da seleção do mapa financeiro">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Descrição</th>
+                  <th>Grupo</th>
+                  <th>Categoria</th>
+                  <th>Classe</th>
+                  <th>Valor</th>
+                </tr>
+              </thead>
+              <tbody id="incomeEvidenceBody"></tbody>
+            </table>
+          </div>
+          <div class="income-evidence-actions" id="incomeEvidenceActions"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="exploreSection">
+      <div class="panel-inner">
+        <div class="panel-title-row">
+          <div>
+            <div class="section-kicker">3 · Para onde foi o dinheiro</div>
+            <h2>Explore as Saídas do Orçamento</h2>
+            <p class="panel-desc">Clique para avançar no drill-down: Grupo → Categoria → Transação.</p>
+          </div>
+          <div class="tabs" role="tablist" aria-label="Visualização">
+            <button class="tab-btn active" id="compositionTab" role="tab" aria-selected="true">Composição</button>
+            <button class="tab-btn" id="timelineTab" role="tab" aria-selected="false">Evolução no ciclo</button>
+          </div>
+        </div>
+
+        <div id="compositionView">
+          <div class="explore-toolbar">
+            <div class="breadcrumb" id="breadcrumb"></div>
+            <div id="classFilterHolder"></div>
+          </div>
+          <div id="barList" class="bar-list"></div>
+          <div id="moreRow" class="more-row"></div>
+        </div>
+
+        <div id="timelineView" style="display:none">
+          <div class="legend">
+            <span><i style="background:#2F6BFF"></i>Saídas do Orçamento acumuladas</span>
+            <span><i style="background:#16836B"></i>Destinação ao Futuro acumulada</span>
+            <span><i style="background:#163E7A"></i>Renda Presumida</span>
+          </div>
+          <div class="timeline-wrap" id="timelineWrap">
+            <svg id="timelineSvg" viewBox="0 0 960 340" role="img" aria-label="Evolução acumulada do ciclo"></svg>
+            <div class="timeline-tooltip" id="timelineTooltip"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel" id="focusSection">
+      <div class="panel-inner">
+        <div class="panel-title-row" style="margin-bottom:8px">
+          <div>
+            <div class="section-kicker">4 · Focos deste ciclo</div>
+            <h2>Focos deste ciclo</h2>
+            <p class="panel-desc">Temas prioritários da V13 conectados às maiores concentrações e às transações que explicam cada tema.</p>
+          </div>
+        </div>
+
+        <div id="focusThemeBlocks"></div>
+      </div>
+    </section>
+
+    <section class="panel fixed-table-panel" id="transactionsSection">
+      <div class="panel-inner">
+        <div class="panel-title-row">
+          <div>
+            <div class="section-kicker">Transações do período</div>
+            <h2>Evidências dos números apresentados</h2>
+            <p class="panel-desc">A tabela acompanha os filtros e seleções do dashboard.</p>
+          </div>
+        </div>
+
+        <div class="tx-context-bar hidden" id="transactionContextBar">
+          <span id="transactionContextText"></span>
+          <button class="btn btn-link" id="clearTransactionContext">Limpar contexto</button>
+        </div>
+
+        <div class="drawer-filters">
+          <input type="search" id="txSearch" placeholder="Buscar descrição">
+          <select id="txClass"><option value="">Todas as classes</option></select>
+          <select id="txGroup"><option value="">Todos os grupos</option></select>
+          <select id="txCategory"><option value="">Todas as categorias</option></select>
+        </div>
+
+        <div class="fixed-table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Data</th>
+                <th>Descrição</th>
+                <th>Grupo</th>
+                <th>Categoria</th>
+                <th>Classe</th>
+                <th>Valor</th>
+              </tr>
+            </thead>
+            <tbody id="transactionBody"></tbody>
+          </table>
+        </div>
+
+        <details class="inline-details">
+          <summary>Entenda esta análise</summary>
+          <div class="inline-details-body">
+            <div class="method-section">
+              <h3>Classes utilizadas</h3>
+              <div class="definition-list">
+                <div class="definition" style="border-color:#2F6BFF"><strong>Essenciais</strong><span>Necessidades e compromissos cotidianos.</span></div>
+                <div class="definition" style="border-color:#D97706"><strong>Não Essencial</strong><span>Escolhas com maior possibilidade de ajuste de valor, frequência ou momento.</span></div>
+                <div class="definition" style="border-color:#16836B"><strong>Futuro</strong><span>Recursos destinados a reserva, objetivos ou patrimônio.</span></div>
+                <div class="definition" style="border-color:#7C3AED"><strong>Obrigações Financeiras</strong><span>Dívidas, parcelas e custos financeiros.</span></div>
+                <div class="definition" style="border-color:#64748B"><strong>A Identificar</strong><span>Movimentações cuja finalidade ainda não está suficientemente clara.</span></div>
+              </div>
+            </div>
+
+            <div class="method-section">
+              <h3>Referências utilizadas pelo Radar</h3>
+              <ul>
+                <li><strong>Essenciais — Referência 50%</strong></li>
+                <li><strong>Não Essencial — Teto de referência 30%</strong></li>
+                <li><strong>Futuro — Referência de construção 20%</strong></li>
+                <li><strong>Obrigações Financeiras — Limite de referência 30%</strong></li>
+                <li><strong>A Identificar — Referência técnica 75%</strong></li>
+                
+              </ul>
+              <p>As referências são parâmetros de leitura e não representam aprovação ou reprovação automática.</p>
+              <p>Essenciais, Não Essencial, Futuro, Obrigações Financeiras e A Identificar usam a Renda Presumida como base no comparativo Real × referência. A síntese de saídas identificadas usa as Saídas Financeiras Totais participantes.</p>
+            </div>
+
+            <div class="method-section">
+              <h3>Orçamento e fluxo financeiro</h3>
+              <p><strong>Renda Presumida</strong> é a renda de referência usada pela camada consultiva.</p>
+              <p><strong>Saídas do Orçamento</strong> correspondem às Saídas Financeiras Totais menos a Destinação ao Futuro.</p>
+              <p><strong>Resultado do Orçamento</strong> compara a Renda Presumida com as Saídas do Orçamento.</p>
+              <p><strong>Resultado Financeiro Total</strong> compara a Renda Presumida com as Saídas Financeiras Totais.</p>
+            </div>
+
+
+            <div class="method-section">
+              <h3>Dados do ciclo</h3>
+              <p><strong>Movimentações:</strong> <span id="methodTxCount">—</span></p>
+              <p><strong>Dia de início do ciclo:</strong> <span id="methodCycleDay">—</span></p>
+              <p><strong>Movimentação Agro:</strong> <span id="methodAgro">—</span></p>
+              <p><strong>Moeda:</strong> <span id="methodCurrency">—</span></p>
+              <p><strong>Participação no Radar:</strong> <span id="methodParticipation">—</span></p>
+            </div>
+
+            <div class="method-section">
+              <h3>Limitações</h3>
+              <p>Os dados atuais não permitem concluir patrimônio total, saldo de reserva, taxas das dívidas, composição familiar, objetivos pessoais ou recorrência de todas as despesas.</p>
+            </div>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <div id="debugPanel" class="debug-panel"></div>
+  </main>
+</div>
+
+<script id="analyticsData" type="application/json">[{"CD_CLI":9001001,"TS_ATL_TRAN":"2026-08-15 08:00:00","DD_INC_MM_CLC_BLC":10,"VL_REN_PRES":7500.0,"CD_MAC_PRFL_CLI":1,"NM_MAC_PRFL_CLI":"Endividado","CD_MIC_PRFL_CLI":4,"NM_MIC_PRFL_CLI":"Consciente","NM_PRFL_FIN":"Endividado Consciente","DT_REF_INI":"2026-07-10","DT_REF_FIM":"2026-08-09","DT_EXEA":"2026-08-15","QT_TRANS_TOTAL":60,"QT_TRANS_ENT":6,"QT_TRANS_SAI":54,"VL_TRANS_ENT":7500.0,"VL_TRANS_SAI":8199.9,"VL_ENT_REN":7350.0,"VL_ENT_EST":125.0,"VL_ENT_RESG":25.0,"VL_ENT_OUT":0.0,"VL_ENT_CRED":0.0,"VL_ENT_TOTAL":7500.0,"VL_SAI_IND":230.0,"VL_SAI_ESS":5358.9,"VL_SAI_NAO_ESS":1260.1,"VL_SAI_FUT":670.0,"VL_SAI_OBR":680.9,"VL_SAI_TOTAL":8199.9,"VL_RES_ORC":-699.9,"PC_SAI_ENT":1.09332,"CD_RES_ORC":2,"TX_RES_ORC":"Deficitário","CD_FAIXA_ORC":1,"TX_STS_RES":"Moderado","TX_STS_FINAL":"Deficitário Moderado","PC_SAI_IND":0.030667,"PC_SAI_ESS":0.71452,"PC_SAI_NAO_ESS":0.168013,"PC_SAI_FUT":0.089333,"PC_SAI_OBR":0.090787,"PC_REF_IND":0.75,"PC_REF_ESS":0.5,"PC_REF_NAO_ESS":0.3,"PC_REF_FUT":0.2,"PC_REF_OBR":0.3,"NR_PONT_CONC_IND":0,"NR_PONT_CONC_ESS":1,"NR_PONT_CONC_NAO_ESS":0,"NR_PONT_CONC_FUT":2,"NR_PONT_CONC_OBR":0,"NR_PONT_ORC_IND":0,"NR_PONT_ORC_ESS":1,"NR_PONT_ORC_NAO_ESS":1,"NR_PONT_ORC_FUT":0,"NR_PONT_ORC_OBR":1,"NR_PONT_PRFL_IND":0,"NR_PONT_PRFL_ESS":0,"NR_PONT_PRFL_NAO_ESS":2,"NR_PONT_PRFL_FUT":1,"NR_PONT_PRFL_OBR":0,"NR_PONT_IND_FIM":0,"NR_PONT_ESS_FIM":2,"NR_PONT_NAO_ESS_FIM":3,"NR_PONT_FUT_FIM":3,"NR_PONT_OBR_FIM":1,"CD_TEMA_VENCEDOR":9,"TX_TEMA_VENCEDOR":"Empate","FL_TEM_MOV_AGRO":"N","FL_MULT_MOE":"N","FL_PARTICIPA_RADAR":"S","DT_MES_EXEA":"2026-08-01"}]</script>
+<script id="transactionsData" type="application/json">[{"ID_TRANS":1,"CD_CLI":9001001,"DT_TRAN":"2026-07-10","TX_DCR_TRAN":"Salário - adiantamento mensal","TP_FLUXO":"C","VL_TRAN":2500.0,"CD_CATEGORIA":1,"CD_PRD":6,"CD_MDLD_PRD":1,"CD_GRUPO":1,"NM_GRUPO":"Receitas","NM_CATEGORIA":"Salário","CD_CLASS_RADAR":1,"NM_CLASS_RADAR":"Renda","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":2,"CD_CLI":9001001,"DT_TRAN":"2026-07-10","TX_DCR_TRAN":"Vale alimentação/refeição - benefício","TP_FLUXO":"C","VL_TRAN":850.0,"CD_CATEGORIA":2,"CD_PRD":6,"CD_MDLD_PRD":1,"CD_GRUPO":1,"NM_GRUPO":"Receitas","NM_CATEGORIA":"Vale Alimentação","CD_CLASS_RADAR":1,"NM_CLASS_RADAR":"Renda","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":3,"CD_CLI":9001001,"DT_TRAN":"2026-07-10","TX_DCR_TRAN":"Aluguel residencial - Imobiliária Central","TP_FLUXO":"D","VL_TRAN":1500.0,"CD_CATEGORIA":10,"CD_PRD":6,"CD_MDLD_PRD":1,"CD_GRUPO":2,"NM_GRUPO":"Casa","NM_CATEGORIA":"Aluguel e Condomínio","CD_CLASS_RADAR":6,"NM_CLASS_RADAR":"Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":4,"CD_CLI":9001001,"DT_TRAN":"2026-07-10","TX_DCR_TRAN":"Parcela de empréstimo pessoal","TP_FLUXO":"D","VL_TRAN":616.9,"CD_CATEGORIA":4417,"CD_PRD":6,"CD_MDLD_PRD":1,"CD_GRUPO":8,"NM_GRUPO":"Despesas Pessoais","NM_CATEGORIA":"Empréstimos e Prestações","CD_CLASS_RADAR":9,"NM_CLASS_RADAR":"Obrigações","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":5,"CD_CLI":9001001,"DT_TRAN":"2026-07-11","TX_DCR_TRAN":"Sabesp - conta de água","TP_FLUXO":"D","VL_TRAN":94.7,"CD_CATEGORIA":6,"CD_PRD":6,"CD_MDLD_PRD":1,"CD_GRUPO":2,"NM_GRUPO":"Casa","NM_CATEGORIA":"Água","CD_CLASS_RADAR":6,"NM_CLASS_RADAR":"Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":6,"CD_CLI":9001001,"DT_TRAN":"2026-07-11","TX_DCR_TRAN":"Carrefour - compras do mês","TP_FLUXO":"D","VL_TRAN":312.4,"CD_CATEGORIA":32,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":6,"NM_GRUPO":"Alimentação","NM_CATEGORIA":"Feira e Supermercado","CD_CLASS_RADAR":6,"NM_CLASS_RADAR":"Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":7,"CD_CLI":9001001,"DT_TRAN":"2026-07-12","TX_DCR_TRAN":"Enel - energia elétrica","TP_FLUXO":"D","VL_TRAN":190.0,"CD_CATEGORIA":7,"CD_PRD":6,"CD_MDLD_PRD":1,"CD_GRUPO":2,"NM_GRUPO":"Casa","NM_CATEGORIA":"Eletricidade e Gás","CD_CLASS_RADAR":6,"NM_CLASS_RADAR":"Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":8,"CD_CLI":9001001,"DT_TRAN":"2026-07-12","TX_DCR_TRAN":"Padaria Real - café e padaria","TP_FLUXO":"D","VL_TRAN":36.9,"CD_CATEGORIA":35,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":6,"NM_GRUPO":"Alimentação","NM_CATEGORIA":"Bar, Rest. e Padaria","CD_CLASS_RADAR":7,"NM_CLASS_RADAR":"Não Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":9,"CD_CLI":9001001,"DT_TRAN":"2026-07-13","TX_DCR_TRAN":"Posto Ipiranga - combustível","TP_FLUXO":"D","VL_TRAN":160.0,"CD_CATEGORIA":37,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":7,"NM_GRUPO":"Transporte","NM_CATEGORIA":"Combustível","CD_CLASS_RADAR":6,"NM_CLASS_RADAR":"Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":10,"CD_CLI":9001001,"DT_TRAN":"2026-07-13","TX_DCR_TRAN":"Wizard - mensalidade curso de inglês","TP_FLUXO":"D","VL_TRAN":79.9,"CD_CATEGORIA":17,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":3,"NM_GRUPO":"Educação","NM_CATEGORIA":"Idiomas","CD_CLASS_RADAR":7,"NM_CLASS_RADAR":"Não Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":11,"CD_CLI":9001001,"DT_TRAN":"2026-07-14","TX_DCR_TRAN":"Assaí Atacadista","TP_FLUXO":"D","VL_TRAN":198.7,"CD_CATEGORIA":32,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":6,"NM_GRUPO":"Alimentação","NM_CATEGORIA":"Feira e Supermercado","CD_CLASS_RADAR":6,"NM_CLASS_RADAR":"Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":12,"CD_CLI":9001001,"DT_TRAN":"2026-07-14","TX_DCR_TRAN":"Uber - corrida","TP_FLUXO":"D","VL_TRAN":45.0,"CD_CATEGORIA":41,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":7,"NM_GRUPO":"Transporte","NM_CATEGORIA":"Transporte Urbano e Apps","CD_CLASS_RADAR":6,"NM_CLASS_RADAR":"Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":13,"CD_CLI":9001001,"DT_TRAN":"2026-07-15","TX_DCR_TRAN":"iFood - jantar","TP_FLUXO":"D","VL_TRAN":42.5,"CD_CATEGORIA":35,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":6,"NM_GRUPO":"Alimentação","NM_CATEGORIA":"Bar, Rest. e Padaria","CD_CLASS_RADAR":7,"NM_CLASS_RADAR":"Não Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":14,"CD_CLI":9001001,"DT_TRAN":"2026-07-15","TX_DCR_TRAN":"Vivo Fibra + telefonia","TP_FLUXO":"D","VL_TRAN":150.2,"CD_CATEGORIA":51,"CD_PRD":6,"CD_MDLD_PRD":1,"CD_GRUPO":9,"NM_GRUPO":"Comunicação","NM_CATEGORIA":"Telefonia e Internet","CD_CLASS_RADAR":6,"NM_CLASS_RADAR":"Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":15,"CD_CLI":9001001,"DT_TRAN":"2026-07-16","TX_DCR_TRAN":"Drogasil - medicamentos","TP_FLUXO":"D","VL_TRAN":89.9,"CD_CATEGORIA":30,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":5,"NM_GRUPO":"Saúde","NM_CATEGORIA":"Farmácias e Drogarias","CD_CLASS_RADAR":6,"NM_CLASS_RADAR":"Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":16,"CD_CLI":9001001,"DT_TRAN":"2026-07-16","TX_DCR_TRAN":"Renner - vestuário","TP_FLUXO":"D","VL_TRAN":89.9,"CD_CATEGORIA":42,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":8,"NM_GRUPO":"Despesas Pessoais","NM_CATEGORIA":"Vestuário e Acessórios","CD_CLASS_RADAR":7,"NM_CLASS_RADAR":"Não Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":17,"CD_CLI":9001001,"DT_TRAN":"2026-07-17","TX_DCR_TRAN":"Carrefour Bairro","TP_FLUXO":"D","VL_TRAN":245.3,"CD_CATEGORIA":32,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":6,"NM_GRUPO":"Alimentação","NM_CATEGORIA":"Feira e Supermercado","CD_CLASS_RADAR":6,"NM_CLASS_RADAR":"Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":18,"CD_CLI":9001001,"DT_TRAN":"2026-07-17","TX_DCR_TRAN":"Smart Fit - mensalidade academia","TP_FLUXO":"D","VL_TRAN":89.9,"CD_CATEGORIA":22,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":4,"NM_GRUPO":"Lazer","NM_CATEGORIA":"Esportes e Academia","CD_CLASS_RADAR":7,"NM_CLASS_RADAR":"Não Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":19,"CD_CLI":9001001,"DT_TRAN":"2026-07-18","TX_DCR_TRAN":"Reembolso Pix recebido","TP_FLUXO":"C","VL_TRAN":150.0,"CD_CATEGORIA":5,"CD_PRD":6,"CD_MDLD_PRD":1,"CD_GRUPO":1,"NM_GRUPO":"Receitas","NM_CATEGORIA":"Outros Rendimentos","CD_CLASS_RADAR":1,"NM_CLASS_RADAR":"Renda","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":20,"CD_CLI":9001001,"DT_TRAN":"2026-07-18","TX_DCR_TRAN":"Padaria do Bairro","TP_FLUXO":"D","VL_TRAN":28.0,"CD_CATEGORIA":35,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":6,"NM_GRUPO":"Alimentação","NM_CATEGORIA":"Bar, Rest. e Padaria","CD_CLASS_RADAR":7,"NM_CLASS_RADAR":"Não Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":21,"CD_CLI":9001001,"DT_TRAN":"2026-07-18","TX_DCR_TRAN":"Uber - corrida","TP_FLUXO":"D","VL_TRAN":55.0,"CD_CATEGORIA":41,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":7,"NM_GRUPO":"Transporte","NM_CATEGORIA":"Transporte Urbano e Apps","CD_CLASS_RADAR":6,"NM_CLASS_RADAR":"Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":22,"CD_CLI":9001001,"DT_TRAN":"2026-07-19","TX_DCR_TRAN":"Posto Shell - combustível","TP_FLUXO":"D","VL_TRAN":145.0,"CD_CATEGORIA":37,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":7,"NM_GRUPO":"Transporte","NM_CATEGORIA":"Combustível","CD_CLASS_RADAR":6,"NM_CLASS_RADAR":"Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":23,"CD_CLI":9001001,"DT_TRAN":"2026-07-20","TX_DCR_TRAN":"Leroy Merlin - material para reparo","TP_FLUXO":"D","VL_TRAN":220.0,"CD_CATEGORIA":12,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":2,"NM_GRUPO":"Casa","NM_CATEGORIA":"Serviços e Manutenção","CD_CLASS_RADAR":6,"NM_CLASS_RADAR":"Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":24,"CD_CLI":9001001,"DT_TRAN":"2026-07-20","TX_DCR_TRAN":"Pão de Açúcar - supermercado","TP_FLUXO":"D","VL_TRAN":176.8,"CD_CATEGORIA":32,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":6,"NM_GRUPO":"Alimentação","NM_CATEGORIA":"Feira e Supermercado","CD_CLASS_RADAR":6,"NM_CLASS_RADAR":"Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":25,"CD_CLI":9001001,"DT_TRAN":"2026-07-21","TX_DCR_TRAN":"Restaurante Sabor Caseiro","TP_FLUXO":"D","VL_TRAN":31.5,"CD_CATEGORIA":35,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":6,"NM_GRUPO":"Alimentação","NM_CATEGORIA":"Bar, Rest. e Padaria","CD_CLASS_RADAR":7,"NM_CLASS_RADAR":"Não Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":26,"CD_CLI":9001001,"DT_TRAN":"2026-07-21","TX_DCR_TRAN":"Netflix e streaming","TP_FLUXO":"D","VL_TRAN":75.0,"CD_CATEGORIA":53,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":9,"NM_GRUPO":"Comunicação","NM_CATEGORIA":"Assinatura TV e Streaming","CD_CLASS_RADAR":7,"NM_CLASS_RADAR":"Não Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":27,"CD_CLI":9001001,"DT_TRAN":"2026-07-22","TX_DCR_TRAN":"Casa & Vídeo - utensílios domésticos","TP_FLUXO":"D","VL_TRAN":120.0,"CD_CATEGORIA":11,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":2,"NM_GRUPO":"Casa","NM_CATEGORIA":"Móveis e Utensílios","CD_CLASS_RADAR":7,"NM_CLASS_RADAR":"Não Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":28,"CD_CLI":9001001,"DT_TRAN":"2026-07-23","TX_DCR_TRAN":"Supermercado Extra","TP_FLUXO":"D","VL_TRAN":230.5,"CD_CATEGORIA":32,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":6,"NM_GRUPO":"Alimentação","NM_CATEGORIA":"Feira e Supermercado","CD_CLASS_RADAR":6,"NM_CLASS_RADAR":"Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":29,"CD_CLI":9001001,"DT_TRAN":"2026-07-23","TX_DCR_TRAN":"Barbearia do Bairro","TP_FLUXO":"D","VL_TRAN":79.4,"CD_CATEGORIA":43,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":8,"NM_GRUPO":"Despesas Pessoais","NM_CATEGORIA":"Cuidado Pessoal e Beleza","CD_CLASS_RADAR":7,"NM_CLASS_RADAR":"Não Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":30,"CD_CLI":9001001,"DT_TRAN":"2026-07-24","TX_DCR_TRAN":"iFood - almoço","TP_FLUXO":"D","VL_TRAN":44.9,"CD_CATEGORIA":35,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":6,"NM_GRUPO":"Alimentação","NM_CATEGORIA":"Bar, Rest. e Padaria","CD_CLASS_RADAR":7,"NM_CLASS_RADAR":"Não Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":31,"CD_CLI":9001001,"DT_TRAN":"2026-07-24","TX_DCR_TRAN":"Droga Raia - medicamentos","TP_FLUXO":"D","VL_TRAN":65.5,"CD_CATEGORIA":30,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":5,"NM_GRUPO":"Saúde","NM_CATEGORIA":"Farmácias e Drogarias","CD_CLASS_RADAR":6,"NM_CLASS_RADAR":"Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":32,"CD_CLI":9001001,"DT_TRAN":"2026-07-25","TX_DCR_TRAN":"Salário - folha mensal","TP_FLUXO":"C","VL_TRAN":3850.0,"CD_CATEGORIA":1,"CD_PRD":6,"CD_MDLD_PRD":1,"CD_GRUPO":1,"NM_GRUPO":"Receitas","NM_CATEGORIA":"Salário","CD_CLASS_RADAR":1,"NM_CLASS_RADAR":"Renda","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":33,"CD_CLI":9001001,"DT_TRAN":"2026-07-25","TX_DCR_TRAN":"Aplicação CDB - reserva mensal","TP_FLUXO":"D","VL_TRAN":670.0,"CD_CATEGORIA":448977,"CD_PRD":6,"CD_MDLD_PRD":1,"CD_GRUPO":13,"NM_GRUPO":"Investimentos","NM_CATEGORIA":"Aplicação","CD_CLASS_RADAR":8,"NM_CLASS_RADAR":"Futuro","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":34,"CD_CLI":9001001,"DT_TRAN":"2026-07-26","TX_DCR_TRAN":"Feira Livre do Bairro","TP_FLUXO":"D","VL_TRAN":141.9,"CD_CATEGORIA":32,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":6,"NM_GRUPO":"Alimentação","NM_CATEGORIA":"Feira e Supermercado","CD_CLASS_RADAR":6,"NM_CLASS_RADAR":"Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":35,"CD_CLI":9001001,"DT_TRAN":"2026-07-26","TX_DCR_TRAN":"Cinemark - cinema","TP_FLUXO":"D","VL_TRAN":70.1,"CD_CATEGORIA":25,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":4,"NM_GRUPO":"Lazer","NM_CATEGORIA":"Cultura e Entretenimento","CD_CLASS_RADAR":7,"NM_CLASS_RADAR":"Não Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":36,"CD_CLI":9001001,"DT_TRAN":"2026-07-27","TX_DCR_TRAN":"Posto Petrobras - combustível","TP_FLUXO":"D","VL_TRAN":110.0,"CD_CATEGORIA":37,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":7,"NM_GRUPO":"Transporte","NM_CATEGORIA":"Combustível","CD_CLASS_RADAR":6,"NM_CLASS_RADAR":"Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":37,"CD_CLI":9001001,"DT_TRAN":"2026-07-28","TX_DCR_TRAN":"Cafeteria Central","TP_FLUXO":"D","VL_TRAN":26.8,"CD_CATEGORIA":35,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":6,"NM_GRUPO":"Alimentação","NM_CATEGORIA":"Bar, Rest. e Padaria","CD_CLASS_RADAR":7,"NM_CLASS_RADAR":"Não Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":38,"CD_CLI":9001001,"DT_TRAN":"2026-07-28","TX_DCR_TRAN":"Livraria Cultura - livro e papelaria","TP_FLUXO":"D","VL_TRAN":55.1,"CD_CATEGORIA":18,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":3,"NM_GRUPO":"Educação","NM_CATEGORIA":"Publicações e Papelaria","CD_CLASS_RADAR":7,"NM_CLASS_RADAR":"Não Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":39,"CD_CLI":9001001,"DT_TRAN":"2026-07-29","TX_DCR_TRAN":"Carrefour - reposição semanal","TP_FLUXO":"D","VL_TRAN":198.6,"CD_CATEGORIA":32,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":6,"NM_GRUPO":"Alimentação","NM_CATEGORIA":"Feira e Supermercado","CD_CLASS_RADAR":6,"NM_CLASS_RADAR":"Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":40,"CD_CLI":9001001,"DT_TRAN":"2026-07-29","TX_DCR_TRAN":"Boleto diverso não identificado","TP_FLUXO":"D","VL_TRAN":130.0,"CD_CATEGORIA":39437,"CD_PRD":6,"CD_MDLD_PRD":1,"CD_GRUPO":11,"NM_GRUPO":"Outros","NM_CATEGORIA":"Boletos Diversos","CD_CLASS_RADAR":5,"NM_CLASS_RADAR":"Indeterminado","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":41,"CD_CLI":9001001,"DT_TRAN":"2026-07-30","TX_DCR_TRAN":"Uber - corridas da semana","TP_FLUXO":"D","VL_TRAN":60.0,"CD_CATEGORIA":41,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":7,"NM_GRUPO":"Transporte","NM_CATEGORIA":"Transporte Urbano e Apps","CD_CLASS_RADAR":6,"NM_CLASS_RADAR":"Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":42,"CD_CLI":9001001,"DT_TRAN":"2026-07-31","TX_DCR_TRAN":"Auto Center - troca de óleo","TP_FLUXO":"D","VL_TRAN":89.4,"CD_CATEGORIA":40,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":7,"NM_GRUPO":"Transporte","NM_CATEGORIA":"Serviços e Manutenção","CD_CLASS_RADAR":7,"NM_CLASS_RADAR":"Não Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":43,"CD_CLI":9001001,"DT_TRAN":"2026-08-01","TX_DCR_TRAN":"Rendimento Poupança/CDB - resgate","TP_FLUXO":"C","VL_TRAN":25.0,"CD_CATEGORIA":448978,"CD_PRD":6,"CD_MDLD_PRD":1,"CD_GRUPO":13,"NM_GRUPO":"Investimentos","NM_CATEGORIA":"Resgate de Investimentos","CD_CLASS_RADAR":3,"NM_CLASS_RADAR":"Resgate","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":44,"CD_CLI":9001001,"DT_TRAN":"2026-08-01","TX_DCR_TRAN":"Assaí Atacadista - mercado","TP_FLUXO":"D","VL_TRAN":154.2,"CD_CATEGORIA":32,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":6,"NM_GRUPO":"Alimentação","NM_CATEGORIA":"Feira e Supermercado","CD_CLASS_RADAR":6,"NM_CLASS_RADAR":"Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":45,"CD_CLI":9001001,"DT_TRAN":"2026-08-01","TX_DCR_TRAN":"Drogasil - farmácia","TP_FLUXO":"D","VL_TRAN":118.6,"CD_CATEGORIA":30,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":5,"NM_GRUPO":"Saúde","NM_CATEGORIA":"Farmácias e Drogarias","CD_CLASS_RADAR":6,"NM_CLASS_RADAR":"Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":46,"CD_CLI":9001001,"DT_TRAN":"2026-08-02","TX_DCR_TRAN":"Serviço hidráulico residencial","TP_FLUXO":"D","VL_TRAN":220.0,"CD_CATEGORIA":12,"CD_PRD":6,"CD_MDLD_PRD":1,"CD_GRUPO":2,"NM_GRUPO":"Casa","NM_CATEGORIA":"Serviços e Manutenção","CD_CLASS_RADAR":6,"NM_CLASS_RADAR":"Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":47,"CD_CLI":9001001,"DT_TRAN":"2026-08-03","TX_DCR_TRAN":"Restaurante por quilo","TP_FLUXO":"D","VL_TRAN":34.9,"CD_CATEGORIA":35,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":6,"NM_GRUPO":"Alimentação","NM_CATEGORIA":"Bar, Rest. e Padaria","CD_CLASS_RADAR":7,"NM_CLASS_RADAR":"Não Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":48,"CD_CLI":9001001,"DT_TRAN":"2026-08-03","TX_DCR_TRAN":"Serviço profissional avulso","TP_FLUXO":"D","VL_TRAN":90.0,"CD_CATEGORIA":60,"CD_PRD":6,"CD_MDLD_PRD":1,"CD_GRUPO":8,"NM_GRUPO":"Despesas Pessoais","NM_CATEGORIA":"Serviços Diversos","CD_CLASS_RADAR":7,"NM_CLASS_RADAR":"Não Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":49,"CD_CLI":9001001,"DT_TRAN":"2026-08-04","TX_DCR_TRAN":"Açougue e Hortifruti Central","TP_FLUXO":"D","VL_TRAN":126.7,"CD_CATEGORIA":32,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":6,"NM_GRUPO":"Alimentação","NM_CATEGORIA":"Feira e Supermercado","CD_CLASS_RADAR":6,"NM_CLASS_RADAR":"Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":50,"CD_CLI":9001001,"DT_TRAN":"2026-08-04","TX_DCR_TRAN":"Curso online de atualização profissional","TP_FLUXO":"D","VL_TRAN":45.0,"CD_CATEGORIA":20,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":3,"NM_GRUPO":"Educação","NM_CATEGORIA":"Outros Gastos, Educação","CD_CLASS_RADAR":7,"NM_CLASS_RADAR":"Não Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":51,"CD_CLI":9001001,"DT_TRAN":"2026-08-05","TX_DCR_TRAN":"Estorno de compra - crédito em conta","TP_FLUXO":"C","VL_TRAN":125.0,"CD_CATEGORIA":3,"CD_PRD":6,"CD_MDLD_PRD":1,"CD_GRUPO":1,"NM_GRUPO":"Receitas","NM_CATEGORIA":"Restituição de IR","CD_CLASS_RADAR":2,"NM_CLASS_RADAR":"Estorno","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":52,"CD_CLI":9001001,"DT_TRAN":"2026-08-05","TX_DCR_TRAN":"Posto Ipiranga - combustível","TP_FLUXO":"D","VL_TRAN":125.0,"CD_CATEGORIA":37,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":7,"NM_GRUPO":"Transporte","NM_CATEGORIA":"Combustível","CD_CLASS_RADAR":6,"NM_CLASS_RADAR":"Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":53,"CD_CLI":9001001,"DT_TRAN":"2026-08-05","TX_DCR_TRAN":"Pacote de serviços bancários","TP_FLUXO":"D","VL_TRAN":64.0,"CD_CATEGORIA":59,"CD_PRD":6,"CD_MDLD_PRD":1,"CD_GRUPO":10,"NM_GRUPO":"Tarifas e impostos","NM_CATEGORIA":"Serviços Financeiros","CD_CLASS_RADAR":9,"NM_CLASS_RADAR":"Obrigações","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":54,"CD_CLI":9001001,"DT_TRAN":"2026-08-06","TX_DCR_TRAN":"Lava-rápido e manutenção automotiva","TP_FLUXO":"D","VL_TRAN":60.0,"CD_CATEGORIA":40,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":7,"NM_GRUPO":"Transporte","NM_CATEGORIA":"Serviços e Manutenção","CD_CLASS_RADAR":7,"NM_CLASS_RADAR":"Não Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":55,"CD_CLI":9001001,"DT_TRAN":"2026-08-07","TX_DCR_TRAN":"Padaria Real - lanche","TP_FLUXO":"D","VL_TRAN":20.9,"CD_CATEGORIA":35,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":6,"NM_GRUPO":"Alimentação","NM_CATEGORIA":"Bar, Rest. e Padaria","CD_CLASS_RADAR":7,"NM_CLASS_RADAR":"Não Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":56,"CD_CLI":9001001,"DT_TRAN":"2026-08-07","TX_DCR_TRAN":"Farmácia do Bairro","TP_FLUXO":"D","VL_TRAN":50.0,"CD_CATEGORIA":30,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":5,"NM_GRUPO":"Saúde","NM_CATEGORIA":"Farmácias e Drogarias","CD_CLASS_RADAR":6,"NM_CLASS_RADAR":"Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":57,"CD_CLI":9001001,"DT_TRAN":"2026-08-08","TX_DCR_TRAN":"Mercado do Bairro","TP_FLUXO":"D","VL_TRAN":114.9,"CD_CATEGORIA":32,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":6,"NM_GRUPO":"Alimentação","NM_CATEGORIA":"Feira e Supermercado","CD_CLASS_RADAR":6,"NM_CLASS_RADAR":"Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":58,"CD_CLI":9001001,"DT_TRAN":"2026-08-08","TX_DCR_TRAN":"Uber - deslocamentos","TP_FLUXO":"D","VL_TRAN":60.0,"CD_CATEGORIA":41,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":7,"NM_GRUPO":"Transporte","NM_CATEGORIA":"Transporte Urbano e Apps","CD_CLASS_RADAR":6,"NM_CLASS_RADAR":"Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":59,"CD_CLI":9001001,"DT_TRAN":"2026-08-08","TX_DCR_TRAN":"Ingresso evento cultural","TP_FLUXO":"D","VL_TRAN":50.0,"CD_CATEGORIA":25,"CD_PRD":9,"CD_MDLD_PRD":1,"CD_GRUPO":4,"NM_GRUPO":"Lazer","NM_CATEGORIA":"Cultura e Entretenimento","CD_CLASS_RADAR":7,"NM_CLASS_RADAR":"Não Essenciais","IN_PARTICIPA":"S","IN_AGRO":"N"},{"ID_TRANS":60,"CD_CLI":9001001,"DT_TRAN":"2026-08-09","TX_DCR_TRAN":"Pagamento diverso sem identificação","TP_FLUXO":"D","VL_TRAN":100.0,"CD_CATEGORIA":39437,"CD_PRD":6,"CD_MDLD_PRD":1,"CD_GRUPO":11,"NM_GRUPO":"Outros","NM_CATEGORIA":"Boletos Diversos","CD_CLASS_RADAR":5,"NM_CLASS_RADAR":"Indeterminado","IN_PARTICIPA":"S","IN_AGRO":"N"}]</script>
+
+<script>
+(() => {
+"use strict";
+
+const analyticsRows = JSON.parse(document.getElementById("analyticsData").textContent);
+const transactions = JSON.parse(document.getElementById("transactionsData").textContent);
+const A = analyticsRows[0] || {};
+
+const COLORS = {
+  structural:"#163E7A",
+  essential:"#2F6BFF",
+  nonEssential:"#D97706",
+  future:"#16836B",
+  obligation:"#7C3AED",
+  unknown:"#64748B"
+};
+
+const CLASS = {
+  5:{label:"A Identificar",color:COLORS.unknown},
+  6:{label:"Essenciais",color:COLORS.essential},
+  7:{label:"Não Essencial",color:COLORS.nonEssential},
+  8:{label:"Futuro",color:COLORS.future},
+  9:{label:"Obrigações Financeiras",color:COLORS.obligation}
+};
+const TOPICS = [
+  {name:"Categorização dos Gastos", score:Number(A.NR_PONT_IND_FIM || 0), classCode:5, classLabel:"A Identificar"},
+  {name:"Gestão de Orçamento", score:Number(A.NR_PONT_ESS_FIM || 0), classCode:6, classLabel:"Essenciais"},
+  {name:"Consumo Planejado", score:Number(A.NR_PONT_NAO_ESS_FIM || 0), classCode:7, classLabel:"Não Essencial"},
+  {name:"Formação de Reserva", score:Number(A.NR_PONT_FUT_FIM || 0), classCode:8, classLabel:"Futuro"},
+  {name:"Uso Consciente do Crédito", score:Number(A.NR_PONT_OBR_FIM || 0), classCode:9, classLabel:"Obrigações Financeiras"}
+];
+
+
+
+const budgetCodes = new Set([5,6,7,9]);
+const participating = transactions.filter(t=>String(t.IN_PARTICIPA).toUpperCase()==="S");
+const budgetTx = participating.filter(t=>t.TP_FLUXO==="D" && budgetCodes.has(Number(t.CD_CLASS_RADAR)));
+const futureTx = participating.filter(t=>t.TP_FLUXO==="D" && Number(t.CD_CLASS_RADAR)===8);
+
+const metrics = {
+  income:Number(A.VL_REN_PRES||0),
+  totalOut:Number(A.VL_SAI_TOTAL||0),
+  future:Number(A.VL_SAI_FUT||0),
+  unknown:Number(A.VL_SAI_IND||0),
+  essential:Number(A.VL_SAI_ESS||0),
+  nonEssential:Number(A.VL_SAI_NAO_ESS||0),
+  obligation:Number(A.VL_SAI_OBR||0)
+};
+metrics.budgetOut=metrics.totalOut-metrics.future;
+metrics.budgetResult=metrics.income-metrics.budgetOut;
+metrics.totalResult=metrics.income-metrics.totalOut;
+metrics.clarity=metrics.totalOut>0?1-metrics.unknown/metrics.totalOut:1;
+
+const refs={
+  essential:Number(A.PC_REF_ESS||.5),
+  nonEssential:Number(A.PC_REF_NAO_ESS||.3),
+  future:Number(A.PC_REF_FUT||.2),
+  obligation:Number(A.PC_REF_OBR||.3)
+};
+
+const pcts={
+  essential:metrics.income>0?metrics.essential/metrics.income:null,
+  nonEssential:metrics.income>0?metrics.nonEssential/metrics.income:null,
+  future:metrics.income>0?metrics.future/metrics.income:null,
+  obligation:metrics.income>0?metrics.obligation/metrics.income:null
+};
+
+const state={
+  classFilter:null,
+  expandedGroup:null,
+  expandedCategory:null,
+  showAll:false,
+  txContext:{}
+,
+  focusExpandedGroup:null,
+  focusExpandedTheme:null,
+  focusShowAllTheme:null
+,
+  expandedBullet:null,
+  bulletShowAll:false
+,
+  closingLevel:"waterfall",
+  closingClass:null,
+  closingGroup:null,
+  closingRoot:"budget"
+,
+  closingShowAllGroups:false,
+  incomeMapSelected:"income:root",
+  incomeMapShowAll:false,
+  incomeMapExpanded:[]
+};
+
+const $=s=>document.querySelector(s);
+const $$=s=>Array.from(document.querySelectorAll(s));
+const EPS=.015;
+
+function fmtBRL(v,signed=false){
+  const n=Number(v||0);
+  const abs=Math.abs(n).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+  if(!signed || Math.abs(n)<.005)return `R$ ${abs}`;
+  return `${n>0?"+ ":"- "}R$ ${abs}`;
+}
+function fmtPct(v){
+  if(v===null||v===undefined||!isFinite(v))return "—";
+  return (v*100).toLocaleString("pt-BR",{minimumFractionDigits:1,maximumFractionDigits:1})+"%";
+}
+function fmtDateISO(s){
+  if(!s)return "—";
+  return new Date(s+"T12:00:00").toLocaleDateString("pt-BR");
+}
+function fmtPeriod(a,b){
+  const m=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+  const x=new Date(a+"T12:00:00"),y=new Date(b+"T12:00:00");
+  return `${String(x.getDate()).padStart(2,"0")} ${m[x.getMonth()]} — ${String(y.getDate()).padStart(2,"0")} ${m[y.getMonth()]} ${y.getFullYear()}`;
+}
+function fmtLastAccess(ts){
+  const d=new Date(String(ts).replace(" ","T"));
+  const m=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+  if(Number.isNaN(d.getTime()))return String(ts||"—");
+  return `${String(d.getDate()).padStart(2,"0")} ${m[d.getMonth()]} ${d.getFullYear()} · ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+}
+function esc(s){
+  return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+}
+function sum(rows){return rows.reduce((a,x)=>a+Number(x.VL_TRAN||0),0)}
+function near(a,b){return Math.abs(Number(a)-Number(b))<=EPS}
+function normClass(t){
+  const c=Number(t.CD_CLASS_RADAR);
+  return CLASS[c]?.label || t.NM_CLASS_RADAR || "—";
+}
+
+function validate(){
+  const checks=[];
+  const classSum=metrics.unknown+metrics.essential+metrics.nonEssential+metrics.future+metrics.obligation;
+  checks.push({name:"Classes de saída = Saídas Financeiras Totais",ok:near(classSum,metrics.totalOut),left:classSum,right:metrics.totalOut});
+  checks.push({name:"Saídas do Orçamento + Futuro = Saídas Financeiras Totais",ok:near(metrics.budgetOut+metrics.future,metrics.totalOut),left:metrics.budgetOut+metrics.future,right:metrics.totalOut});
+  checks.push({name:"Resultado do Orçamento - Futuro = Resultado Financeiro Total",ok:near(metrics.budgetResult-metrics.future,metrics.totalResult),left:metrics.budgetResult-metrics.future,right:metrics.totalResult});
+  checks.push({name:"Saídas participantes = Saídas Financeiras Totais",ok:near(sum(participating.filter(t=>t.TP_FLUXO==="D")),metrics.totalOut),left:sum(participating.filter(t=>t.TP_FLUXO==="D")),right:metrics.totalOut});
+  return checks;
+}
+const checks=validate();
+const valid=checks.every(x=>x.ok);
+
+function renderGate(){
+  $("#lastAccessValue").textContent=fmtLastAccess(A.TS_ATL_TRAN);
+  $("#periodValue").textContent=fmtPeriod(A.DT_REF_INI,A.DT_REF_FIM);
+
+
+  $("#transactionCountLabel").textContent=`${transactions.length}`;
+  $("#cycleDayLabel").textContent=`dia ${Number(A.DD_INC_MM_CLC_BLC || 0)}`;
+
+  const agro=String(A.FL_TEM_MOV_AGRO).toUpperCase()==="S";
+  const multCurrency=String(A.FL_MULT_MOE).toUpperCase()==="S";
+  const participates=String(A.FL_PARTICIPA_RADAR).toUpperCase()==="S";
+
+  $("#agroLabel").textContent=agro ? "Movimentação Agro" : "Sem movimentação Agro";
+  $("#agroLabel").classList.add(agro ? "is-active" : "is-neutral");
+
+  $("#currencyLabel").textContent=multCurrency ? "Múltiplas moedas" : "Moeda única";
+  $("#currencyLabel").classList.add(multCurrency ? "is-warning" : "is-neutral");
+
+  $("#participationLabel").textContent=participates ? "Participa do Radar" : "Fora do Radar";
+  $("#participationLabel").classList.add(participates ? "is-active" : "is-warning");
+
+  $("#methodTxCount").textContent=`${transactions.length}`;
+  $("#methodCycleDay").textContent=`dia ${Number(A.DD_INC_MM_CLC_BLC || 0)}`;
+  $("#methodAgro").textContent=agro ? "Sim" : "Não";
+  $("#methodCurrency").textContent=multCurrency ? "Múltiplas moedas" : "Moeda única";
+  $("#methodParticipation").textContent=participates ? "Participa" : "Não participa";
+
+  if(String(A.FL_PARTICIPA_RADAR).toUpperCase()!=="S"){
+    $("#gate").innerHTML=`<div class="blocked-state"><strong>Análise indisponível para este ciclo.</strong></div>`;
+    return false;
+  }
+  if(String(A.FL_MULT_MOE).toUpperCase()==="S"){
+    $("#gate").innerHTML=`<div class="blocked-state"><strong>Análise monetária indisponível para este ciclo.</strong><br>Há múltiplas moedas e a V1 não realiza conversão.</div>`;
+    return false;
+  }
+  if(!valid){
+    $("#gate").innerHTML=`<div class="validation-fail"><strong>Não foi possível gerar a interpretação consultiva.</strong><ul>${checks.filter(x=>!x.ok).map(x=>`<li>${esc(x.name)}</li>`).join("")}</ul></div>`;
+    return false;
+  }
+  $("#dashboard").style.display="block";
+  return true;
+}
+
+function renderClosing(){
+  $("#kpiIncome").textContent=fmtBRL(metrics.income);
+  $("#kpiBudgetOut").textContent=fmtBRL(metrics.budgetOut);
+  $("#kpiBudgetResult").textContent=fmtBRL(metrics.budgetResult,true);
+  $("#secondaryTotalOut").textContent=fmtBRL(metrics.totalOut);
+  $("#secondaryTotalResult").textContent=fmtBRL(metrics.totalResult,true);
+  $("#kpiFuture").textContent=fmtBRL(metrics.future);
+  $("#kpiFuturePct").textContent=metrics.income>0?`${fmtPct(pcts.future)} da renda presumida`:"Renda presumida indisponível";
+  // O waterfall foi removido da experiência visual.
+}
+
+function resetClosingDrill(){
+  state.closingLevel="waterfall";
+  state.closingClass=null;
+  state.closingGroup=null;
+  state.closingRoot="budget";
+  state.closingShowAllGroups=false;
+  renderClosingDrill();
+}
+
+function closingClassTotal(code){
+  if(code===5)return metrics.unknown;
+  if(code===6)return metrics.essential;
+  if(code===7)return metrics.nonEssential;
+  if(code===8)return metrics.future;
+  if(code===9)return metrics.obligation;
+  return 0;
+}
+
+function closingClassRows(code){
+  return participating.filter(t=>
+    t.TP_FLUXO==="D" &&
+    Number(t.CD_CLASS_RADAR)===Number(code)
+  );
+}
+
+function openClosingClass(code, root="budget"){
+  state.closingLevel="class";
+  state.closingClass=Number(code);
+  state.closingGroup=null;
+  state.closingRoot=root;
+  state.closingShowAllGroups=false;
+  renderClosingDrill();
+}
+
+function openClosingGroup(group){
+  state.closingLevel="group";
+  state.closingGroup=group;
+  state.closingShowAllGroups=false;
+  renderClosingDrill();
+}
+
+function renderClosingDrill(){
+  const back=$("#backToWaterfall");
+  const note=$("#closingChartNote");
+
+  if(state.closingLevel==="waterfall"){
+    back.style.display="none";
+    note.textContent="Futuro não compõe este waterfall";
+    $("#closingBreadcrumb").innerHTML=
+      `<span class="closing-crumb current">Composição do Orçamento</span>`;
+    $("#closingChartContent").innerHTML=
+      `<svg id="waterfallSvg" viewBox="0 0 1040 320" role="img" aria-label="Waterfall do orçamento"></svg>`;
+    renderWaterfall();
+    return;
+  }
+
+  back.style.display="inline-flex";
+  note.textContent=state.closingLevel==="class"
+    ? "Grupos da classe · percentual dentro da classe"
+    : "Categorias do grupo · percentual dentro do grupo";
+
+  const classInfo=CLASS[state.closingClass];
+  const rootLabel=state.closingRoot==="future"
+    ? "Destinação ao Futuro"
+    : "Composição do Orçamento";
+
+  let breadcrumb=
+    `<button class="closing-crumb" data-closing-root>${esc(rootLabel)}</button>`+
+    `<span>›</span>`+
+    `<button class="closing-crumb ${state.closingLevel==="class"?"current":""}" data-closing-class>${esc(classInfo.label)}</button>`;
+
+  if(state.closingLevel==="group"){
+    breadcrumb+=
+      `<span>›</span>`+
+      `<span class="closing-crumb current">${esc(state.closingGroup)}</span>`;
+  }
+
+  $("#closingBreadcrumb").innerHTML=breadcrumb;
+
+  $("[data-closing-root]")?.addEventListener("click",resetClosingDrill);
+  $("[data-closing-class]")?.addEventListener("click",()=>{
+    state.closingLevel="class";
+    state.closingGroup=null;
+    renderClosingDrill();
+  });
+
+  const classRows=closingClassRows(state.closingClass);
+  const classTotal=closingClassTotal(state.closingClass);
+
+  if(state.closingLevel==="class"){
+    const groups=new Map();
+
+    classRows.forEach(t=>{
+      groups.set(
+        t.NM_GRUPO,
+        (groups.get(t.NM_GRUPO)||0)+Number(t.VL_TRAN||0)
+      );
+    });
+
+    const items=[...groups.entries()]
+      .map(([name,value])=>({
+        name,
+        value,
+        pct:classTotal>0?value/classTotal:0
+      }))
+      .sort((a,b)=>b.value-a.value);
+
+    renderClosingColumns(items, classInfo.color);
+    return;
+  }
+
+  const groupRows=classRows.filter(t=>t.NM_GRUPO===state.closingGroup);
+  const groupTotal=sum(groupRows);
+  const categories=new Map();
+
+  groupRows.forEach(t=>{
+    categories.set(
+      t.NM_CATEGORIA,
+      (categories.get(t.NM_CATEGORIA)||0)+Number(t.VL_TRAN||0)
+    );
+  });
+
+  const items=[...categories.entries()]
+    .map(([name,value])=>({
+      name,
+      value,
+      pct:groupTotal>0?value/groupTotal:0
+    }))
+    .sort((a,b)=>b.value-a.value);
+
+  renderClosingCategoryBars(items, classInfo.color);
+}
+
+function renderClosingColumns(items, color){
+  const visible=state.closingShowAllGroups ? items : items.slice(0,8);
+  const max=Math.max(1,...items.map(x=>x.value));
+
+  $("#closingChartContent").innerHTML=
+    `<div class="closing-columns-wrap">
+      <div class="closing-columns">
+        ${visible.length
+          ? visible.map(item=>`
+              <button class="closing-column-item"
+                      type="button"
+                      data-closing-group="${esc(item.name)}"
+                      title="${esc(item.name)} · ${fmtBRL(item.value)} · ${fmtPct(item.pct)} da classe">
+                <span class="closing-column-value">${fmtBRL(item.value)}</span>
+                <span class="closing-column-bar"
+                      style="height:${Math.max(4,item.value/max*205)}px;background:${color}"></span>
+                <span class="closing-column-label">
+                  ${esc(item.name)}
+                  <span class="closing-column-pct">${fmtPct(item.pct)}</span>
+                </span>
+              </button>
+            `).join("")
+          : `<div class="empty-state">Nenhum grupo encontrado nesta classe.</div>`
+        }
+      </div>
+    </div>
+    ${items.length>8
+      ? `<div class="closing-level-action">
+          <button class="btn btn-link" id="closingShowAllGroups">
+            ${state.closingShowAllGroups?"Mostrar principais":"Ver todos os grupos"}
+          </button>
+        </div>`
+      : ""
+    }`;
+
+  $$("[data-closing-group]").forEach(btn=>{
+    btn.addEventListener("click",()=>openClosingGroup(btn.dataset.closingGroup));
+  });
+
+  $("#closingShowAllGroups")?.addEventListener("click",()=>{
+    state.closingShowAllGroups=!state.closingShowAllGroups;
+    renderClosingDrill();
+  });
+}
+
+function renderClosingCategoryBars(items, color){
+  const max=Math.max(1,...items.map(x=>x.value));
+
+  $("#closingChartContent").innerHTML=
+    `<div class="closing-category-bars">
+      ${items.length
+        ? items.map(item=>`
+            <div class="closing-category-row">
+              <span class="closing-category-name">${esc(item.name)}</span>
+              <span class="closing-category-track">
+                <span class="closing-category-fill"
+                      style="width:${(item.value/max*100).toFixed(2)}%;background:${color}"></span>
+              </span>
+              <span class="closing-category-metric">${fmtBRL(item.value)} · ${fmtPct(item.pct)}</span>
+            </div>
+          `).join("")
+        : `<div class="empty-state">Nenhuma categoria encontrada neste grupo.</div>`
+      }
+    </div>`;
+}
+
+function renderWaterfall(){
+  const svg=$("#waterfallSvg");
+  if(!svg)return;
+
+  const W=1040,H=320,ml=48,mr=28,mt=30,mb=78;
+
+  const items=[
+    {
+      label:"Renda Presumida",
+      delta:metrics.income,
+      color:COLORS.structural,
+      type:"start",
+      clickable:false
+    },
+    {
+      label:"Essenciais",
+      delta:-metrics.essential,
+      color:COLORS.essential,
+      classCode:6,
+      clickable:true
+    },
+    {
+      label:"Não Essencial",
+      delta:-metrics.nonEssential,
+      color:COLORS.nonEssential,
+      classCode:7,
+      clickable:true
+    },
+    {
+      label:"Obrigações Financeiras",
+      delta:-metrics.obligation,
+      color:COLORS.obligation,
+      classCode:9,
+      clickable:true
+    },
+    {
+      label:"A Identificar",
+      delta:-metrics.unknown,
+      color:COLORS.unknown,
+      classCode:5,
+      clickable:true
+    },
+    {
+      label:"Resultado do Orçamento",
+      value:metrics.budgetResult,
+      color:metrics.budgetResult<0?"#9A6A2B":COLORS.structural,
+      type:"result",
+      clickable:false
+    }
+  ];
+
+  let cumulative=0;
+  const pts=[];
+
+  items.forEach(it=>{
+    if(it.type==="start"){
+      pts.push({...it,from:0,to:metrics.income});
+      cumulative=metrics.income;
+    }else if(it.type==="result"){
+      pts.push({...it,from:0,to:metrics.budgetResult});
+    }else{
+      const from=cumulative;
+      cumulative+=it.delta;
+      pts.push({...it,from,to:cumulative});
+    }
+  });
+
+  const vals=pts.flatMap(p=>[p.from,p.to,0]);
+  let ymin=Math.min(...vals),ymax=Math.max(...vals);
+  const pad=(ymax-ymin||1)*.12;
+  ymin-=pad;
+  ymax+=pad;
+
+  const y=v=>mt+(ymax-v)/(ymax-ymin)*(H-mt-mb);
+  const plotW=W-ml-mr;
+  const step=plotW/items.length;
+  const bw=Math.min(92,step*.55);
+  const zeroY=y(0);
+
+  let out=`<line x1="${ml}" y1="${zeroY}" x2="${W-mr}" y2="${zeroY}" stroke="#CBD5E1"/>`;
+
+  pts.forEach((p,i)=>{
+    const x=ml+i*step+(step-bw)/2;
+    const top=Math.min(y(p.from),y(p.to));
+    const h=Math.max(3,Math.abs(y(p.from)-y(p.to)));
+    const val=p.type==="start"
+      ? metrics.income
+      : p.type==="result"
+        ? metrics.budgetResult
+        : p.delta;
+    const ly=top>35?top-8:top+h+17;
+
+    const groupAttrs=p.clickable
+      ? `class="waterfall-clickable" data-waterfall-class="${p.classCode}" tabindex="0" role="button" aria-label="Explorar ${esc(p.label)}"`
+      : "";
+
+    out+=`<g ${groupAttrs}>
+      <rect x="${x}" y="${top}" width="${bw}" height="${h}" rx="7" fill="${p.color}" opacity="${p.clickable?".88":".82"}"/>
+      <text x="${x+bw/2}" y="${ly}" text-anchor="middle" class="chart-value">${esc(fmtBRL(val,true))}</text>
+      <text x="${x+bw/2}" y="${H-37}" text-anchor="middle" class="chart-label">${esc(p.label)}</text>
+    </g>`;
+
+    if(i>0 && p.type!=="result"){
+      const px=ml+(i-1)*step+(step+bw)/2;
+      out+=`<line x1="${px}" y1="${y(p.from)}" x2="${x}" y2="${y(p.from)}" stroke="#C6D0DC" stroke-dasharray="4 4"/>`;
+    }
+  });
+
+  svg.innerHTML=out;
+
+  $$("[data-waterfall-class]").forEach(el=>{
+    const open=()=>openClosingClass(Number(el.dataset.waterfallClass),"budget");
+
+    el.addEventListener("click",open);
+    el.addEventListener("keydown",e=>{
+      if(e.key==="Enter" || e.key===" "){
+        e.preventDefault();
+        open();
+      }
+    });
+  });
+}
+
+function getIncomeMapRows(){
+  const unknownRef=Number(A.PC_REF_IND || .75);
+  return [
+    {code:6,name:"Essenciais",value:metrics.essential,pct:pcts.essential,ref:refs.essential,caption:"Referência 50%",color:CLASS[6].color},
+    {code:7,name:"Não Essencial",value:metrics.nonEssential,pct:pcts.nonEssential,ref:refs.nonEssential,caption:"Teto de referência 30%",color:CLASS[7].color},
+    {code:8,name:"Futuro",value:metrics.future,pct:pcts.future,ref:refs.future,caption:"Referência de construção 20%",color:CLASS[8].color},
+    {code:9,name:"Obrigações Financeiras",value:metrics.obligation,pct:pcts.obligation,ref:refs.obligation,caption:"Limite de referência 30%",color:CLASS[9].color},
+    {code:5,name:"A Identificar",value:metrics.unknown,pct:metrics.income>0?metrics.unknown/metrics.income:null,ref:unknownRef,caption:"Referência técnica 75%",color:CLASS[5].color}
+  ];
+}
+
+function incomeSafeId(v){
+  return String(v??"").replace(/[^a-zA-Z0-9_-]+/g,"_");
+}
+
+function buildIncomeHierarchy(){
+  const debitTx=participating.filter(t=>t.TP_FLUXO==="D");
+  const nodes=[];
+  const links=[];
+  const byId=new Map();
+  const add=node=>{nodes.push(node);byId.set(node.id,node);return node;};
+
+  const root=add({
+    id:"income:root",
+    level:"income",
+    name:"Renda Presumida",
+    value:metrics.income,
+    pctParent:1,
+    pctIncome:1,
+    color:"#163E7A",
+    parentId:null,
+    transactions:participating,
+    childIds:[]
+  });
+
+  const classMeta=new Map(getIncomeMapRows().map(r=>[Number(r.code),r]));
+
+  const groupMap=new Map();
+  debitTx.forEach(t=>{
+    const key=`${t.CD_GRUPO??"x"}:${t.NM_GRUPO||"Sem grupo"}`;
+    if(!groupMap.has(key))groupMap.set(key,[]);
+    groupMap.get(key).push(t);
+  });
+
+  [...groupMap.entries()]
+    .map(([key,tx])=>({key,tx,value:tx.reduce((s,t)=>s+Number(t.VL_TRAN||0),0)}))
+    .sort((a,b)=>b.value-a.value)
+    .forEach(g=>{
+      const first=g.tx[0]||{};
+      const groupName=first.NM_GRUPO||"Sem grupo";
+      const groupId=`group:${incomeSafeId(g.key)}`;
+      const classCount=new Set(g.tx.map(t=>Number(t.CD_CLASS_RADAR))).size;
+      const groupNode=add({
+        id:groupId,
+        level:"group",
+        name:groupName,
+        value:g.value,
+        pctParent:metrics.income>0?g.value/metrics.income:null,
+        pctIncome:metrics.income>0?g.value/metrics.income:null,
+        color:"#4C6A95",
+        parentId:root.id,
+        groupCode:first.CD_GRUPO,
+        transactions:g.tx,
+        classCount,
+        childIds:[]
+      });
+      root.childIds.push(groupId);
+      links.push({source:root.id,target:groupId,level:"group",color:"#98ABC7"});
+
+      const groupClassMap=new Map();
+      g.tx.forEach(t=>{
+        const code=Number(t.CD_CLASS_RADAR);
+        if(!groupClassMap.has(code))groupClassMap.set(code,[]);
+        groupClassMap.get(code).push(t);
+      });
+
+      [...groupClassMap.entries()]
+        .map(([code,tx])=>({code,tx,value:tx.reduce((s,t)=>s+Number(t.VL_TRAN||0),0)}))
+        .sort((a,b)=>b.value-a.value)
+        .forEach(c=>{
+          const meta=classMeta.get(Number(c.code)) || {code:c.code,name:`Classe ${c.code}`,color:"#64748B",caption:"—",ref:null};
+          const classId=`class:${incomeSafeId(g.key)}:${meta.code}`;
+          const classNode=add({
+            id:classId,
+            level:"class",
+            name:meta.name,
+            value:c.value,
+            pctParent:g.value>0?c.value/g.value:null,
+            pctGroup:g.value>0?c.value/g.value:null,
+            pctIncome:metrics.income>0?c.value/metrics.income:null,
+            reference:meta.ref,
+            referenceLabel:meta.caption,
+            color:meta.color,
+            parentId:groupId,
+            classCode:meta.code,
+            groupCode:first.CD_GRUPO,
+            groupName,
+            transactions:c.tx,
+            childIds:[]
+          });
+          groupNode.childIds.push(classId);
+          links.push({source:groupId,target:classId,level:"class",color:meta.color});
+
+          const catMap=new Map();
+          c.tx.forEach(t=>{
+            const catKey=`${t.CD_CATEGORIA??"x"}:${t.NM_CATEGORIA||"Sem categoria"}`;
+            if(!catMap.has(catKey))catMap.set(catKey,[]);
+            catMap.get(catKey).push(t);
+          });
+
+          [...catMap.entries()]
+            .map(([key,tx])=>({key,tx,value:tx.reduce((s,t)=>s+Number(t.VL_TRAN||0),0)}))
+            .sort((a,b)=>b.value-a.value)
+            .forEach(cat=>{
+              const cfirst=cat.tx[0]||{};
+              const catId=`category:${incomeSafeId(g.key)}:${meta.code}:${incomeSafeId(cat.key)}`;
+              add({
+                id:catId,
+                level:"category",
+                name:cfirst.NM_CATEGORIA||"Sem categoria",
+                value:cat.value,
+                pctParent:c.value>0?cat.value/c.value:null,
+                pctClass:c.value>0?cat.value/c.value:null,
+                pctGroup:g.value>0?cat.value/g.value:null,
+                pctIncome:metrics.income>0?cat.value/metrics.income:null,
+                color:meta.color,
+                parentId:classId,
+                classCode:meta.code,
+                className:meta.name,
+                groupCode:first.CD_GRUPO,
+                groupName,
+                categoryCode:cfirst.CD_CATEGORIA,
+                transactions:cat.tx,
+                childIds:[]
+              });
+              classNode.childIds.push(catId);
+              links.push({source:classId,target:catId,level:"category",color:meta.color});
+            });
+        });
+    });
+
+  return {nodes,links,byId,root};
+}
+
+const incomeForceState={
+  raf:null,
+  positions:new Map(),
+  nodeEls:new Map(),
+  linkEls:[],
+  nodes:[],
+  links:[],
+  width:1080,
+  height:680,
+  tick:0,
+  drag:null
+};
+
+function incomeIsExpanded(id){return state.incomeMapExpanded.includes(id);}
+function incomeToggleExpanded(id){
+  if(incomeIsExpanded(id))state.incomeMapExpanded=state.incomeMapExpanded.filter(x=>x!==id);
+  else state.incomeMapExpanded=[...state.incomeMapExpanded,id];
+}
+
+function getVisibleIncomeGraph(h){
+  const visibleIds=new Set([h.root.id,...h.root.childIds]);
+  h.root.childIds.forEach(groupId=>{
+    const group=h.byId.get(groupId);
+    if(!group)return;
+    if(incomeIsExpanded(groupId)){
+      group.childIds.forEach(classId=>{
+        visibleIds.add(classId);
+        const cls=h.byId.get(classId);
+        if(cls && incomeIsExpanded(classId))cls.childIds.forEach(catId=>visibleIds.add(catId));
+      });
+    }
+  });
+  const nodes=h.nodes.filter(n=>visibleIds.has(n.id));
+  const links=h.links.filter(l=>visibleIds.has(l.source)&&visibleIds.has(l.target));
+  return {nodes,links};
+}
+
+function incomeNodeRadius(node){
+  if(node.level==="income")return 114;
+  const p=Math.max(0,Math.min(1.15,Number(node.pctParent||0)));
+  if(node.level==="group")return 47+Math.sqrt(p)*50;
+  if(node.level==="class")return 37+Math.sqrt(p)*39;
+  return 29+Math.sqrt(p)*30;
+}
+
+function incomeTextLines(name,level){
+  const maxChars=level==="income"?16:level==="class"?16:level==="group"?18:16;
+  const maxLines=level==="category"?3:2;
+  const words=String(name||"").split(/\s+/).filter(Boolean);
+  if(!words.length)return ["—"];
+  const lines=[];
+  let cur="";
+  words.forEach(w=>{
+    const next=cur?`${cur} ${w}`:w;
+    if(next.length>maxChars && cur && lines.length<maxLines-1){lines.push(cur);cur=w;}
+    else cur=next;
+  });
+  if(cur)lines.push(cur);
+  if(lines.length>maxLines){
+    const keep=lines.slice(0,maxLines);
+    keep[maxLines-1]=keep[maxLines-1].slice(0,Math.max(3,maxChars-1))+"…";
+    return keep;
+  }
+  if(lines[lines.length-1]?.length>maxChars+5){lines[lines.length-1]=lines[lines.length-1].slice(0,maxChars+3)+"…";}
+  return lines;
+}
+
+function incomeHexToRgba(hex,a){
+  const h=String(hex||"#64748B").replace("#","");
+  const v=h.length===3?h.split("").map(x=>x+x).join(""):h.padEnd(6,"0").slice(0,6);
+  const r=parseInt(v.slice(0,2),16),g=parseInt(v.slice(2,4),16),b=parseInt(v.slice(4,6),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function incomeInitNodePosition(node,byId){
+  const cached=incomeForceState.positions.get(node.id);
+  if(cached && node.level!=="income" && node.level!=="group")return {...node,...cached,vx:cached.vx||0,vy:cached.vy||0,r:incomeNodeRadius(node)};
+
+  const W=incomeForceState.width,H=incomeForceState.height;
+  const cx=W*.50,cy=H*.50;
+  if(node.level==="income")return {...node,x:cx,y:cy,vx:0,vy:0,r:incomeNodeRadius(node),fixed:true,anchorX:cx,anchorY:cy,phase:0};
+
+  const parent=byId.get(node.parentId);
+  const parentCached=incomeForceState.positions.get(node.parentId);
+
+  // Primeiro anel: grupos distribuídos ao redor da renda.
+  if(node.level==="group"){
+    const siblings=byId.get("income:root")?.childIds||[];
+    const idx=Math.max(0,siblings.indexOf(node.id));
+    const count=Math.max(1,siblings.length);
+    const angle=(-Math.PI/2)+(idx/count)*Math.PI*2;
+    const radius=230;
+    const gx=cx+Math.cos(angle)*radius;
+    const gy=cy+Math.sin(angle)*radius;
+    return {...node,x:gx,y:gy,vx:0,vy:0,r:incomeNodeRadius(node),fixed:true,anchorX:gx,anchorY:gy,phase:angle};
+  }
+
+  const px=parentCached?.x ?? cx;
+  const py=parentCached?.y ?? cy;
+  let baseAngle=Math.atan2(py-cy,px-cx);
+  if(!Number.isFinite(baseAngle))baseAngle=0;
+
+  const siblings=parent?.childIds||[];
+  const idx=Math.max(0,siblings.indexOf(node.id));
+  const count=Math.max(1,siblings.length);
+  const centered=idx-(count-1)/2;
+  const spread=node.level==="class"?.42:.34;
+  const angle=baseAngle+centered*spread;
+  const dist=node.level==="class"?150:122;
+
+  // Filhos sempre nascem do lado exterior do pai, nunca entre o pai e a renda.
+  return {...node,x:px+Math.cos(angle)*dist,y:py+Math.sin(angle)*dist,vx:0,vy:0,r:incomeNodeRadius(node),phase:angle};
+}
+
+function incomeLinkDistance(link,nodesById){
+  const s=nodesById.get(link.source),t=nodesById.get(link.target);
+  if(!s||!t)return 120;
+  if(t.level==="group")return 255+s.r*.28+t.r*.42;
+  if(t.level==="class")return 165+s.r*.38+t.r*.48;
+  return 122+s.r*.30+t.r*.42;
+}
+
+function incomeForceTick(){
+  const F=incomeForceState;
+  if(!F.nodes.length)return;
+  F.tick++;
+  const nodes=F.nodes,links=F.links;
+  const byId=new Map(nodes.map(n=>[n.id,n]));
+  const W=F.width,H=F.height;
+
+  // Springs keep the hierarchy connected.
+  links.forEach(l=>{
+    const a=byId.get(l.source),b=byId.get(l.target); if(!a||!b)return;
+    let dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)||1;
+    const target=incomeLinkDistance(l,byId);
+    const k=.0105;
+    const f=(d-target)*k;
+    const ux=dx/d,uy=dy/d;
+    if(!a.fixed){a.vx+=ux*f;a.vy+=uy*f;}
+    if(!b.fixed){b.vx-=ux*f;b.vy-=uy*f;}
+  });
+
+  // Repulsion + collision: floating bubbles never overlap.
+  for(let i=0;i<nodes.length;i++){
+    const a=nodes[i];
+    for(let j=i+1;j<nodes.length;j++){
+      const b=nodes[j];
+      let dx=b.x-a.x,dy=b.y-a.y,d2=dx*dx+dy*dy;
+      if(d2<1){dx=.5;dy=.5;d2=.5;}
+      const d=Math.sqrt(d2),minD=a.r+b.r+28;
+      const ux=dx/d,uy=dy/d;
+      let force=Math.min(1.6,1250/d2);
+      if(d<minD)force+=(minD-d)*.032;
+      if(!a.fixed){a.vx-=ux*force;a.vy-=uy*force;}
+      if(!b.fixed){b.vx+=ux*force;b.vy+=uy*force;}
+    }
+  }
+
+  // Radial hierarchy: every child is kept on the exterior side of its parent.
+  const rootNode=byId.get("income:root");
+  const cx=rootNode?.x ?? W*.48, cy=rootNode?.y ?? H*.50;
+  nodes.forEach(n=>{
+    if(n.fixed)return;
+    const parent=byId.get(n.parentId);
+    if(!parent)return;
+
+    let ux=parent.x-cx, uy=parent.y-cy;
+    let plen=Math.hypot(ux,uy);
+    if(plen<1){
+      const a=n.phase||0; ux=Math.cos(a); uy=Math.sin(a); plen=1;
+    }else{ux/=plen;uy/=plen;}
+
+    const dx=n.x-parent.x, dy=n.y-parent.y;
+    const outward=dx*ux+dy*uy;
+    const minOut=n.level==="class"?118:n.level==="category"?96:132;
+    if(outward<minOut){
+      const push=(minOut-outward)*.018;
+      n.vx+=ux*push;
+      n.vy+=uy*push;
+    }
+
+    // Leve atração para o raio externo correspondente ao nível.
+    const desiredRadius=n.level==="group"?230:n.level==="class"?390:540;
+    let rx=n.x-cx, ry=n.y-cy, rr=Math.hypot(rx,ry)||1;
+    rx/=rr; ry/=rr;
+    const radialDelta=desiredRadius-rr;
+    n.vx+=rx*radialDelta*.0017;
+    n.vy+=ry*radialDelta*.0017;
+  });
+
+  nodes.forEach(n=>{
+    if(n.fixed){
+      n.x=Number.isFinite(n.anchorX)?n.anchorX:(n.level==="income"?W*.50:n.x);
+      n.y=Number.isFinite(n.anchorY)?n.anchorY:(n.level==="income"?H*.50:n.y);
+      n.vx=0;n.vy=0;return;
+    }
+    // Gentle center pull and permanent micro-motion give the floating effect.
+    n.vx+=(W*.5-n.x)*.00007 + Math.sin(F.tick*.016+(n.phase||0))*.004;
+    n.vy+=(H*.5-n.y)*.00007 + Math.cos(F.tick*.014+(n.phase||0))*.004;
+    n.vx*=.91;n.vy*=.91;
+    n.x+=n.vx;n.y+=n.vy;
+    const pad=n.r+12;
+    if(n.x<pad){n.x=pad;n.vx=Math.abs(n.vx)*.55;}
+    if(n.x>W-pad){n.x=W-pad;n.vx=-Math.abs(n.vx)*.55;}
+    if(n.y<pad){n.y=pad;n.vy=Math.abs(n.vy)*.55;}
+    if(n.y>H-pad){n.y=H-pad;n.vy=-Math.abs(n.vy)*.55;}
+  });
+
+  F.links.forEach((l,i)=>{
+    const a=byId.get(l.source),b=byId.get(l.target),el=F.linkEls[i];
+    if(a&&b&&el){el.setAttribute("x1",a.x);el.setAttribute("y1",a.y);el.setAttribute("x2",b.x);el.setAttribute("y2",b.y);}
+  });
+  F.nodes.forEach(n=>{
+    const el=F.nodeEls.get(n.id); if(el)el.setAttribute("transform",`translate(${n.x.toFixed(2)},${n.y.toFixed(2)})`);
+    F.positions.set(n.id,{x:n.x,y:n.y,vx:n.vx,vy:n.vy});
+  });
+  F.raf=requestAnimationFrame(incomeForceTick);
+}
+
+function incomeBubblePct(node){
+  if(node.level==="income")return 1;
+  if(node.level==="group")return node.pctIncome;
+  if(node.level==="class")return node.pctGroup;
+  if(node.level==="category")return node.pctClass;
+  return node.pctParent;
+}
+
+function renderIncomeGraph(){
+  const svg=$("#incomeGraphSvg");
+  if(!svg)return;
+  const hierarchy=buildIncomeHierarchy();
+  const vis=getVisibleIncomeGraph(hierarchy);
+  const F=incomeForceState;
+  if(F.raf)cancelAnimationFrame(F.raf);
+  F.width=1280;F.height=820;F.tick=0;
+  F.nodes=vis.nodes.map(n=>incomeInitNodePosition(n,hierarchy.byId));
+  F.links=vis.links.map(l=>({...l}));
+  const visibleIdSet=new Set(F.nodes.map(n=>n.id));
+  if(!visibleIdSet.has(state.incomeMapSelected))state.incomeMapSelected="income:root";
+
+  const defs=`<defs>
+    <filter id="incomeNodeGlow" x="-40%" y="-40%" width="180%" height="180%"><feDropShadow dx="0" dy="4" stdDeviation="5" flood-color="#163E7A" flood-opacity=".18"/></filter>
+  </defs>`;
+  const linkSvg=F.links.map((l,i)=>`<line class="income-force-link" data-income-link="${i}" style="stroke:${incomeHexToRgba(l.color||'#AAB6C5',.48)}"></line>`).join("");
+  const nodeSvg=F.nodes.map(n=>{
+    const lines=incomeTextLines(n.name,n.level);
+    const offset=(lines.length-1)*8.5;
+    const pct=fmtPct(incomeBubblePct(n));
+    const nameShift=lines.length>1?-8:-5;
+    const text=lines.map((ln,i)=>`<tspan x="0" y="${(nameShift-offset+i*17).toFixed(1)}">${esc(ln)}</tspan>`).join("");
+    const pctY=lines.length>1?23:16;
+    const selected=n.id===state.incomeMapSelected;
+    const fillOpacity=n.level==="income"?.10:n.level==="class"?.105:n.level==="group"?.075:.055;
+    return `<g class="income-force-node level-${n.level} ${selected?'selected':''}" data-income-node="${esc(n.id)}" tabindex="0" role="button" aria-label="${esc(n.name)} ${esc(pct)}">
+      <circle r="${n.r.toFixed(1)}" fill="${n.color}" fill-opacity="${fillOpacity}" stroke="${n.color}"></circle>
+      <text text-anchor="middle" dominant-baseline="middle">${text}</text>
+      <text class="income-node-pct" x="0" y="${pctY}" text-anchor="middle" dominant-baseline="middle">${esc(pct)}</text>
+    </g>`;
+  }).join("");
+  svg.innerHTML=defs+`<g id="incomeLinksLayer">${linkSvg}</g><g id="incomeNodesLayer">${nodeSvg}</g>`;
+  F.nodeEls=new Map($$("#incomeGraphSvg [data-income-node]").map(el=>[el.dataset.incomeNode,el]));
+  F.linkEls=$$("#incomeGraphSvg [data-income-link]");
+
+  const selectAndMaybeExpand=id=>{
+    const node=hierarchy.byId.get(id); if(!node)return;
+    state.incomeMapSelected=id;
+    state.incomeMapShowAll=false;
+    if(node.level==="group"||node.level==="class")incomeToggleExpanded(id);
+    renderBullets();
+  };
+
+  F.nodeEls.forEach((el,id)=>{
+    let moved=false,start=null;
+    const pointerDown=e=>{
+      const node=F.nodes.find(n=>n.id===id); if(!node)return;
+      moved=false;start={x:e.clientX,y:e.clientY};
+      if(node.fixed){
+        F.drag={id,pointerId:e.pointerId,fixedClick:true};
+        el.setPointerCapture?.(e.pointerId);
+        e.preventDefault();
+        return;
+      }
+      F.drag={id,pointerId:e.pointerId};
+      el.setPointerCapture?.(e.pointerId);
+      e.preventDefault();
+    };
+    const pointerMove=e=>{
+      if(!F.drag||F.drag.id!==id)return;
+      if(F.drag.fixedClick)return;
+      const node=F.nodes.find(n=>n.id===id); if(!node)return;
+      const rect=svg.getBoundingClientRect();
+      const sx=F.width/rect.width,sy=F.height/rect.height;
+      if(start&&Math.hypot(e.clientX-start.x,e.clientY-start.y)>4)moved=true;
+      node.x=(e.clientX-rect.left)*sx;node.y=(e.clientY-rect.top)*sy;node.vx=0;node.vy=0;
+      e.preventDefault();
+    };
+    const pointerUp=e=>{
+      if(F.drag&&F.drag.id===id)F.drag=null;
+      el.releasePointerCapture?.(e.pointerId);
+      if(!moved)selectAndMaybeExpand(id);
+      e.preventDefault();
+    };
+    el.addEventListener("pointerdown",pointerDown);
+    el.addEventListener("pointermove",pointerMove);
+    el.addEventListener("pointerup",pointerUp);
+    el.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();selectAndMaybeExpand(id);}});
+  });
+  F.raf=requestAnimationFrame(incomeForceTick);
+}
+
+function getIncomeSelection(){
+  const h=buildIncomeHierarchy();
+  return h.byId.get(state.incomeMapSelected)||h.root;
+}
+
+const INFO_GRUPOS_CATALOGO={"0":{"name":"Sem categoria","categories":[{"code":"0","name":"Sem categoria"},{"code":"83","name":"Sem categoria"}]},"1":{"name":"Receitas","categories":[{"code":"1","name":"Salário"},{"code":"2","name":"Vale Alimentação"},{"code":"3","name":"Restituição de IR"},{"code":"4","name":"Bonificação"},{"code":"5","name":"Outros Rendimentos"}]},"2":{"name":"Casa","categories":[{"code":"6","name":"Água"},{"code":"7","name":"Eletricidade e Gás"},{"code":"9","name":"Compra de Imóvel"},{"code":"10","name":"Aluguel e Condomínio"},{"code":"11","name":"Móveis e Utensílios"},{"code":"12","name":"Serviços e Manutenção"},{"code":"13","name":"Empregados"},{"code":"14","name":"Animais e Pets"},{"code":"3790","name":"Seguro Residencial"}]},"3":{"name":"Educação","categories":[{"code":"15","name":"Educação Superior"},{"code":"16","name":"Colégio"},{"code":"17","name":"Idiomas"},{"code":"18","name":"Publicações e Papelaria"},{"code":"20","name":"Outros Gastos"}]},"4":{"name":"Lazer","categories":[{"code":"21","name":"Viagens e Lazer"},{"code":"22","name":"Esportes e Academia"},{"code":"25","name":"Cultura e Entretenimento"},{"code":"26","name":"Publicações Digitais"},{"code":"61","name":"Jogos e Loterias"}]},"5":{"name":"Saúde","categories":[{"code":"27","name":"Plano de Saúde"},{"code":"28","name":"Serviços de Saúde"},{"code":"29","name":"Dentista"},{"code":"30","name":"Farmácias e Drogarias"}]},"6":{"name":"Alimentação","categories":[{"code":"32","name":"Feira e Supermercado"},{"code":"35","name":"Bar"}]},"7":{"name":"Transporte","categories":[{"code":"36","name":"Compra de Veículo"},{"code":"37","name":"Combustível"},{"code":"38","name":"Estacionamento e Pedágio"},{"code":"39","name":"Seguro de Veículo"},{"code":"40","name":"Serviços e Manutenção"},{"code":"41","name":"Transporte Urbano e Apps"}]},"8":{"name":"Despesas Pessoais","categories":[{"code":"42","name":"Vestuário e Acessórios"},{"code":"43","name":"Cuidado Pessoal e Beleza"},{"code":"44","name":"Compras Diversas"},{"code":"45","name":"Pensão Alimentícia"},{"code":"46","name":"Seguros e Previdência"},{"code":"47","name":"Doação"},{"code":"48","name":"Gasto com Familiares"},{"code":"49","name":"Presentes"},{"code":"60","name":"Serviços Diversos"},{"code":"4417","name":"Empréstimos e Prestações"}]},"9":{"name":"Comunicação","categories":[{"code":"51","name":"Telefonia e Internet"},{"code":"53","name":"Assinatura TV e Streaming"}]},"10":{"name":"Tarifas e impostos","categories":[{"code":"54","name":"IPTU"},{"code":"55","name":"IPVA e Gastos Detran"},{"code":"56","name":"Imposto de Renda"},{"code":"57","name":"ISS(Imposto sobre Serviços)"},{"code":"58","name":"GPS(Guia de Previdência Social)"},{"code":"59","name":"Serviços Financeiros"},{"code":"3787","name":"IOF"},{"code":"3788","name":"Encargos e Tarifas"}]},"12":{"name":"Fatura","categories":[{"code":"111","name":"Cartão de Crédito"}]},"11":{"name":"Outros","categories":[{"code":"279","name":"Gastos Diversos"},{"code":"39434","name":"Cheque"},{"code":"39435","name":"Saque"},{"code":"39436","name":"Transferência"},{"code":"39437","name":"Boletos Diversos"}]},"14":{"name":"Agro","categories":[{"code":"300","name":"Receitas Agro"},{"code":"310","name":"Criações"},{"code":"330","name":"Cultivos"},{"code":"350","name":"Insumos"},{"code":"370","name":"Apoio Produtivo"}]},"13":{"name":"Investimentos","categories":[{"code":"448977","name":"Aplicação"},{"code":"448978","name":"Resgate de Investimentos"}]}};
+const INFO_CATEGORIAS_CATALOGO={"0":{"name":"Sem categoria","groupCode":"0","groupName":"Sem categoria","definition":"Código utilizado para categporias não identificadas"},"83":{"name":"Sem categoria","groupCode":"0","groupName":"Sem categoria","definition":"Código de sistema utilizado para que o lançamento seja recategorizado em rotina noturna após erro no processamento da categorização"},"1":{"name":"Salário","groupCode":"1","groupName":"Receitas","definition":"Use esta categoria para registrar recebimentos relacionados à remuneração por trabalho, provenientes de vínculo empregatício, prestação de serviços ou créditos laborais formais."},"2":{"name":"Vale Alimentação","groupCode":"1","groupName":"Receitas","definition":"Use esta categoria para registrar recebimentos de vale-alimentação, benefício corporativo destinado à compra de alimentos em supermercados, padarias e estabelecimentos autorizados."},"3":{"name":"Restituição de IR","groupCode":"1","groupName":"Receitas","definition":"Créditos referentes à restituição de Imposto de Renda.(Ela é a devolução,\n\npela Receita Federal, de valores pagos a mais pelo contribuinte durante o ano-base, retidos na fonte (salário) ou via Carnê-Leão). Possui palavras como: \"\"restituição de Imposto de Renda\"\" | \"\"Estorno\"\" | \"\"Restituição de IRPF\"\" |"},"4":{"name":"Bonificação","groupCode":"1","groupName":"Receitas","definition":"Use esta categoria para registrar recebimentos de bônus, prêmios, participações e remunerações meritórias, provenientes de empresas, empregadores ou programas de incentivo."},"5":{"name":"Outros Rendimentos","groupCode":"1","groupName":"Receitas","definition":"Use esta categoria para registrar créditos recebidos que não se enquadram em nenhuma das demais categorias de receita, incluindo entradas genéricas, transferências recebidas e valores cuja origem não é possível identificar com precisão."},"6":{"name":"Água","groupCode":"2","groupName":"Casa","definition":"Use esta categoria para registrar pagamentos de contas residenciais de abastecimento de água e serviços de saneamento básico, realizados por meio de boletos, débito automático, PIX ou outros meios."},"7":{"name":"Eletricidade e Gás","groupCode":"2","groupName":"Casa","definition":"Use esta categoria para registrar pagamentos de despesas residenciais ou prediais relacionadas ao consumo de energia elétrica e gás."},"9":{"name":"Compra de Imóvel","groupCode":"2","groupName":"Casa","definition":"Use esta categoria para registrar pagamentos de prestações de financiamentos imobiliários, independentemente do banco, instituição financeira ou modalidade de crédito utilizada.\n\nNormalmente esses lançamentos são pagos por boleto, mas também podem ocorrer via PIX, débito ou transferência, desde que se refiram exclusivamente ao financiamento ou aquisição de imóvel.\n\nDevem ser incluídos aqui também pagamentos feitos a prefeituras municipais relacionados à compra, regularização ou financiamento de imóveis, quando caracterizados como parte do processo de aquisição."},"10":{"name":"Aluguel e Condomínio","groupCode":"2","groupName":"Casa","definition":"Use esta categoria para registrar pagamentos de aluguel e de taxas de condomínio, tanto de imóveis residenciais quanto comerciais.\n\nEssa unificação é importante porque muitas imobiliárias cobram aluguel e condomínio no mesmo boleto, ou fazem a gestão integrada desses pagamentos."},"11":{"name":"Móveis e Utensílios","groupCode":"2","groupName":"Casa","definition":"Use esta categoria para registrar gastos realizados em lojas físicas ou virtuais que comercializam móveis, eletrodomésticos, eletroportáteis e utensílios domésticos.\n\nInclua nesta categoria compras como:\n\nMóveis (sofás, mesas, cadeiras, camas, armários etc.)\n\nEletrodomésticos (geladeira, fogão, máquina de lavar, micro-ondas…)\n\nEletroportáteis (liquidificador, ventilador, aspirador, batedeira etc.)\n\nUtensílios de uso doméstico (panelas, pratos, copos, talheres, potes, itens de organização etc.)"},"12":{"name":"Serviços e Manutenção","groupCode":"2","groupName":"Casa","definition":"Use esta categoria para registrar quaisquer gastos relacionados a serviços prestados para a casa, incluindo manutenção, reparos, limpeza e cuidados gerais com o imóvel."},"13":{"name":"Empregados","groupCode":"2","groupName":"Casa","definition":"Conjunto de profissionais contratados por famílias ou unidades domésticas para executar atividades de suporte direto ao ambiente residencial, garantindo organização, manutenção, bem-estar e segurança dos residentes. Inclui trabalhadores responsáveis por tarefas como limpeza, preparo de refeições, cuidados com roupas e pertences, apoio a crianças e idosos, manutenção de áreas internas e externas, condução veicular para uso da família, e administração cotidiana da casa.\n\nEsses empregados desempenham funções essenciais para o funcionamento adequado do lar e atuam de forma contínua ou periódica, sempre sem caráter empresarial, pois o empregador é a própria família ou indivíduo residente, conforme previsto no CNAE 9700-5/00.\n\nCom base nos descritores oficiais do CNAE, integram esta categoria profissionais como:\n\nArrumadeira / camareira doméstica\n\nCozinheiro(a) e copeiro(a)\n\nBabá / acompanhante\n\nJardineiro(a)\n\nCaseiro(a)\n\nLavadeira / passadeira\n\nMotorista residencial\n\nGovernanta\n\nEssa categoria não inclui:\n\nPrestadores terceirizados ou empresas que fornecem mão de obra temporária (CNAE 78.20-5)\n\nProfissionais autônomos ou empresas de jardinagem, culinária, limpeza ou conservação que atuam como prestadores independentes"},"14":{"name":"Animais e Pets","groupCode":"2","groupName":"Casa","definition":"Use esta categoria para registrar todos os gastos relacionados ao cuidado, saúde, alimentação e bem‑estar de animais domésticos."},"3790":{"name":"Seguro Residencial","groupCode":"2","groupName":"Casa","definition":"Use esta categoria para registrar pagamentos relacionados ao seguro residencial, independentemente da seguradora, tipo de cobertura ou forma de contratação."},"15":{"name":"Educação Superior","groupCode":"3","groupName":"Educação","definition":"Use esta categoria para registrar gastos relacionados ao pagamento de instituições de ensino superior, incluindo universidades e faculdades, em qualquer modalidade de formação."},"16":{"name":"Colégio","groupCode":"3","groupName":"Educação","definition":"Use esta categoria para registrar gastos relacionados ao pagamento de instituições de ensino infantil, fundamental e médio, incluindo:\n\nBerçário\n\nCreche\n\nEscola\n\nColégio"},"17":{"name":"Idiomas","groupCode":"3","groupName":"Educação","definition":"Use esta categoria para registrar gastos relacionados ao pagamento de cursos de ensino de idiomas, em qualquer formato ou modalidade."},"18":{"name":"Publicações e Papelaria","groupCode":"3","groupName":"Educação","definition":"Use esta categoria para registrar compras de materiais escolares, itens de papelaria e produtos de livraria adquiridos em livrarias, papelarias e editoras, tanto em lojas físicas quanto virtuais."},"20":{"name":"Outros Gastos","groupCode":"3","groupName":"Educação","definition":"Use esta categoria para registrar gastos com cursos profissionalizantes e cursos livres realizados em escolas, instituições de formação ou com profissionais especializados."},"21":{"name":"Viagens e Lazer","groupCode":"4","groupName":"Lazer","definition":"Use esta categoria para registrar gastos relacionados a viagens, sejam elas turísticas, a trabalho ou educacionais."},"22":{"name":"Esportes e Academia","groupCode":"4","groupName":"Lazer","definition":"Use esta categoria para registrar gastos relacionados à prática de atividades físicas, esportes e bem‑estar corporal, em qualquer modalidade, formato ou ambiente."},"25":{"name":"Cultura e Entretenimento","groupCode":"4","groupName":"Lazer","definition":"Use esta categoria para registrar gastos relacionados a atividades de cultura, lazer, diversão e entretenimento, em diferentes formatos e ambientes."},"26":{"name":"Publicações Digitais","groupCode":"4","groupName":"Lazer","definition":"Use esta categoria para registrar compras e assinaturas de conteúdo digital, como jornais, livros e revistas em formato eletrônico."},"61":{"name":"Jogos e Loterias","groupCode":"4","groupName":"Lazer","definition":"Use esta categoria para registrar gastos relacionados a jogos de apostas, loterias e serviços prestados por casas lotéricas."},"27":{"name":"Plano de Saúde","groupCode":"5","groupName":"Saúde","definition":"Use esta categoria para registrar gastos relacionados ao pagamento de planos de saúde."},"28":{"name":"Serviços de Saúde","groupCode":"5","groupName":"Saúde","definition":"Use esta categoria para registrar gastos relacionados a serviços médicos, procedimentos de saúde, atendimentos clínicos e exames, realizados em hospitais, clínicas, consultórios ou laboratórios."},"29":{"name":"Dentista","groupCode":"5","groupName":"Saúde","definition":"Use esta categoria para registrar gastos relacionados a serviços odontológicos, realizados em clínicas, consultórios ou profissionais de odontologia."},"30":{"name":"Farmácias e Drogarias","groupCode":"5","groupName":"Saúde","definition":"Use esta categoria para registrar gastos com a compra de medicamentos e outros itens adquiridos especificamente em farmácias e drogarias."},"32":{"name":"Feira e Supermercado","groupCode":"6","groupName":"Alimentação","definition":"Categoria para classificar compras em mercados, feiras, mercearias, cerealistas, açougues, minimercados, distribuidoras de bebidas, hortifrutis (Ver Nota de Exemplo)\n\nObs.: Classificar os lançamentos que referenciam compra de alimentos in natura. Lançamentos de compras de alimentos prontos para consumir (bares, restaurantes, padarias) devem ser classificados em 35 - Bares e Restaurantes.\n\nVER Bares/Restaurantes (GFP) (Cod. Cat. 35 - Débito)\n\nNão USE Feira (Cod. Cat. 33 - Débito)"},"35":{"name":"Bar","groupCode":"6","groupName":"Alimentação","definition":"Use esta categoria para registrar gastos com alimentação preparada para consumo imediato, adquirida em:\n\nBares\n\nRestaurantes\n\nCafés\n\nPadarias\n\nLanchonetes\n\nConfeitarias\n\nDocerias\n\nEstabelecimentos similares que vendam alimentos prontos\n\nIncluindo Marmitas\n\nAdega\n\npeixaria\n\nquiosque\n\nconveniência"},"36":{"name":"Compra de Veículo","groupCode":"7","groupName":"Transporte","definition":"Use esta categoria para registrar gastos relacionados à aquisição ou utilização de veículos, incluindo compras financiadas, consórcios e contratos de locação."},"37":{"name":"Combustível","groupCode":"7","groupName":"Transporte","definition":"Use esta categoria para registrar gastos com abastecimento de veículos realizados em postos de combustíveis, independentemente do tipo de combustível adquirido."},"38":{"name":"Estacionamento e Pedágio","groupCode":"7","groupName":"Transporte","definition":"Use esta categoria para registrar gastos relacionados a estacionamentos e pedágios, independentemente do local ou do meio de pagamento."},"39":{"name":"Seguro de Veículo","groupCode":"7","groupName":"Transporte","definition":"Use esta categoria para registrar gastos relacionados a seguros de veículos, independentemente do tipo de cobertura ou da seguradora contratada."},"40":{"name":"Serviços e Manutenção","groupCode":"7","groupName":"Transporte","definition":"Use esta categoria para registrar gastos relacionados à manutenção, conservação e serviços automotivos, realizados em oficinas, centros automotivos ou prestadores especializados."},"41":{"name":"Transporte Urbano e Apps","groupCode":"7","groupName":"Transporte","definition":"Use esta categoria para registrar gastos com transportes urbanos, tanto públicos quanto privados, incluindo deslocamentos realizados por aplicativo."},"42":{"name":"Vestuário e Acessórios","groupCode":"8","groupName":"Despesas Pessoais","definition":"Use esta categoria para registrar gastos relacionados à compra de roupas, calçados, acessórios e itens de moda, adquiridos em lojas físicas ou virtuais."},"43":{"name":"Cuidado Pessoal e Beleza","groupCode":"8","groupName":"Despesas Pessoais","definition":"Use esta categoria para registrar gastos relacionados a produtos e serviços de beleza, cuidados pessoais e estética, realizados em lojas físicas, virtuais ou estabelecimentos especializados."},"44":{"name":"Compras Diversas","groupCode":"8","groupName":"Despesas Pessoais","definition":"Use esta categoria para registrar gastos realizados em lojas de varejo, lojas de departamento e marketplaces, especialmente quando a compra não se enquadra claramente em outra categoria específica."},"45":{"name":"Pensão Alimentícia","groupCode":"8","groupName":"Despesas Pessoais","definition":"Use esta categoria para registrar pagamentos de pensão alimentícia, independentemente do meio de pagamento utilizado ou da forma definida entre as partes."},"46":{"name":"Seguros e Previdência","groupCode":"8","groupName":"Despesas Pessoais","definition":"Use esta categoria para registrar gastos relacionados a Quaisquer seguros pessoais e planos de proteção individual, bem como contribuições para previdência privada, quando aplicável."},"47":{"name":"Doação","groupCode":"8","groupName":"Despesas Pessoais","definition":"Use esta categoria para registrar doações e contribuições voluntárias feitas a entidades, instituições e organizações sem fins lucrativos, bem como a grupos religiosos ou beneficentes."},"48":{"name":"Gasto com Familiares","groupCode":"8","groupName":"Despesas Pessoais","definition":"Use esta categoria para registrar gastos feitos em benefício de familiares, independentemente do tipo de serviço ou da instituição envolvida."},"49":{"name":"Presentes","groupCode":"8","groupName":"Despesas Pessoais","definition":"Use esta categoria para registrar gastos relacionados à compra de presentes, adquiridos em lojas físicas, virtuais ou estabelecimentos especializados."},"60":{"name":"Serviços Diversos","groupCode":"8","groupName":"Despesas Pessoais","definition":"Use esta categoria para registrar gastos com serviços personalizados, ocasionais ou criativos, realizados por profissionais independentes ou empresas que prestam serviços específicos que não se enquadram em outras categorias tradicionais.\n\nEssa categoria contempla atividades pontuais, sob demanda e voltadas para necessidades únicas ou projetos especiais, incluindo serviços técnicos, criativos, artesanais ou de suporte."},"4417":{"name":"Empréstimos e Prestações","groupCode":"8","groupName":"Despesas Pessoais","definition":"Use esta categoria para registrar pagamentos de prestações diversas relacionados a empréstimos, adiantamentos ou créditos contratados, exceto quando o pagamento se referir à compra de veículos ou imóveis, que possuem categorias específicas."},"51":{"name":"Telefonia e Internet","groupCode":"9","groupName":"Comunicação","definition":"Use esta categoria para registrar gastos relacionados a serviços de telefonia (fixa e móvel) e de acesso à internet, contratados junto a operadoras e provedores."},"53":{"name":"Assinatura TV e Streaming","groupCode":"9","groupName":"Comunicação","definition":"Use esta categoria para registrar pagamentos de serviços de transmissão de conteúdo audiovisual, incluindo TV por assinatura e plataformas de streaming digital.\n\nDe animes como Crunchroll, de música como Spotfy."},"54":{"name":"IPTU","groupCode":"10","groupName":"Tarifas e impostos","definition":"Use esta categoria para registrar pagamentos de IPTU (Imposto Predial e Territorial Urbano) e demais cobranças municipais relacionadas a esse tributo."},"55":{"name":"IPVA e Gastos Detran","groupCode":"10","groupName":"Tarifas e impostos","definition":"Use esta categoria para registrar pagamentos relacionados a tributos e serviços de órgãos de trânsito, especialmente aqueles vinculados a veículos."},"56":{"name":"Imposto de Renda","groupCode":"10","groupName":"Tarifas e impostos","definition":"Use esta categoria para registrar pagamentos relacionados ao Imposto de Renda, seja de pessoas físicas ou jurídicas, incluindo guias e documentos de arrecadação emitidos pela Receita Federal."},"57":{"name":"ISS(Imposto sobre Serviços)","groupCode":"10","groupName":"Tarifas e impostos","definition":"Use esta categoria para registrar pagamentos relacionados ao ISS – Imposto Sobre Serviços, tributo municipal cobrado sobre a prestação de serviços."},"58":{"name":"GPS(Guia de Previdência Social)","groupCode":"10","groupName":"Tarifas e impostos","definition":"Use esta categoria para registrar pagamentos relacionados à Guia da Previdência Social (GPS), destinados ao recolhimento de contribuições ao INSS."},"59":{"name":"Serviços Financeiros","groupCode":"10","groupName":"Tarifas e impostos","definition":"Use esta categoria para registrar gastos relacionados a tarifas, taxas e serviços financeiros cobrados por instituições bancárias, fintechs, cooperativas de crédito e demais instituições do sistema financeiro, bem como operações de câmbio."},"3787":{"name":"IOF","groupCode":"10","groupName":"Tarifas e impostos","definition":"Use esta categoria para registrar lançamentos que referenciam diretamente o IOF (Imposto sobre Operações Financeiras), independentemente do tipo de operação financeira à qual o tributo esteja vinculado."},"3788":{"name":"Encargos e Tarifas","groupCode":"10","groupName":"Tarifas e impostos","definition":"Use esta categoria para registrar lançamentos relacionados a tarifas, encargos e cobranças diversas que não estejam vinculadas a serviços financeiros tradicionais.\n\nTambém inclui contribuições obrigatórias para entidades de classe, conforme vinculação ao CNAE 9412-0/99 (Entidades de Classe)."},"111":{"name":"Cartão de Crédito","groupCode":"12","groupName":"Fatura","definition":"Use esta categoria para registrar pagamentos de faturas de cartão de crédito, independentemente do banco, instituição financeira ou operadora emissora do cartão."},"279":{"name":"Gastos Diversos","groupCode":"11","groupName":"Outros","definition":"Use esta categoria para registrar lançamentos que não se enquadram em nenhuma das categorias existentes, seja por falta de informação, por descrição genérica ou por natureza não identificada do gasto.\n\nEsta categoria funciona como uma categoria residual — destinada a agrupar despesas que não podem ser classificadas com precisão nas demais categorias disponíveis."},"39434":{"name":"Cheque","groupCode":"11","groupName":"Outros","definition":"Categoria para agrupar lançamentos que relacionam gastos realizados por meio de emissão de cheque.\n\nLançamentos de custódia de cheques também entram nesta categoria."},"39435":{"name":"Saque","groupCode":"11","groupName":"Outros","definition":"Use esta categoria para registrar lançamentos relacionados a saques de dinheiro em espécie, realizados em agências bancárias, terminais de autoatendimento ou correspondentes autorizados."},"39436":{"name":"Transferência","groupCode":"11","groupName":"Outros","definition":"Use esta categoria para registrar transferências de valores realizadas entre contas, especialmente quando o destinatário é pessoa física.\n\nEssa categoria abrange movimentações financeiras que representam envio de dinheiro, mas que não correspondem a pagamentos de produtos ou serviços — apenas transferência de recursos."},"39437":{"name":"Boletos Diversos","groupCode":"11","groupName":"Outros","definition":"Use esta categoria para registrar pagamentos de boletos quando não for possível identificar claramente a classe ou finalidade do lançamento, mas onde a descrição contém explicitamente o termo “boleto”.\n\nEssa categoria deve ser utilizada somente quando o boleto não puder ser classificado em nenhuma categoria específica, e NÃO deve ser substituída pela categoria 279 (Outros Diversos), já que a presença da palavra boleto garante a natureza da operação."},"300":{"name":"Receitas Agro","groupCode":"14","groupName":"Agro","definition":"Use esta categoria para registrar todos os lançamentos de crédito provenientes de empresas, atividades ou operações do setor agropecuário."},"310":{"name":"Criações","groupCode":"14","groupName":"Agro","definition":"Use esta categoria para registrar receitas, créditos ou movimentações financeiras relacionadas à criação e manejo de animais destinados à produção de alimentos ou derivados de origem animal."},"330":{"name":"Cultivos","groupCode":"14","groupName":"Agro","definition":"Use esta categoria para registrar gastos ou movimentações financeiras relacionadas às atividades de plantio, cultivo, manejo e colheita de culturas agrícolas.\n\nEssa categoria abrange toda a cadeia produtiva vegetal, desde a preparação do solo até a pós-colheita, incluindo culturas anuais, perenes e temporárias."},"350":{"name":"Insumos","groupCode":"14","groupName":"Agro","definition":"Use esta categoria para registrar gastos, compras ou operações relacionadas a insumos utilizados na produção agrícola e pecuária.\n\nEssa categoria abrange materiais, produtos, insumos biológicos e químicos, além de itens necessários para o desenvolvimento das atividades rurais."},"370":{"name":"Apoio Produtivo","groupCode":"14","groupName":"Agro","definition":"Use esta categoria para registrar gastos e serviços que dão suporte direto às atividades de produção agrícola e pecuária, abrangendo atividades operacionais, técnicas e logísticas necessárias para viabilizar, manter ou aprimorar a produção rural.\n\nEssa categoria contempla serviços de apoio, atividades complementares e despesas produtivas que não são insumos nem a produção final, mas que fazem parte do processo produtivo."},"448977":{"name":"Aplicação","groupCode":"13","groupName":"Investimentos","definition":"Use esta categoria para registrar lançamentos relacionados a aplicações financeiras e investimentos, realizados por meio de instituições financeiras, corretoras, bancos ou plataformas de investimento."},"448978":{"name":"Resgate de Investimentos","groupCode":"13","groupName":"Investimentos","definition":"Use esta categoria para registrar valores recebidos provenientes do resgate de aplicações financeiras, incluindo qualquer crédito decorrente do encerramento, liquidação, venda ou retirada de investimentos."}};
+
+function renderIncomeCatalogInfo(node){
+  if(node.level==="group"){
+    const info=INFO_GRUPOS_CATALOGO[String(node.groupCode)];
+    if(!info)return "";
+    const tags=(info.categories||[]).map(c=>`<span class="income-source-tag">${esc(c.name)}</span>`).join("");
+    return `<div class="income-source-info">
+      <div class="income-source-title">Categorias deste grupo</div>
+      <div class="income-source-tags">${tags}</div>
+    </div>`;
+  }
+  if(node.level==="category"){
+    const info=INFO_CATEGORIAS_CATALOGO[String(node.categoryCode)];
+    if(!info || !info.definition)return "";
+    const definition=esc(info.definition).replace(/\n\n+/g,"<br><br>").replace(/\n/g," ");
+    return `<div class="income-source-info">
+      <div class="income-source-title">Definição da categoria</div>
+      <p class="income-source-text">${definition}</p>
+    </div>`;
+  }
+  return "";
+}
+
+function renderIncomeSideCard(){
+  const h=buildIncomeHierarchy();
+  const node=h.byId.get(state.incomeMapSelected)||h.root;
+  const box=$("#incomeSideCard");
+  if(!box)return;
+  const levelLabel={income:"Renda",group:"Grupo",class:"Classificação",category:"Categoria"}[node.level]||node.level;
+  const rows=[];
+  rows.push(["Nível",levelLabel]);
+  if(node.level==="group"){
+    rows.push(["Valor",fmtBRL(node.value)]);
+    rows.push(["% da renda",fmtPct(node.pctIncome)]);
+    rows.push(["Classificações",String(node.childIds?.length||0)]);
+  }else if(node.level==="class"){
+    rows.push(["Grupo",node.groupName||"—"]);
+    rows.push(["Valor",fmtBRL(node.value)]);
+    rows.push(["% do grupo",fmtPct(node.pctGroup)]);
+    rows.push(["% da renda",fmtPct(node.pctIncome)]);
+    rows.push(["Categorias",String(node.childIds?.length||0)]);
+    rows.push(["Referência",node.referenceLabel||"—"]);
+  }else if(node.level==="category"){
+    rows.push(["Grupo",node.groupName||"—"]);
+    rows.push(["Classificação",node.className||"—"]);
+    rows.push(["Valor",fmtBRL(node.value)]);
+    rows.push(["% da classificação",fmtPct(node.pctClass)]);
+    rows.push(["% do grupo",fmtPct(node.pctGroup)]);
+    rows.push(["% da renda",fmtPct(node.pctIncome)]);
+  }else{
+    rows.push(["Valor",fmtBRL(node.value)]);
+    rows.push(["Grupos",String(node.childIds?.length||0)]);
+  }
+  rows.push(["Transações",String(node.transactions?.length||0)]);
+
+  box.innerHTML=`
+    <div class="income-card-head">
+      <span class="income-card-dot" style="background:${node.color}"></span>
+      <div>
+        <div class="income-card-title">${esc(node.name)}</div>
+        <div class="income-card-subtitle">${esc(levelLabel)}</div>
+      </div>
+    </div>
+    <div class="income-card-metrics">
+      ${rows.map(([k,v])=>`<div class="income-metric-row"><span class="income-metric-label">${esc(k)}</span><span class="income-metric-value">${esc(v)}</span></div>`).join("")}
+    </div>
+    ${renderIncomeCatalogInfo(node)}`;
+}
+
+function renderIncomeEvidenceTable(){
+  const node=getIncomeSelection();
+  const rows=(node.transactions||[]).slice().sort((a,b)=>String(b.DT_TRAN).localeCompare(String(a.DT_TRAN))||Number(b.ID_TRANS)-Number(a.ID_TRANS));
+  const visible=state.incomeMapShowAll?rows:rows.slice(0,10);
+  $("#incomeEvidenceNote").textContent=`${node.name}: ${visible.length} de ${rows.length} transações exibidas${state.incomeMapShowAll?"":" inicialmente"}.`;
+  const body=$("#incomeEvidenceBody");
+  body.innerHTML=visible.length?visible.map(t=>`<tr>
+    <td>${fmtDateISO(t.DT_TRAN)}</td>
+    <td>${esc(t.TX_DCR_TRAN)}</td>
+    <td>${esc(t.NM_GRUPO||"—")}</td>
+    <td>${esc(t.NM_CATEGORIA||"—")}</td>
+    <td>${esc(normClass(t))}</td>
+    <td>${fmtBRL(t.VL_TRAN)}</td>
+  </tr>`).join(""):`<tr><td colspan="6"><div class="empty-state">Nenhuma transação encontrada para a seleção.</div></td></tr>`;
+  const actions=$("#incomeEvidenceActions");
+  if(rows.length>10){
+    actions.innerHTML=`<button class="income-toggle-btn" id="incomeToggleBtn">${state.incomeMapShowAll?"Mostrar menos":`Ver mais (${rows.length})`}</button>`;
+    $("#incomeToggleBtn").addEventListener("click",()=>{state.incomeMapShowAll=!state.incomeMapShowAll;renderIncomeEvidenceTable();});
+  }else actions.innerHTML="";
+}
+
+function renderBullets(){
+  renderIncomeGraph();
+  renderIncomeSideCard();
+  renderIncomeEvidenceTable();
+}
+
+function handleClass(code){
+  if(code===8){
+    showTransactions({classCode:8,title:"Destinação ao Futuro"});
+    return;
+  }
+  state.classFilter=code;
+  resetDrill(false);
+  setView("composition");
+  renderDrill();
+  $("#exploreSection").scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+function resetDrill(clearClass=true){
+  state.expandedGroup=null;
+  state.expandedCategory=null;
+  state.showAll=false;
+  if(clearClass)state.classFilter=null;
+}
+
+function currentBudgetRows(){
+  return state.classFilter
+    ? budgetTx.filter(t=>Number(t.CD_CLASS_RADAR)===state.classFilter)
+    : budgetTx;
+}
+
+function aggregateBy(rows, field){
+  const m=new Map();
+  rows.forEach(t=>m.set(t[field],(m.get(t[field])||0)+Number(t.VL_TRAN||0)));
+  return [...m.entries()]
+    .map(([name,value])=>({name,value}))
+    .sort((a,b)=>b.value-a.value);
+}
+
+function renderDrill(){
+  const base=currentBudgetRows();
+  const groups=aggregateBy(base,"NM_GRUPO");
+  const visible=state.showAll?groups:groups.slice(0,8);
+  const maxGroup=Math.max(1,...groups.map(x=>x.value));
+
+  if(!visible.length){
+    $("#barList").innerHTML=`<div class="drill-empty">Nenhuma Saída do Orçamento encontrada para este filtro.</div>`;
+    $("#moreRow").innerHTML="";
+    renderClassChip();
+    return;
+  }
+
+  $("#barList").className="classic-drill";
+  $("#barList").innerHTML=visible.map(g=>{
+    const gpct=metrics.budgetOut>0?g.value/metrics.budgetOut:0;
+    const expanded=state.expandedGroup===g.name;
+
+    let categoriesHtml="";
+    if(expanded){
+      const groupRows=base.filter(t=>t.NM_GRUPO===g.name);
+      const cats=aggregateBy(groupRows,"NM_CATEGORIA");
+      const maxCat=Math.max(1,...cats.map(x=>x.value));
+
+      categoriesHtml=`<div class="drill-categories">`+cats.map(c=>{
+        const cpct=g.value>0?c.value/g.value:0;
+        const catKey=g.name+"|||"+c.name;
+        const catExpanded=state.expandedCategory===catKey;
+
+        let txHtml="";
+        if(catExpanded){
+          const txs=groupRows
+            .filter(t=>t.NM_CATEGORIA===c.name)
+            .sort((a,b)=>String(b.DT_TRAN).localeCompare(String(a.DT_TRAN)) || Number(b.ID_TRANS)-Number(a.ID_TRANS));
+
+          txHtml=`<div class="drill-transactions">`+txs.map(t=>{
+            return `<div class="drill-transaction">
+              <span class="desc">${esc(t.TX_DCR_TRAN)}</span>
+              <span class="date">${fmtDateISO(t.DT_TRAN)}</span>
+              <span class="amount">- ${fmtBRL(t.VL_TRAN)}</span>
+            </div>`;
+          }).join("")+`</div>`;
+        }
+
+        return `<div>
+          <button class="drill-category-btn" data-category="${esc(c.name)}" data-group="${esc(g.name)}">
+            <span class="drill-toggle">${catExpanded?"−":"+"}</span>
+            <span class="drill-label">${esc(c.name)}</span>
+            <span class="drill-track"><span class="drill-fill" style="display:block;width:${(c.value/maxCat*100).toFixed(2)}%"></span></span>
+            <span class="drill-amount">${fmtBRL(c.value)} · ${fmtPct(cpct)}</span>
+          </button>
+          ${txHtml}
+        </div>`;
+      }).join("")+`</div>`;
+    }
+
+    return `<div class="drill-group">
+      <button class="drill-group-btn" data-group-toggle="${esc(g.name)}">
+        <span class="drill-toggle">${expanded?"−":"+"}</span>
+        <span class="drill-label">${esc(g.name)}</span>
+        <span class="drill-track"><span class="drill-fill" style="display:block;width:${(g.value/maxGroup*100).toFixed(2)}%"></span></span>
+        <span class="drill-amount">${fmtBRL(g.value)} · ${fmtPct(gpct)}</span>
+      </button>
+      ${categoriesHtml}
+    </div>`;
+  }).join("");
+
+  $("#breadcrumb").innerHTML=`<span class="crumb current">Todos os grupos</span>`;
+  renderClassChip();
+
+  $("#moreRow").innerHTML=groups.length>8
+    ? `<button class="btn btn-link" id="showAllBtn">${state.showAll?"Mostrar menos":"Ver todos"} →</button>`
+    : "";
+
+  $("#showAllBtn")?.addEventListener("click",()=>{
+    state.showAll=!state.showAll;
+    renderDrill();
+  });
+
+  $$("[data-group-toggle]").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      const group=btn.dataset.groupToggle;
+      state.expandedGroup=state.expandedGroup===group?null:group;
+      state.expandedCategory=null;
+      renderDrill();
+    });
+  });
+
+  $$("[data-category]").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      const group=btn.dataset.group;
+      const category=btn.dataset.category;
+      const key=group+"|||"+category;
+
+      state.expandedGroup=group;
+      state.expandedCategory=state.expandedCategory===key?null:key;
+
+      // A tabela fixa acompanha o contexto, mas a tela não muda nem rola.
+      if(state.expandedCategory){
+        showTransactions({
+          classCode:state.classFilter,
+          group,
+          category,
+          title:`${group} · ${category}`,
+          noScroll:true
+        });
+      }
+      renderDrill();
+    });
+  });
+}
+
+function renderClassChip(){
+  $("#classFilterHolder").innerHTML=state.classFilter
+    ? `<span class="filter-chip">Filtro: ${esc(CLASS[state.classFilter].label)} <button id="clearClass">×</button></span>`
+    : "";
+
+  $("#clearClass")?.addEventListener("click",()=>{
+    resetDrill(true);
+    renderDrill();
+  });
+}
+
+function setView(view){
+  const comp=view==="composition";
+  $("#compositionView").style.display=comp?"block":"none";
+  $("#timelineView").style.display=comp?"none":"block";
+  $("#compositionTab").classList.toggle("active",comp);
+  $("#timelineTab").classList.toggle("active",!comp);
+  if(!comp)renderTimeline();
+}
+
+function dateRange(a,b){
+  const out=[];
+  let d=new Date(a+"T12:00:00");
+  const end=new Date(b+"T12:00:00");
+  while(d<=end){
+    out.push(d.toISOString().slice(0,10));
+    d.setDate(d.getDate()+1);
+  }
+  return out;
+}
+
+function renderTimeline(){
+  const dates=dateRange(A.DT_REF_INI,A.DT_REF_FIM);
+  const map=new Map(dates.map(d=>[d,{budget:0,future:0,count:0}]));
+
+  participating.forEach(t=>{
+    const x=map.get(t.DT_TRAN);
+    if(!x)return;
+    x.count++;
+    if(t.TP_FLUXO==="D" && budgetCodes.has(Number(t.CD_CLASS_RADAR)))x.budget+=Number(t.VL_TRAN||0);
+    if(t.TP_FLUXO==="D" && Number(t.CD_CLASS_RADAR)===8)x.future+=Number(t.VL_TRAN||0);
+  });
+
+  let cb=0,cf=0;
+  const s=dates.map(d=>{
+    const day=map.get(d);
+    cb+=day.budget;cf+=day.future;
+    return {date:d,day,budget:cb,future:cf};
+  });
+
+  const svg=$("#timelineSvg");
+  const W=960,H=340,ml=70,mr=22,mt=24,mb=50;
+  const maxV=Math.max(1,metrics.income,...s.flatMap(x=>[x.budget,x.future]));
+  const x=i=>ml+i/Math.max(1,s.length-1)*(W-ml-mr);
+  const y=v=>mt+(maxV-v)/maxV*(H-mt-mb);
+  const path=key=>s.map((p,i)=>(i?"L":"M")+x(i).toFixed(1)+","+y(p[key]).toFixed(1)).join(" ");
+
+  let out="";
+
+  for(let i=0;i<=4;i++){
+    const val=maxV*(1-i/4),yy=y(val);
+    out+=`<line x1="${ml}" y1="${yy}" x2="${W-mr}" y2="${yy}" stroke="#E5EAF0"/>`;
+    const lab=val>=1000?`R$ ${(val/1000).toLocaleString("pt-BR",{maximumFractionDigits:1})} mil`:fmtBRL(val);
+    out+=`<text x="${ml-10}" y="${yy+4}" text-anchor="end" class="axis-text">${esc(lab)}</text>`;
+  }
+
+  out+=`<path d="${path("budget")}" fill="none" stroke="${COLORS.essential}" stroke-width="3"/>`;
+  out+=`<path d="${path("future")}" fill="none" stroke="${COLORS.future}" stroke-width="3"/>`;
+
+  const ry=y(metrics.income);
+  out+=`<line x1="${ml}" y1="${ry}" x2="${W-mr}" y2="${ry}" stroke="${COLORS.structural}" stroke-width="2" stroke-dasharray="7 5"/>`;
+
+  const ticks=[0,Math.floor((s.length-1)/4),Math.floor((s.length-1)/2),Math.floor((s.length-1)*3/4),s.length-1];
+  [...new Set(ticks)].forEach(i=>{
+    out+=`<text x="${x(i)}" y="${H-18}" text-anchor="middle" class="axis-text">${fmtDateISO(s[i].date).slice(0,5)}</text>`;
+  });
+
+  s.forEach((p,i)=>{
+    out+=`<circle data-day="${i}" cx="${x(i)}" cy="${y(p.budget)}" r="10" fill="transparent" tabindex="0"/>`;
+  });
+
+  svg.innerHTML=out;
+
+  $$("[data-day]").forEach(c=>{
+    const p=s[Number(c.dataset.day)];
+    const show=e=>{
+      const tip=$("#timelineTooltip");
+      tip.innerHTML=`<strong>${fmtDateISO(p.date)}</strong>
+        Movimentos do dia: ${p.day.count}<br>
+        Saídas do Orçamento do dia: ${fmtBRL(p.day.budget)} · acumulado ${fmtBRL(p.budget)}<br>
+        Futuro do dia: ${fmtBRL(p.day.future)} · acumulado ${fmtBRL(p.future)}<br>
+        Renda Presumida: ${fmtBRL(metrics.income)}`;
+      tip.style.display="block";
+      const r=$("#timelineWrap").getBoundingClientRect();
+      let left=(e.clientX?e.clientX-r.left:80)+12;
+      let top=(e.clientY?e.clientY-r.top:70)-20;
+      if(left>r.width-250)left=r.width-250;
+      if(top<10)top=10;
+      tip.style.left=left+"px";tip.style.top=top+"px";
+    };
+    c.addEventListener("mouseenter",show);
+    c.addEventListener("mousemove",show);
+    c.addEventListener("focus",show);
+    c.addEventListener("mouseleave",()=>$("#timelineTooltip").style.display="none");
+    c.addEventListener("blur",()=>$("#timelineTooltip").style.display="none");
+    c.addEventListener("click",()=>showTransactions({date:p.date,participatingOnly:true,title:`Movimentações de ${fmtDateISO(p.date)}`}));
+  });
+}
+
+function renderWinnerThemes(){
+  const maxScore=Math.max(...TOPICS.map(t=>t.score));
+  const winners=TOPICS.filter(t=>t.score===maxScore);
+
+  const blocks=winners.map(topic=>{
+    const classRows=participating.filter(t=>
+      t.TP_FLUXO==="D" &&
+      Number(t.CD_CLASS_RADAR)===topic.classCode
+    );
+
+    const classTotal=sum(classRows);
+
+    const groups=new Map();
+    classRows.forEach(t=>{
+      groups.set(
+        t.NM_GRUPO,
+        (groups.get(t.NM_GRUPO)||0)+Number(t.VL_TRAN||0)
+      );
+    });
+
+    const topGroups=[...groups.entries()]
+      .map(([name,value])=>({
+        name,
+        value,
+        pct:classTotal>0?value/classTotal:0
+      }))
+      .sort((a,b)=>b.value-a.value)
+      .slice(0,3);
+
+    const groupRows=topGroups.length
+      ? topGroups.map(g=>{
+          const key=topic.name+"|||"+g.name;
+          const expanded=state.focusExpandedGroup===key;
+
+          const txs=classRows
+            .filter(t=>t.NM_GRUPO===g.name)
+            .sort((a,b)=>String(b.DT_TRAN).localeCompare(String(a.DT_TRAN)) || Number(b.ID_TRANS)-Number(a.ID_TRANS));
+
+          const txHtml=expanded
+            ? `<div class="focus-inline-transactions">
+                ${txs.map(t=>`
+                  <div class="focus-inline-transaction">
+                    <span class="date">${fmtDateISO(t.DT_TRAN)}</span>
+                    <span class="desc">${esc(t.TX_DCR_TRAN)}</span>
+                    <span class="amount">- ${fmtBRL(t.VL_TRAN)}</span>
+                  </div>
+                `).join("")}
+              </div>`
+            : "";
+
+          return `<div class="focus-group-row">
+            <button class="focus-group-btn"
+                    data-focus-topic="${esc(topic.name)}"
+                    data-focus-class="${topic.classCode}"
+                    data-focus-group="${esc(g.name)}">
+              <span class="focus-group-toggle">${expanded?"−":"+"}</span>
+              <span class="focus-group-name">${esc(g.name)}</span>
+              <span class="focus-group-metric">${fmtBRL(g.value)} · ${fmtPct(g.pct)}</span>
+            </button>
+            ${txHtml}
+          </div>`;
+        }).join("")
+      : `<div class="drill-empty">Nenhum grupo encontrado para este tema no período.</div>`;
+
+    const showAll=state.focusShowAllTheme===topic.name;
+
+    const allTxHtml=showAll
+      ? `<div class="focus-all-transactions">
+          <div class="focus-all-transactions-title">Todas as transações deste tema</div>
+          <div class="focus-inline-transactions" style="padding-left:0;background:transparent;border-top:0">
+            ${classRows
+              .sort((a,b)=>String(b.DT_TRAN).localeCompare(String(a.DT_TRAN)) || Number(b.ID_TRANS)-Number(a.ID_TRANS))
+              .map(t=>`
+                <div class="focus-inline-transaction">
+                  <span class="date">${fmtDateISO(t.DT_TRAN)}</span>
+                  <span class="desc">${esc(t.TX_DCR_TRAN)} <span style="color:#94A3B8">· ${esc(t.NM_GRUPO)}</span></span>
+                  <span class="amount">- ${fmtBRL(t.VL_TRAN)}</span>
+                </div>
+              `).join("")}
+          </div>
+        </div>`
+      : "";
+
+    return `<div class="focus-theme-block">
+      <div class="focus-theme-head">
+        <div>
+          <div class="focus-theme-title">${esc(topic.name)}</div>
+          <div class="focus-theme-class">${esc(topic.classLabel)} · ${fmtBRL(classTotal)}</div>
+        </div>
+
+        <button class="focus-theme-all"
+                data-focus-all-theme="${esc(topic.name)}"
+                data-focus-all-class="${topic.classCode}">
+          ${showAll?"Ocultar transações do tema":"Ver todas as transações deste tema"}
+        </button>
+      </div>
+
+      <div class="subsection-title" style="margin:12px 16px 7px">
+        Maiores concentrações relacionadas ao tema
+      </div>
+
+      <div class="focus-groups-list">
+        ${groupRows}
+      </div>
+
+      ${allTxHtml}
+    </div>`;
+  }).join("");
+
+  $("#focusThemeBlocks").innerHTML=blocks;
+
+  $$("[data-focus-group]").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      const topic=btn.dataset.focusTopic;
+      const group=btn.dataset.focusGroup;
+      const key=topic+"|||"+group;
+
+      state.focusExpandedGroup=
+        state.focusExpandedGroup===key ? null : key;
+
+      renderWinnerThemes();
+    });
+  });
+
+  $$("[data-focus-all-theme]").forEach(btn=>{
+    btn.addEventListener("click",()=>{
+      const topic=btn.dataset.focusAllTheme;
+
+      state.focusShowAllTheme=
+        state.focusShowAllTheme===topic ? null : topic;
+
+      renderWinnerThemes();
+    });
+  });
+}
+
+function buildFilters(){
+  const classes=[...new Set(transactions.map(normClass))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  const groups=[...new Set(transactions.map(t=>t.NM_GRUPO).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  $("#txClass").innerHTML=`<option value="">Todas as classes</option>`+classes.map(x=>`<option>${esc(x)}</option>`).join("");
+  $("#txGroup").innerHTML=`<option value="">Todos os grupos</option>`+groups.map(x=>`<option>${esc(x)}</option>`).join("");
+  updateCategories();
+}
+
+function updateCategories(){
+  const g=$("#txGroup").value;
+  const cats=[...new Set(transactions.filter(t=>!g||t.NM_GRUPO===g).map(t=>t.NM_CATEGORIA).filter(Boolean))]
+    .sort((a,b)=>a.localeCompare(b,"pt-BR"));
+  $("#txCategory").innerHTML=`<option value="">Todas as categorias</option>`+cats.map(x=>`<option>${esc(x)}</option>`).join("");
+}
+
+function showTransactions(ctx={}){
+  state.txContext={...ctx};
+
+  $("#txSearch").value="";
+  $("#txClass").value=ctx.classCode?CLASS[ctx.classCode]?.label||"":"";
+  $("#txGroup").value=ctx.group||"";
+  updateCategories();
+  $("#txCategory").value=ctx.category||"";
+
+  renderTxContext();
+  renderTransactions();
+
+  if(!ctx.noScroll)$("#transactionsSection").scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+function renderTxContext(){
+  const ctx=state.txContext;
+  const bits=[];
+  if(ctx.title)bits.push(ctx.title);
+  else{
+    if(ctx.group)bits.push(ctx.group);
+    if(ctx.category)bits.push(ctx.category);
+    if(ctx.date)bits.push(fmtDateISO(ctx.date));
+  }
+
+  const bar=$("#transactionContextBar");
+  if(bits.length){
+    bar.classList.remove("hidden");
+    $("#transactionContextText").innerHTML=`<strong>Contexto:</strong> ${esc(bits.join(" · "))}`;
+  }else{
+    bar.classList.add("hidden");
+  }
+}
+
+function clearTxContext(){
+  state.txContext={};
+  $("#txSearch").value="";
+  $("#txClass").value="";
+  $("#txGroup").value="";
+  updateCategories();
+  $("#txCategory").value="";
+  renderTxContext();
+  renderTransactions();
+}
+
+function renderTransactions(){
+  const q=$("#txSearch").value.trim().toLowerCase();
+  const cls=$("#txClass").value;
+  const grp=$("#txGroup").value;
+  const cat=$("#txCategory").value;
+  const ctx=state.txContext;
+
+  let rows=transactions.filter(t=>{
+    if(ctx.id && Number(t.ID_TRANS)!==Number(ctx.id))return false;
+    if(ctx.date && t.DT_TRAN!==ctx.date)return false;
+    if(ctx.participatingOnly && String(t.IN_PARTICIPA).toUpperCase()!=="S")return false;
+    if(q && !String(t.TX_DCR_TRAN||"").toLowerCase().includes(q) && !String(t.NM_GRUPO||"").toLowerCase().includes(q) && !String(t.NM_CATEGORIA||"").toLowerCase().includes(q))return false;
+    if(cls && normClass(t)!==cls)return false;
+    if(grp && t.NM_GRUPO!==grp)return false;
+    if(cat && t.NM_CATEGORIA!==cat)return false;
+    return true;
+  });
+
+  rows.sort((a,b)=>String(b.DT_TRAN).localeCompare(String(a.DT_TRAN))||Number(b.ID_TRANS)-Number(a.ID_TRANS));
+
+  $("#transactionBody").innerHTML=rows.length?rows.map(t=>{
+    const sign=t.TP_FLUXO==="C"?"+ ":"- ";
+    return `<tr>
+      <td>${fmtDateISO(t.DT_TRAN)}</td>
+      <td>${esc(t.TX_DCR_TRAN)}${String(t.IN_PARTICIPA).toUpperCase()!=="S"?`<div class="badge">Não considerada nos cálculos do Radar</div>`:""}</td>
+      <td>${esc(t.NM_GRUPO||"—")}</td>
+      <td>${esc(t.NM_CATEGORIA||"—")}</td>
+      <td>${esc(normClass(t))}</td>
+      <td class="${t.TP_FLUXO==="C"?"amount-pos":"amount-neg"}">${sign}${fmtBRL(t.VL_TRAN)}</td>
+    </tr>`;
+  }).join(""):`<tr><td colspan="6"><div class="empty-state">Nenhuma transação encontrada.</div></td></tr>`;
+}
+
+function renderDebug(){
+  if(new URLSearchParams(location.search).get("debug")!=="1")return;
+  $("#debugPanel").textContent=[
+    "MODO TÉCNICO (?debug=1)",
+    "",
+    ...checks.map(x=>`${x.ok?"OK":"FALHA"} | ${x.name} | calculado=${x.left.toFixed(2)} esperado=${x.right.toFixed(2)}`),
+    "",
+    `VL_REN_PRES=${A.VL_REN_PRES}`,
+    `VL_ENT_TOTAL=${A.VL_ENT_TOTAL} (não usado na camada consultiva)`,
+    `VL_SAI_TOTAL=${A.VL_SAI_TOTAL}`,
+    `VL_SAI_FUT=${A.VL_SAI_FUT}`,
+    `Transações=${transactions.length}`
+  ].join("\n");
+  $("#debugPanel").classList.add("show");
+}
+
+function attachEvents(){
+  $("#compositionTab").addEventListener("click",()=>setView("composition"));
+  $("#timelineTab").addEventListener("click",()=>setView("timeline"));
+  $("#futureTop").addEventListener("click",()=>showTransactions({classCode:8,title:"Destinação ao Futuro"}));
+
+  $("#clearTransactionContext").addEventListener("click",clearTxContext);
+  $("#txSearch").addEventListener("input",renderTransactions);
+  $("#txClass").addEventListener("change",renderTransactions);
+  $("#txCategory").addEventListener("change",renderTransactions);
+  $("#txGroup").addEventListener("change",()=>{updateCategories();renderTransactions()});
+}
+
+function init(){
+  buildFilters();
+  attachEvents();
+  renderTransactions();
+
+  if(renderGate()){
+    renderClosing();
+    renderBullets();
+    renderDrill();
+    renderWinnerThemes();
+  }
+
+  renderDebug();
+}
+
+init();
+})();
+</script>
+</body>
+</html>
