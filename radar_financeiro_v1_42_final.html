@@ -70,22 +70,49 @@ a{color:inherit}
 .section-kicker{color:var(--struct);font-size:12px;letter-spacing:.08em;text-transform:uppercase;font-weight:800;margin-bottom:5px}
 .panel h2{margin:0;font-size:22px;letter-spacing:-.015em}
 .panel-desc{margin:6px 0 0;color:var(--muted);font-size:14px}
-.closing-grid{display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:22px;align-items:stretch}
+.closing-grid{display:grid;grid-template-columns:1fr;gap:12px;align-items:stretch}
 .flow-strip{
-  display:grid;grid-template-columns:1fr 28px 1fr 28px 1fr;align-items:center;
-  border:1px solid var(--line);background:var(--surface-soft);border-radius:15px;padding:17px 18px;
+  display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:stretch;
+  background:transparent;padding:0;
+}
+.flow-item{
+  display:flex;flex-direction:column;justify-content:center;min-width:0;
+  border:1px solid var(--line);background:var(--surface-soft);border-radius:13px;padding:16px 17px;
 }
 .flow-item .label{color:var(--muted);font-size:12px;font-weight:700;margin-bottom:5px}
 .flow-item .value{font-size:23px;font-weight:800;letter-spacing:-.02em;white-space:nowrap}
-.flow-arrow{text-align:center;color:#94A3B8;font-size:18px}
-.future-box{
-  border:1px solid rgba(22,131,107,.22);background:rgba(22,131,107,.06);border-radius:15px;padding:17px 18px;
-  display:flex;flex-direction:column;justify-content:center;cursor:pointer;
+.flow-arrow{display:none!important}
+.budget-result-card{
+  border:1px solid rgba(22,62,122,.18);background:#fff;border-radius:13px;padding:14px 15px;
+  box-shadow:0 5px 14px rgba(15,23,42,.035);min-width:0;
 }
-.future-box:hover{border-color:rgba(22,131,107,.45)}
-.future-box .label{font-size:12px;color:#276759;font-weight:800}
-.future-box .value{font-size:26px;color:var(--future);font-weight:850;margin:4px 0 2px}
-.future-box .sub{font-size:12px;color:#52776F}
+.budget-result-card .label{color:var(--struct);font-weight:850}
+.budget-result-card .value{font-size:25px}
+.budget-result-status{
+  display:inline-flex;align-items:center;align-self:flex-start;margin-top:9px;
+  min-height:26px;padding:4px 9px;border-radius:999px;border:1px solid transparent;
+  font-size:11px;font-weight:900;letter-spacing:.015em;line-height:1;
+}
+.budget-result-status.is-surplus{background:#EAF7F3;border-color:#B7DED3;color:#11735F}
+.budget-result-status.is-neutral{background:#F1F4F8;border-color:#D9E1EA;color:#526177}
+.budget-result-status.is-deficit{background:#FFF1F0;border-color:#F0C5C1;color:#A13D35}
+.budget-result-status.is-unavailable{background:#F8FAFC;border-color:#E2E8F0;color:#718096}
+.budget-result-details{margin-top:11px;border-top:1px solid #E6EBF2;padding-top:9px}
+.budget-result-details summary{
+  list-style:none;cursor:pointer;color:var(--struct);font-size:12px;font-weight:850;display:flex;align-items:center;justify-content:space-between;gap:10px;
+}
+.budget-result-details summary::-webkit-details-marker{display:none}
+.budget-result-details summary::after{content:"+";font-size:18px;line-height:1;color:#718198;font-weight:650}
+.budget-result-details[open] summary::after{content:"−"}
+.budget-result-explain{padding-top:10px;color:#55657B;font-size:12px;line-height:1.55}
+.budget-result-explain p{margin:0 0 8px}
+.budget-result-explain p:last-child{margin-bottom:0}
+.budget-result-future{
+  display:flex;justify-content:space-between;gap:14px;align-items:baseline;margin:9px 0;padding:9px 10px;
+  border-radius:10px;background:rgba(22,131,107,.065);color:#276759
+}
+.budget-result-future span{font-weight:750}
+.budget-result-future strong{font-size:14px;color:var(--future);white-space:nowrap}
 .secondary-metrics{
   margin-top:10px;padding:0 3px;color:var(--muted);font-size:13px;display:flex;gap:18px;flex-wrap:wrap
 }
@@ -271,8 +298,8 @@ tr:last-child td{border-bottom:0}
 @media (max-width:900px){
   .app-shell{padding:20px 16px 88px}
   .closing-grid,.chart-split,.sim-grid{grid-template-columns:1fr}
-  .flow-strip{grid-template-columns:1fr;gap:7px}
-  .flow-arrow{transform:rotate(90deg)}
+  .flow-strip{grid-template-columns:1fr;gap:10px}
+  .budget-result-card{margin-top:0}
   .signal-grid,.steps{grid-template-columns:1fr}
   .bar-button{grid-template-columns:minmax(130px,1fr) minmax(150px,1.4fr) 100px}
   .drawer-filters{grid-template-columns:1fr 1fr}
@@ -557,6 +584,18 @@ tr:last-child td{border-bottom:0}
   background:#FFF9EF;
   color:#7A5222;
   font-weight:800;
+}
+.title-label.is-success{
+  border-color:#A7D9C9;
+  background:#EAF7F3;
+  color:#08725D;
+  font-weight:850;
+}
+.title-label.is-danger{
+  border-color:#F1B7B7;
+  background:#FFF0F0;
+  color:#B42318;
+  font-weight:850;
 }
 @media (max-width:700px){
   .title-labels{gap:7px}
@@ -1153,6 +1192,324 @@ button.closing-bar-row:hover{
   }
 }
 
+
+/* V1.27 — Item 3: temas vencedores → Real × referência → grupo → transação */
+.winner-theme-list{display:flex;flex-direction:column;gap:16px}
+.winner-reference-block{border:1px solid #DCE4ED;border-radius:16px;background:#fff;overflow:hidden}
+.winner-reference-button{width:100%;border:0;background:#fff;text-align:left;padding:18px 20px;cursor:pointer;color:inherit}
+.winner-reference-button:hover{background:#FBFCFE}
+.winner-reference-head{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;margin-bottom:14px}
+.winner-reference-theme{font-size:16px;font-weight:900;color:#26354A}
+.winner-reference-class{font-size:12px;color:#6B7A90;margin-top:3px;font-weight:760}
+.winner-reference-values{text-align:right;white-space:nowrap}
+.winner-reference-values strong{display:block;font-size:18px;color:#26354A;font-variant-numeric:tabular-nums}
+.winner-reference-values span{font-size:11px;color:#728096}
+.winner-reference-track{height:16px;background:#E9EEF5;border-radius:999px;position:relative;overflow:visible;margin-top:6px}
+.winner-reference-fill{height:100%;border-radius:999px;transition:width .28s ease}
+.winner-reference-marker{position:absolute;top:-6px;bottom:-6px;width:2px;background:#27364D;border-radius:2px}
+.winner-reference-marker::after{content:"";position:absolute;top:-4px;left:-3px;width:8px;height:8px;border:2px solid #27364D;background:#fff;border-radius:50%}
+.winner-reference-axis{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:8px;font-size:11px;color:#728096}
+.winner-reference-axis strong{color:#43536A}
+.winner-drill{border-top:1px solid #E6EBF1;background:#FBFCFE;padding:4px 18px 14px}
+.winner-drill-title{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:#77859A;font-weight:900;padding:12px 2px 7px}
+.winner-group-row{border-top:1px solid #E7ECF2}
+.winner-group-row:first-of-type{border-top:0}
+.winner-group-btn{width:100%;display:grid;grid-template-columns:28px minmax(150px,1fr) auto;gap:10px;align-items:center;border:0;background:transparent;padding:12px 2px;cursor:pointer;text-align:left;color:inherit}
+.winner-group-btn:hover .winner-group-name{color:#163E7A}
+.winner-group-toggle{width:22px;height:22px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:#E9EEF5;color:#40516A;font-weight:900}
+.winner-group-name{font-size:13px;font-weight:850;color:#34445B}
+.winner-group-metric{font-size:12px;color:#526177;font-weight:800;white-space:nowrap}
+.winner-inline-transactions{padding:0 2px 9px 40px}
+.winner-inline-transaction{display:grid;grid-template-columns:82px minmax(180px,1fr) 120px;gap:12px;align-items:center;padding:8px 0;border-top:1px dashed #DCE4ED;font-size:12px}
+.winner-inline-transaction .date{color:#6B7A90}.winner-inline-transaction .desc{color:#40516A}.winner-inline-transaction .amount{text-align:right;font-weight:850;color:#334155;white-space:nowrap}
+@media(max-width:760px){.winner-reference-head{flex-direction:column}.winner-reference-values{text-align:left}.winner-group-btn{grid-template-columns:28px minmax(110px,1fr) 135px}.winner-inline-transaction{grid-template-columns:72px minmax(120px,1fr) 100px}}
+
+
+#transactionsSection{display:none!important;}
+
+/* V1.32 — Bloco 5: tabela de pontuação dos temas */
+.theme-score-matrix{
+  border:1px solid #DCE5EF;
+  border-radius:18px;
+  overflow:hidden;
+  background:#fff;
+  box-shadow:0 10px 28px rgba(22,62,122,.05);
+}
+.theme-score-grid{
+  display:grid;
+  grid-template-columns:minmax(270px,1.65fr) repeat(3,minmax(150px,.9fr)) minmax(110px,.68fr);
+  align-items:stretch;
+}
+.theme-score-head{
+  background:#F8FAFD;
+  border-bottom:1px solid #DCE5EF;
+  color:#24354D;
+  font-size:13px;
+  font-weight:900;
+  letter-spacing:.01em;
+}
+.theme-score-head>div,
+.theme-score-row>div{
+  min-height:60px;
+  padding:14px 16px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border-right:1px solid #E7EDF4;
+}
+.theme-score-head>div:first-child,
+.theme-score-row>div:first-child{justify-content:flex-start}
+.theme-score-head>div:last-child,
+.theme-score-row>div:last-child{border-right:none}
+.theme-score-row{
+  position:relative;
+  border-bottom:1px solid #E7EDF4;
+  transition:background .18s ease,box-shadow .18s ease;
+}
+.theme-score-row:last-child{border-bottom:none}
+.theme-score-row.winner{
+  background:linear-gradient(90deg,rgba(22,131,107,.075),rgba(22,131,107,.025));
+  box-shadow:inset 3px 0 0 #16836B;
+}
+.theme-score-theme{
+  gap:12px;
+  color:#1D2D44;
+  font-size:14px;
+  font-weight:850;
+  line-height:1.25;
+}
+.theme-score-icon{
+  width:34px;height:34px;border-radius:12px;
+  display:inline-flex;align-items:center;justify-content:center;
+  flex:0 0 auto;
+  font-size:15px;font-weight:950;
+  border:1px solid rgba(22,62,122,.08);
+}
+.theme-score-cell{gap:5px}
+.theme-score-number{
+  min-width:34px;
+  text-align:center;
+  color:#1D2D44;
+  font-size:18px;
+  font-weight:950;
+  line-height:1;
+}
+.theme-score-conc{color:#2F6BFF}
+.theme-score-orc{color:#B87500}
+.theme-score-profile{color:#16836B}
+.theme-score-head-wrap{
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:4px;
+  line-height:1.05;
+}
+.theme-score-head-wrap small{
+  display:inline-flex;
+  align-items:center;
+  min-height:22px;
+  padding:3px 8px;
+  border-radius:999px;
+  background:#EEF3F8;
+  color:#66758A;
+  font-size:10.5px;
+  font-weight:850;
+  letter-spacing:0;
+  white-space:nowrap;
+}
+.theme-score-head-wrap.theme-score-orc small{background:#FFF5DF;color:#9B6700}
+.theme-score-head-wrap.theme-score-profile small{background:#EAF7F3;color:#11735F}
+.theme-score-total{
+  min-width:52px;height:38px;padding:0 14px;
+  border-radius:12px;
+  display:inline-flex;align-items:center;justify-content:center;
+  background:#F2F5F9;
+  color:#18253A;
+  font-size:20px;font-weight:950;
+  border:1px solid #E0E6EE;
+}
+.theme-score-row.winner .theme-score-total{
+  background:#E8F7F2;
+  border-color:#A9DDD0;
+  color:#08725D;
+}
+@media(max-width:900px){
+  .theme-score-matrix{overflow-x:auto}
+  .theme-score-grid{min-width:850px}
+}
+
+
+/* V1.35 — bloco final: temas vencedores → grupo → categoria → transação */
+.final-focus-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:16px;
+}
+.final-focus-card{
+  border:1px solid #DCE4ED;
+  border-radius:18px;
+  background:#fff;
+  overflow:hidden;
+  box-shadow:0 8px 24px rgba(26,45,74,.045);
+}
+.final-focus-card-head{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:18px 20px 15px;
+  border-bottom:1px solid #E8EDF3;
+}
+.final-focus-card-dot{
+  width:10px;
+  height:10px;
+  border-radius:50%;
+  flex:0 0 auto;
+}
+.final-focus-card-title{
+  font-size:16px;
+  font-weight:900;
+  color:#26354A;
+}
+.final-focus-groups{padding:4px 18px 14px}
+.final-focus-group{
+  border-top:1px solid #E8EDF3;
+}
+.final-focus-group:first-child{border-top:0}
+.final-focus-group-btn{
+  width:100%;
+  border:0;
+  background:transparent;
+  padding:13px 2px 12px;
+  cursor:pointer;
+  text-align:left;
+  color:inherit;
+}
+.final-focus-group-main{
+  display:grid;
+  grid-template-columns:26px minmax(120px,1fr) auto;
+  gap:9px;
+  align-items:center;
+}
+.final-focus-toggle{
+  width:22px;
+  height:22px;
+  border-radius:50%;
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  background:#EEF2F6;
+  color:#40516A;
+  font-weight:900;
+  font-size:13px;
+}
+.final-focus-group-name{
+  font-size:13px;
+  font-weight:850;
+  color:#34445B;
+}
+.final-focus-group-pct{
+  font-size:13px;
+  font-weight:900;
+  color:#334155;
+  font-variant-numeric:tabular-nums;
+  white-space:nowrap;
+}
+.final-focus-track{
+  height:6px;
+  background:#EDF1F5;
+  border-radius:999px;
+  overflow:hidden;
+  margin:9px 0 0 35px;
+}
+.final-focus-fill{height:100%;border-radius:999px}
+.final-focus-categories{
+  margin:0 0 8px 35px;
+  border-left:2px solid #E8EDF3;
+  padding-left:12px;
+}
+.final-focus-category{
+  border-top:1px dashed #DCE4ED;
+}
+.final-focus-category:first-child{border-top:0}
+.final-focus-category-btn{
+  width:100%;
+  display:grid;
+  grid-template-columns:22px minmax(120px,1fr) auto;
+  gap:8px;
+  align-items:center;
+  border:0;
+  background:transparent;
+  padding:10px 2px;
+  cursor:pointer;
+  text-align:left;
+  color:inherit;
+}
+.final-focus-category-btn:hover .final-focus-category-name,
+.final-focus-group-btn:hover .final-focus-group-name{color:#163E7A}
+.final-focus-category-toggle{
+  color:#697A91;
+  font-size:15px;
+  font-weight:900;
+  text-align:center;
+}
+.final-focus-category-name{
+  font-size:12px;
+  font-weight:800;
+  color:#46566C;
+}
+.final-focus-category-pct{
+  font-size:11px;
+  font-weight:850;
+  color:#6B7A90;
+  white-space:nowrap;
+  font-variant-numeric:tabular-nums;
+}
+.final-focus-transactions{
+  padding:0 2px 8px 30px;
+}
+.final-focus-transaction{
+  display:grid;
+  grid-template-columns:78px minmax(140px,1fr) 108px;
+  gap:10px;
+  align-items:center;
+  padding:7px 0;
+  border-top:1px dashed #E0E6ED;
+  font-size:11px;
+}
+.final-focus-transaction .date{color:#77859A}
+.final-focus-transaction .desc{color:#526177}
+.final-focus-transaction .amount{text-align:right;font-weight:850;color:#334155;white-space:nowrap}
+.final-focus-empty{padding:18px 2px;color:#7A889B;font-size:12px}
+@media(max-width:900px){
+  .final-focus-grid{grid-template-columns:1fr}
+}
+@media(max-width:620px){
+  .final-focus-group-main{grid-template-columns:26px minmax(90px,1fr) 58px}
+  .final-focus-categories{margin-left:18px}
+  .final-focus-track{margin-left:35px}
+  .final-focus-transaction{grid-template-columns:70px minmax(100px,1fr) 92px;gap:7px}
+}
+
+
+/* V1.42 — Bloco 2: grafo único com movimento orgânico */
+.income-force-link{
+  stroke-dasharray:6 9;
+  animation:income-link-flow 12s linear infinite;
+}
+.income-force-node:not(.level-income) circle{
+  filter:drop-shadow(0 3px 7px rgba(22,62,122,.07));
+}
+.income-force-node.level-group circle{
+  filter:drop-shadow(0 4px 9px rgba(22,62,122,.085));
+}
+@keyframes income-link-flow{
+  to{stroke-dashoffset:-30}
+}
+@media (prefers-reduced-motion:reduce){
+  .income-force-link{animation:none}
+}
+
 </style>
 
 </head>
@@ -1170,23 +1527,18 @@ button.closing-bar-row:hover{
         </span>
 
         <span class="title-label">
-          <span class="title-label-key">Período analisado</span>
-          <strong id="periodValue">—</strong>
-        </span>
-
-        <span class="title-label">
-          <span class="title-label-key">Movimentações</span>
-          <strong id="transactionCountLabel">—</strong>
-        </span>
-
-        <span class="title-label">
           <span class="title-label-key">Ciclo</span>
           <strong id="cycleDayLabel">—</strong>
         </span>
 
+        <span class="title-label">
+          <span class="title-label-key">Período analisado</span>
+          <strong id="periodValue">—</strong>
+        </span>
+
         <span class="title-label" id="agroLabel">—</span>
         <span class="title-label" id="currencyLabel">—</span>
-        <span class="title-label" id="participationLabel">—</span>
+        <span class="title-label" id="participationLabel">Participa do Radar</span>
       </div>
     </div>
   </header>
@@ -1210,29 +1562,24 @@ button.closing-bar-row:hover{
                 <div class="label">Renda Presumida</div>
                 <div class="value" id="kpiIncome">—</div>
               </div>
-              <div class="flow-arrow">→</div>
+
               <div class="flow-item">
                 <div class="label">Saídas do Orçamento</div>
                 <div class="value" id="kpiBudgetOut">—</div>
               </div>
-              <div class="flow-arrow">→</div>
+
               <div class="flow-item">
+                <div class="label">Investimento</div>
+                <div class="value" id="kpiFuture">—</div>
+              </div>
+
+              <div class="flow-item budget-result-card">
                 <div class="label">Resultado do Orçamento</div>
                 <div class="value" id="kpiBudgetResult">—</div>
+                <span class="budget-result-status is-unavailable" id="kpiBudgetStatus">—</span>
               </div>
             </div>
-
-            <div class="secondary-metrics">
-              <span>Saídas Financeiras Totais: <strong id="secondaryTotalOut">—</strong></span>
-              <span>Resultado Financeiro Total: <strong id="secondaryTotalResult">—</strong></span>
-            </div>
           </div>
-
-          <button class="future-box clickable" id="futureTop" aria-label="Ver transações da Destinação ao Futuro">
-            <span class="label">Destinação ao Futuro</span>
-            <span class="value" id="kpiFuture">—</span>
-            <span class="sub" id="kpiFuturePct">—</span>
-          </button>
         </div>
       </div>
     </section>
@@ -1280,67 +1627,48 @@ button.closing-bar-row:hover{
       </div>
     </section>
 
-    <section class="panel" id="exploreSection">
+    <section class="panel" id="winnerThemesSection">
       <div class="panel-inner">
-        <div class="panel-title-row">
+        <div class="panel-title-row" style="margin-bottom:10px">
           <div>
-            <div class="section-kicker">3 · Para onde foi o dinheiro</div>
-            <h2>Explore as Saídas do Orçamento</h2>
-            <p class="panel-desc">Clique para avançar no drill-down: Grupo → Categoria → Transação.</p>
-          </div>
-          <div class="tabs" role="tablist" aria-label="Visualização">
-            <button class="tab-btn active" id="compositionTab" role="tab" aria-selected="true">Composição</button>
-            <button class="tab-btn" id="timelineTab" role="tab" aria-selected="false">Evolução no ciclo</button>
+            <div class="section-kicker">3 · Temas do ciclo</div>
+            <h2>Real × referência dos temas</h2>
+            <p class="panel-desc">Todos os temas aparecem ligados à sua classificação e referência. Clique para avançar no drill-down: Tema → Classificação → Grupo → Transação.</p>
           </div>
         </div>
-
-        <div id="compositionView">
-          <div class="explore-toolbar">
-            <div class="breadcrumb" id="breadcrumb"></div>
-            <div id="classFilterHolder"></div>
-          </div>
-          <div id="barList" class="bar-list"></div>
-          <div id="moreRow" class="more-row"></div>
-        </div>
-
-        <div id="timelineView" style="display:none">
-          <div class="legend">
-            <span><i style="background:#2F6BFF"></i>Saídas do Orçamento acumuladas</span>
-            <span><i style="background:#16836B"></i>Destinação ao Futuro acumulada</span>
-            <span><i style="background:#163E7A"></i>Renda Presumida</span>
-          </div>
-          <div class="timeline-wrap" id="timelineWrap">
-            <svg id="timelineSvg" viewBox="0 0 960 340" role="img" aria-label="Evolução acumulada do ciclo"></svg>
-            <div class="timeline-tooltip" id="timelineTooltip"></div>
-          </div>
-        </div>
+        <div id="winnerThemeBlocks" class="winner-theme-list"></div>
       </div>
     </section>
 
-    <section class="panel" id="focusSection">
+
+    <section class="panel" id="themeScoreSection">
       <div class="panel-inner">
-        <div class="panel-title-row" style="margin-bottom:8px">
+        <div class="panel-title-row" style="margin-bottom:14px">
           <div>
-            <div class="section-kicker">4 · Focos deste ciclo</div>
-            <h2>Focos deste ciclo</h2>
-            <p class="panel-desc">Temas prioritários da V13 conectados às maiores concentrações e às transações que explicam cada tema.</p>
+            <div class="section-kicker">5 · Focos do ciclo</div>
+            <h2>Como o Radar chegou aos focos deste ciclo</h2>
           </div>
         </div>
+        <div class="theme-score-matrix" id="themeScoreMatrix"></div>
+      </div>
+    </section>
 
-        <div id="focusThemeBlocks"></div>
+
+
+    <section class="panel" id="finalFocusSection">
+      <div class="panel-inner">
+        <div class="panel-title-row" style="margin-bottom:14px">
+          <div>
+            <div class="section-kicker">6 · Temas vencedores</div>
+            <h2>Onde estão os focos deste ciclo?</h2>
+          </div>
+        </div>
+        <div class="final-focus-grid" id="finalFocusGrid"></div>
       </div>
     </section>
 
     <section class="panel fixed-table-panel" id="transactionsSection">
       <div class="panel-inner">
-        <div class="panel-title-row">
-          <div>
-            <div class="section-kicker">Transações do período</div>
-            <h2>Evidências dos números apresentados</h2>
-            <p class="panel-desc">A tabela acompanha os filtros e seleções do dashboard.</p>
-          </div>
-        </div>
-
         <div class="tx-context-bar hidden" id="transactionContextBar">
           <span id="transactionContextText"></span>
           <button class="btn btn-link" id="clearTransactionContext">Limpar contexto</button>
@@ -1509,6 +1837,9 @@ const state={
   focusExpandedTheme:null,
   focusShowAllTheme:null
 ,
+  finalFocusExpandedGroup:null,
+  finalFocusExpandedCategory:null
+,
   expandedBullet:null,
   bulletShowAll:false
 ,
@@ -1550,7 +1881,7 @@ function fmtLastAccess(ts){
   const d=new Date(String(ts).replace(" ","T"));
   const m=["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
   if(Number.isNaN(d.getTime()))return String(ts||"—");
-  return `${String(d.getDate()).padStart(2,"0")} ${m[d.getMonth()]} ${d.getFullYear()} · ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+  return `${String(d.getDate()).padStart(2,"0")} ${m[d.getMonth()]} ${d.getFullYear()}`;
 }
 function esc(s){
   return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
@@ -1579,7 +1910,6 @@ function renderGate(){
   $("#periodValue").textContent=fmtPeriod(A.DT_REF_INI,A.DT_REF_FIM);
 
 
-  $("#transactionCountLabel").textContent=`${transactions.length}`;
   $("#cycleDayLabel").textContent=`dia ${Number(A.DD_INC_MM_CLC_BLC || 0)}`;
 
   const agro=String(A.FL_TEM_MOV_AGRO).toUpperCase()==="S";
@@ -1592,8 +1922,8 @@ function renderGate(){
   $("#currencyLabel").textContent=multCurrency ? "Múltiplas moedas" : "Moeda única";
   $("#currencyLabel").classList.add(multCurrency ? "is-warning" : "is-neutral");
 
-  $("#participationLabel").textContent=participates ? "Participa do Radar" : "Fora do Radar";
-  $("#participationLabel").classList.add(participates ? "is-active" : "is-warning");
+  $("#participationLabel").textContent="Participa do Radar";
+  $("#participationLabel").classList.add(participates ? "is-success" : "is-danger");
 
   $("#methodTxCount").textContent=`${transactions.length}`;
   $("#methodCycleDay").textContent=`dia ${Number(A.DD_INC_MM_CLC_BLC || 0)}`;
@@ -1621,10 +1951,19 @@ function renderClosing(){
   $("#kpiIncome").textContent=fmtBRL(metrics.income);
   $("#kpiBudgetOut").textContent=fmtBRL(metrics.budgetOut);
   $("#kpiBudgetResult").textContent=fmtBRL(metrics.budgetResult,true);
-  $("#secondaryTotalOut").textContent=fmtBRL(metrics.totalOut);
-  $("#secondaryTotalResult").textContent=fmtBRL(metrics.totalResult,true);
   $("#kpiFuture").textContent=fmtBRL(metrics.future);
-  $("#kpiFuturePct").textContent=metrics.income>0?`${fmtPct(pcts.future)} da renda presumida`:"Renda presumida indisponível";
+
+  const status=$("#kpiBudgetStatus");
+  const budgetUse=metrics.income>0?metrics.budgetOut/metrics.income:null;
+  const result=budgetUse==null
+    ? {label:"Indisponível",className:"is-unavailable"}
+    : budgetUse<0.95
+      ? {label:"Superavitário",className:"is-surplus"}
+      : budgetUse<=1.05
+        ? {label:"Neutro",className:"is-neutral"}
+        : {label:"Deficitário",className:"is-deficit"};
+  status.textContent=result.label;
+  status.className=`budget-result-status ${result.className}`;
   // O waterfall foi removido da experiência visual.
 }
 
@@ -2168,33 +2507,57 @@ function incomeHexToRgba(hex,a){
   return `rgba(${r},${g},${b},${a})`;
 }
 
+function incomeMotionSeed(id){
+  let h=2166136261;
+  const s=String(id||"");
+  for(let i=0;i<s.length;i++){
+    h^=s.charCodeAt(i);
+    h=Math.imul(h,16777619);
+  }
+  return (h>>>0)/4294967295*Math.PI*2;
+}
+
 function incomeInitNodePosition(node,byId){
   const cached=incomeForceState.positions.get(node.id);
-  if(cached && node.level!=="income" && node.level!=="group")return {...node,...cached,vx:cached.vx||0,vy:cached.vy||0,r:incomeNodeRadius(node)};
-
   const W=incomeForceState.width,H=incomeForceState.height;
   const cx=W*.50,cy=H*.50;
-  if(node.level==="income")return {...node,x:cx,y:cy,vx:0,vy:0,r:incomeNodeRadius(node),fixed:true,anchorX:cx,anchorY:cy,phase:0};
+  const r=incomeNodeRadius(node);
+  const seed=incomeMotionSeed(node.id);
+
+  // A renda é o único ponto estrutural totalmente imóvel.
+  if(node.level==="income"){
+    return {...node,x:cx,y:cy,vx:0,vy:0,r,fixed:true,anchorX:cx,anchorY:cy,phase:0,motionSeed:seed};
+  }
 
   const parent=byId.get(node.parentId);
   const parentCached=incomeForceState.positions.get(node.parentId);
 
-  // Primeiro anel: grupos distribuídos ao redor da renda.
+  // Grupos nascem em um primeiro anel organizado, mas passam a flutuar.
   if(node.level==="group"){
     const siblings=byId.get("income:root")?.childIds||[];
     const idx=Math.max(0,siblings.indexOf(node.id));
     const count=Math.max(1,siblings.length);
     const angle=(-Math.PI/2)+(idx/count)*Math.PI*2;
-    const radius=230;
-    const gx=cx+Math.cos(angle)*radius;
-    const gy=cy+Math.sin(angle)*radius;
-    return {...node,x:gx,y:gy,vx:0,vy:0,r:incomeNodeRadius(node),fixed:true,anchorX:gx,anchorY:gy,phase:angle};
+    const radius=238;
+    if(cached){
+      return {...node,...cached,r,fixed:false,phase:angle,motionSeed:seed};
+    }
+    return {
+      ...node,
+      x:cx+Math.cos(angle)*radius,
+      y:cy+Math.sin(angle)*radius,
+      vx:0,vy:0,r,fixed:false,phase:angle,motionSeed:seed
+    };
+  }
+
+  if(cached){
+    return {...node,...cached,r,fixed:false,phase:seed,motionSeed:seed};
   }
 
   const px=parentCached?.x ?? cx;
   const py=parentCached?.y ?? cy;
   let baseAngle=Math.atan2(py-cy,px-cx);
-  if(!Number.isFinite(baseAngle))baseAngle=0;
+  if(!Number.isFinite(baseAngle))baseAngle=seed;
 
   const siblings=parent?.childIds||[];
   const idx=Math.max(0,siblings.indexOf(node.id));
@@ -2202,10 +2565,15 @@ function incomeInitNodePosition(node,byId){
   const centered=idx-(count-1)/2;
   const spread=node.level==="class"?.42:.34;
   const angle=baseAngle+centered*spread;
-  const dist=node.level==="class"?150:122;
+  const dist=node.level==="class"?154:124;
 
-  // Filhos sempre nascem do lado exterior do pai, nunca entre o pai e a renda.
-  return {...node,x:px+Math.cos(angle)*dist,y:py+Math.sin(angle)*dist,vx:0,vy:0,r:incomeNodeRadius(node),phase:angle};
+  // Filhos nascem no lado exterior do pai e depois se acomodam organicamente.
+  return {
+    ...node,
+    x:px+Math.cos(angle)*dist,
+    y:py+Math.sin(angle)*dist,
+    vx:0,vy:0,r,fixed:false,phase:angle,motionSeed:seed
+  };
 }
 
 function incomeLinkDistance(link,nodesById){
@@ -2224,78 +2592,101 @@ function incomeForceTick(){
   const byId=new Map(nodes.map(n=>[n.id,n]));
   const W=F.width,H=F.height;
 
-  // Springs keep the hierarchy connected.
+  // Springs mantêm a leitura pai → filho sem congelar a composição.
   links.forEach(l=>{
     const a=byId.get(l.source),b=byId.get(l.target); if(!a||!b)return;
     let dx=b.x-a.x,dy=b.y-a.y,d=Math.hypot(dx,dy)||1;
     const target=incomeLinkDistance(l,byId);
-    const k=.0105;
+    const k=b.level==="group"?.0085:.0105;
     const f=(d-target)*k;
     const ux=dx/d,uy=dy/d;
     if(!a.fixed){a.vx+=ux*f;a.vy+=uy*f;}
     if(!b.fixed){b.vx-=ux*f;b.vy-=uy*f;}
   });
 
-  // Repulsion + collision: floating bubbles never overlap.
+  // Repulsão e colisão preservam espaço entre as bolhas enquanto elas flutuam.
   for(let i=0;i<nodes.length;i++){
     const a=nodes[i];
     for(let j=i+1;j<nodes.length;j++){
       const b=nodes[j];
       let dx=b.x-a.x,dy=b.y-a.y,d2=dx*dx+dy*dy;
       if(d2<1){dx=.5;dy=.5;d2=.5;}
-      const d=Math.sqrt(d2),minD=a.r+b.r+28;
+      const d=Math.sqrt(d2),minD=a.r+b.r+30;
       const ux=dx/d,uy=dy/d;
-      let force=Math.min(1.6,1250/d2);
-      if(d<minD)force+=(minD-d)*.032;
+      let force=Math.min(1.7,1380/d2);
+      if(d<minD)force+=(minD-d)*.034;
       if(!a.fixed){a.vx-=ux*force;a.vy-=uy*force;}
       if(!b.fixed){b.vx+=ux*force;b.vy+=uy*force;}
     }
   }
 
-  // Radial hierarchy: every child is kept on the exterior side of its parent.
   const rootNode=byId.get("income:root");
-  const cx=rootNode?.x ?? W*.48, cy=rootNode?.y ?? H*.50;
+  const cx=rootNode?.x ?? W*.50,cy=rootNode?.y ?? H*.50;
+
   nodes.forEach(n=>{
     if(n.fixed)return;
     const parent=byId.get(n.parentId);
     if(!parent)return;
 
-    let ux=parent.x-cx, uy=parent.y-cy;
+    // Os grupos têm um setor preferencial, mas esse setor respira e se move lentamente.
+    if(n.level==="group"){
+      const seed=n.motionSeed||0;
+      const targetAngle=(n.phase||0)+Math.sin(F.tick*.0065+seed)*.105;
+      const targetRadius=242+Math.sin(F.tick*.0105+seed*.7)*15;
+      const tx=cx+Math.cos(targetAngle)*targetRadius;
+      const ty=cy+Math.sin(targetAngle)*targetRadius;
+      n.vx+=(tx-n.x)*.0028;
+      n.vy+=(ty-n.y)*.0028;
+    }
+
+    // Filhos continuam preferencialmente para fora do pai.
+    let ux=parent.x-cx,uy=parent.y-cy;
     let plen=Math.hypot(ux,uy);
     if(plen<1){
-      const a=n.phase||0; ux=Math.cos(a); uy=Math.sin(a); plen=1;
+      const a=n.phase||0;ux=Math.cos(a);uy=Math.sin(a);plen=1;
     }else{ux/=plen;uy/=plen;}
 
-    const dx=n.x-parent.x, dy=n.y-parent.y;
+    const dx=n.x-parent.x,dy=n.y-parent.y;
     const outward=dx*ux+dy*uy;
-    const minOut=n.level==="class"?118:n.level==="category"?96:132;
+    const minOut=n.level==="group"?128:n.level==="class"?116:94;
     if(outward<minOut){
-      const push=(minOut-outward)*.018;
+      const push=(minOut-outward)*.020;
       n.vx+=ux*push;
       n.vy+=uy*push;
     }
 
-    // Leve atração para o raio externo correspondente ao nível.
-    const desiredRadius=n.level==="group"?230:n.level==="class"?390:540;
-    let rx=n.x-cx, ry=n.y-cy, rr=Math.hypot(rx,ry)||1;
-    rx/=rr; ry/=rr;
+    const desiredRadius=n.level==="group"?242:n.level==="class"?402:552;
+    let rx=n.x-cx,ry=n.y-cy,rr=Math.hypot(rx,ry)||1;
+    rx/=rr;ry/=rr;
     const radialDelta=desiredRadius-rr;
-    n.vx+=rx*radialDelta*.0017;
-    n.vy+=ry*radialDelta*.0017;
+    const radialK=n.level==="group"?.0010:n.level==="class"?.00145:.0013;
+    n.vx+=rx*radialDelta*radialK;
+    n.vy+=ry*radialDelta*radialK;
   });
 
+  const reducedMotion=window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
   nodes.forEach(n=>{
     if(n.fixed){
-      n.x=Number.isFinite(n.anchorX)?n.anchorX:(n.level==="income"?W*.50:n.x);
-      n.y=Number.isFinite(n.anchorY)?n.anchorY:(n.level==="income"?H*.50:n.y);
+      n.x=Number.isFinite(n.anchorX)?n.anchorX:W*.50;
+      n.y=Number.isFinite(n.anchorY)?n.anchorY:H*.50;
       n.vx=0;n.vy=0;return;
     }
-    // Gentle center pull and permanent micro-motion give the floating effect.
-    n.vx+=(W*.5-n.x)*.00007 + Math.sin(F.tick*.016+(n.phase||0))*.004;
-    n.vy+=(H*.5-n.y)*.00007 + Math.cos(F.tick*.014+(n.phase||0))*.004;
-    n.vx*=.91;n.vy*=.91;
+
+    // Movimento permanente, suave e diferente por nível: o grafo nunca parece congelado.
+    if(!reducedMotion){
+      const seed=n.motionSeed||0;
+      const amp=n.level==="group"?.010:n.level==="class"?.014:.018;
+      const speed=n.level==="group"?.014:n.level==="class"?.017:.020;
+      n.vx+=Math.sin(F.tick*speed+seed)*amp;
+      n.vy+=Math.cos(F.tick*(speed*.87)+seed*1.17)*amp;
+    }
+
+    n.vx+=(W*.5-n.x)*.000045;
+    n.vy+=(H*.5-n.y)*.000045;
+    n.vx*=.925;n.vy*=.925;
     n.x+=n.vx;n.y+=n.vy;
-    const pad=n.r+12;
+
+    const pad=n.r+14;
     if(n.x<pad){n.x=pad;n.vx=Math.abs(n.vx)*.55;}
     if(n.x>W-pad){n.x=W-pad;n.vx=-Math.abs(n.vx)*.55;}
     if(n.y<pad){n.y=pad;n.vy=Math.abs(n.vy)*.55;}
@@ -2304,10 +2695,14 @@ function incomeForceTick(){
 
   F.links.forEach((l,i)=>{
     const a=byId.get(l.source),b=byId.get(l.target),el=F.linkEls[i];
-    if(a&&b&&el){el.setAttribute("x1",a.x);el.setAttribute("y1",a.y);el.setAttribute("x2",b.x);el.setAttribute("y2",b.y);}
+    if(a&&b&&el){
+      el.setAttribute("x1",a.x);el.setAttribute("y1",a.y);
+      el.setAttribute("x2",b.x);el.setAttribute("y2",b.y);
+    }
   });
   F.nodes.forEach(n=>{
-    const el=F.nodeEls.get(n.id); if(el)el.setAttribute("transform",`translate(${n.x.toFixed(2)},${n.y.toFixed(2)})`);
+    const el=F.nodeEls.get(n.id);
+    if(el)el.setAttribute("transform",`translate(${n.x.toFixed(2)},${n.y.toFixed(2)})`);
     F.positions.set(n.id,{x:n.x,y:n.y,vx:n.vx,vy:n.vy});
   });
   F.raf=requestAnimationFrame(incomeForceTick);
@@ -2321,7 +2716,7 @@ function incomeBubblePct(node){
   return node.pctParent;
 }
 
-function renderIncomeGraph(){
+function renderIncomeForceGraph(){
   const svg=$("#incomeGraphSvg");
   if(!svg)return;
   const hierarchy=buildIncomeHierarchy();
@@ -2402,6 +2797,13 @@ function renderIncomeGraph(){
     el.addEventListener("keydown",e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();selectAndMaybeExpand(id);}});
   });
   F.raf=requestAnimationFrame(incomeForceTick);
+}
+
+
+function renderIncomeGraph(){
+  const note=$("#incomeReferenceNote");
+  if(note)note.textContent="Renda → Grupo → Classificação → Categoria. Clique nas bolhas para expandir ou recolher.";
+  renderIncomeForceGraph();
 }
 
 function getIncomeSelection(){
@@ -2761,137 +3163,104 @@ function renderTimeline(){
   });
 }
 
+function topicReferenceMeta(topic){
+  const unknownRef=Number(A.PC_REF_IND || .75);
+  const map={
+    5:{value:metrics.unknown,pct:metrics.income>0?metrics.unknown/metrics.income:0,ref:unknownRef,refLabel:"Referência técnica 75%",color:CLASS[5].color},
+    6:{value:metrics.essential,pct:pcts.essential||0,ref:refs.essential,refLabel:"Referência 50%",color:CLASS[6].color},
+    7:{value:metrics.nonEssential,pct:pcts.nonEssential||0,ref:refs.nonEssential,refLabel:"Teto de referência 30%",color:CLASS[7].color},
+    8:{value:metrics.future,pct:pcts.future||0,ref:refs.future,refLabel:"Referência de construção 20%",color:CLASS[8].color},
+    9:{value:metrics.obligation,pct:pcts.obligation||0,ref:refs.obligation,refLabel:"Limite de referência 30%",color:CLASS[9].color}
+  };
+  return map[topic.classCode];
+}
+
 function renderWinnerThemes(){
-  const maxScore=Math.max(...TOPICS.map(t=>t.score));
-  const winners=TOPICS.filter(t=>t.score===maxScore);
+  const holder=$("#winnerThemeBlocks");
+  if(!holder)return;
 
-  const blocks=winners.map(topic=>{
-    const classRows=participating.filter(t=>
-      t.TP_FLUXO==="D" &&
-      Number(t.CD_CLASS_RADAR)===topic.classCode
-    );
+  const winners=TOPICS;
 
+  holder.innerHTML=winners.map(topic=>{
+    const meta=topicReferenceMeta(topic);
+    const classRows=participating.filter(t=>t.TP_FLUXO==="D" && Number(t.CD_CLASS_RADAR)===topic.classCode);
     const classTotal=sum(classRows);
+    const expandedTheme=state.focusExpandedTheme===topic.name;
 
     const groups=new Map();
-    classRows.forEach(t=>{
-      groups.set(
-        t.NM_GRUPO,
-        (groups.get(t.NM_GRUPO)||0)+Number(t.VL_TRAN||0)
-      );
-    });
-
+    classRows.forEach(t=>groups.set(t.NM_GRUPO,(groups.get(t.NM_GRUPO)||0)+Number(t.VL_TRAN||0)));
     const topGroups=[...groups.entries()]
-      .map(([name,value])=>({
-        name,
-        value,
-        pct:classTotal>0?value/classTotal:0
-      }))
+      .map(([name,value])=>({name,value,pct:classTotal>0?value/classTotal:0}))
       .sort((a,b)=>b.value-a.value)
       .slice(0,3);
 
-    const groupRows=topGroups.length
-      ? topGroups.map(g=>{
-          const key=topic.name+"|||"+g.name;
-          const expanded=state.focusExpandedGroup===key;
+    const groupsHtml=expandedTheme ? `<div class="winner-drill">
+      <div class="winner-drill-title">Maiores concentrações relacionadas ao tema</div>
+      ${topGroups.length ? topGroups.map(g=>{
+        const key=topic.name+"|||"+g.name;
+        const expandedGroup=state.focusExpandedGroup===key;
+        const txs=classRows.filter(t=>t.NM_GRUPO===g.name)
+          .sort((a,b)=>String(b.DT_TRAN).localeCompare(String(a.DT_TRAN))||Number(b.ID_TRANS)-Number(a.ID_TRANS));
+        const txHtml=expandedGroup ? `<div class="winner-inline-transactions">${txs.map(t=>`
+          <div class="winner-inline-transaction">
+            <span class="date">${fmtDateISO(t.DT_TRAN)}</span>
+            <span class="desc">${esc(t.TX_DCR_TRAN)}</span>
+            <span class="amount">${fmtBRL(t.VL_TRAN)}</span>
+          </div>`).join("")}</div>` : "";
+        return `<div class="winner-group-row">
+          <button class="winner-group-btn" data-winner-topic="${esc(topic.name)}" data-winner-group="${esc(g.name)}">
+            <span class="winner-group-toggle">${expandedGroup?"−":"+"}</span>
+            <span class="winner-group-name">${esc(g.name)}</span>
+            <span class="winner-group-metric">${fmtBRL(g.value)} · ${fmtPct(g.pct)}</span>
+          </button>${txHtml}
+        </div>`;
+      }).join("") : `<div class="drill-empty">Nenhum grupo encontrado para este tema no período.</div>`}
+    </div>` : "";
 
-          const txs=classRows
-            .filter(t=>t.NM_GRUPO===g.name)
-            .sort((a,b)=>String(b.DT_TRAN).localeCompare(String(a.DT_TRAN)) || Number(b.ID_TRANS)-Number(a.ID_TRANS));
+    const actualPct=Math.max(0,Number(meta?.pct||0));
+    const refPct=Math.max(0,Number(meta?.ref||0));
+    const actualWidth=Math.min(100,actualPct*100);
+    const refLeft=Math.min(100,refPct*100);
 
-          const txHtml=expanded
-            ? `<div class="focus-inline-transactions">
-                ${txs.map(t=>`
-                  <div class="focus-inline-transaction">
-                    <span class="date">${fmtDateISO(t.DT_TRAN)}</span>
-                    <span class="desc">${esc(t.TX_DCR_TRAN)}</span>
-                    <span class="amount">- ${fmtBRL(t.VL_TRAN)}</span>
-                  </div>
-                `).join("")}
-              </div>`
-            : "";
-
-          return `<div class="focus-group-row">
-            <button class="focus-group-btn"
-                    data-focus-topic="${esc(topic.name)}"
-                    data-focus-class="${topic.classCode}"
-                    data-focus-group="${esc(g.name)}">
-              <span class="focus-group-toggle">${expanded?"−":"+"}</span>
-              <span class="focus-group-name">${esc(g.name)}</span>
-              <span class="focus-group-metric">${fmtBRL(g.value)} · ${fmtPct(g.pct)}</span>
-            </button>
-            ${txHtml}
-          </div>`;
-        }).join("")
-      : `<div class="drill-empty">Nenhum grupo encontrado para este tema no período.</div>`;
-
-    const showAll=state.focusShowAllTheme===topic.name;
-
-    const allTxHtml=showAll
-      ? `<div class="focus-all-transactions">
-          <div class="focus-all-transactions-title">Todas as transações deste tema</div>
-          <div class="focus-inline-transactions" style="padding-left:0;background:transparent;border-top:0">
-            ${classRows
-              .sort((a,b)=>String(b.DT_TRAN).localeCompare(String(a.DT_TRAN)) || Number(b.ID_TRANS)-Number(a.ID_TRANS))
-              .map(t=>`
-                <div class="focus-inline-transaction">
-                  <span class="date">${fmtDateISO(t.DT_TRAN)}</span>
-                  <span class="desc">${esc(t.TX_DCR_TRAN)} <span style="color:#94A3B8">· ${esc(t.NM_GRUPO)}</span></span>
-                  <span class="amount">- ${fmtBRL(t.VL_TRAN)}</span>
-                </div>
-              `).join("")}
+    return `<div class="winner-reference-block">
+      <button class="winner-reference-button" data-winner-theme="${esc(topic.name)}" aria-expanded="${expandedTheme?"true":"false"}">
+        <div class="winner-reference-head">
+          <div>
+            <div class="winner-reference-theme">${esc(topic.name)}</div>
+            <div class="winner-reference-class">${esc(topic.classLabel)} · ${fmtBRL(meta?.value||0)}</div>
           </div>
-        </div>`
-      : "";
-
-    return `<div class="focus-theme-block">
-      <div class="focus-theme-head">
-        <div>
-          <div class="focus-theme-title">${esc(topic.name)}</div>
-          <div class="focus-theme-class">${esc(topic.classLabel)} · ${fmtBRL(classTotal)}</div>
+          <div class="winner-reference-values">
+            <strong>${fmtPct(actualPct)}</strong>
+            <span>da Renda Presumida</span>
+          </div>
         </div>
-
-        <button class="focus-theme-all"
-                data-focus-all-theme="${esc(topic.name)}"
-                data-focus-all-class="${topic.classCode}">
-          ${showAll?"Ocultar transações do tema":"Ver todas as transações deste tema"}
-        </button>
-      </div>
-
-      <div class="subsection-title" style="margin:12px 16px 7px">
-        Maiores concentrações relacionadas ao tema
-      </div>
-
-      <div class="focus-groups-list">
-        ${groupRows}
-      </div>
-
-      ${allTxHtml}
+        <div class="winner-reference-track" aria-label="Real ${fmtPct(actualPct)}; ${esc(meta?.refLabel||"")}">
+          <div class="winner-reference-fill" style="width:${actualWidth.toFixed(2)}%;background:${meta?.color||"#64748B"}"></div>
+          <span class="winner-reference-marker" style="left:${refLeft.toFixed(2)}%"></span>
+        </div>
+        <div class="winner-reference-axis">
+          <span><strong>Real:</strong> ${fmtPct(actualPct)}</span>
+          <span><strong>Referência:</strong> ${fmtPct(refPct)}</span>
+        </div>
+      </button>
+      ${groupsHtml}
     </div>`;
   }).join("");
 
-  $("#focusThemeBlocks").innerHTML=blocks;
-
-  $$("[data-focus-group]").forEach(btn=>{
-    btn.addEventListener("click",()=>{
-      const topic=btn.dataset.focusTopic;
-      const group=btn.dataset.focusGroup;
-      const key=topic+"|||"+group;
-
-      state.focusExpandedGroup=
-        state.focusExpandedGroup===key ? null : key;
-
+  $$('[data-winner-theme]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const theme=btn.dataset.winnerTheme;
+      state.focusExpandedTheme=state.focusExpandedTheme===theme?null:theme;
+      state.focusExpandedGroup=null;
       renderWinnerThemes();
     });
   });
 
-  $$("[data-focus-all-theme]").forEach(btn=>{
-    btn.addEventListener("click",()=>{
-      const topic=btn.dataset.focusAllTheme;
-
-      state.focusShowAllTheme=
-        state.focusShowAllTheme===topic ? null : topic;
-
+  $$('[data-winner-group]').forEach(btn=>{
+    btn.addEventListener('click',e=>{
+      e.stopPropagation();
+      const key=btn.dataset.winnerTopic+"|||"+btn.dataset.winnerGroup;
+      state.focusExpandedGroup=state.focusExpandedGroup===key?null:key;
       renderWinnerThemes();
     });
   });
@@ -2990,6 +3359,163 @@ function renderTransactions(){
   }).join(""):`<tr><td colspan="6"><div class="empty-state">Nenhuma transação encontrada.</div></td></tr>`;
 }
 
+
+function getThemeScoreRows(){
+  return [
+    {name:"Categorização dos Gastos",classCode:5,conc:Number(A.NR_PONT_CONC_IND||0),orc:Number(A.NR_PONT_ORC_IND||0),profile:Number(A.NR_PONT_PRFL_IND||0),total:Number(A.NR_PONT_IND_FIM||0),icon:"CG"},
+    {name:"Gestão de Orçamento",classCode:6,conc:Number(A.NR_PONT_CONC_ESS||0),orc:Number(A.NR_PONT_ORC_ESS||0),profile:Number(A.NR_PONT_PRFL_ESS||0),total:Number(A.NR_PONT_ESS_FIM||0),icon:"GO"},
+    {name:"Consumo Planejado",classCode:7,conc:Number(A.NR_PONT_CONC_NAO_ESS||0),orc:Number(A.NR_PONT_ORC_NAO_ESS||0),profile:Number(A.NR_PONT_PRFL_NAO_ESS||0),total:Number(A.NR_PONT_NAO_ESS_FIM||0),icon:"CP"},
+    {name:"Formação de Reserva",classCode:8,conc:Number(A.NR_PONT_CONC_FUT||0),orc:Number(A.NR_PONT_ORC_FUT||0),profile:Number(A.NR_PONT_PRFL_FUT||0),total:Number(A.NR_PONT_FUT_FIM||0),icon:"FR"},
+    {name:"Uso Consciente do Crédito",classCode:9,conc:Number(A.NR_PONT_CONC_OBR||0),orc:Number(A.NR_PONT_ORC_OBR||0),profile:Number(A.NR_PONT_PRFL_OBR||0),total:Number(A.NR_PONT_OBR_FIM||0),icon:"UC"}
+  ];
+}
+
+function themeScoreNumber(value){
+  return `<span class="theme-score-number">${Number(value)||0}</span>`;
+}
+
+function renderThemeScoreMatrix(){
+  const box=$("#themeScoreMatrix");
+  if(!box)return;
+  const rows=getThemeScoreRows();
+  const maxScore=Math.max(...rows.map(r=>r.total));
+  const budgetUse=metrics.income>0?metrics.budgetOut/metrics.income:null;
+  const budgetResultLabel=budgetUse==null?"—":budgetUse<0.95?"Superavitário":budgetUse<=1.05?"Neutro":"Deficitário";
+  const themeColors={5:"#64748B",6:"#2F6BFF",7:"#D97706",8:"#16836B",9:"#7C3AED"};
+  const themeBg={5:"#F1F4F7",6:"#EAF1FF",7:"#FFF4E3",8:"#E9F7F3",9:"#F3EDFF"};
+  box.innerHTML=`
+    <div class="theme-score-grid theme-score-head">
+      <div>Tema</div>
+      <div class="theme-score-conc">Concentração</div>
+      <div class="theme-score-head-wrap theme-score-orc"><span>Orçamento</span><small>${esc(budgetResultLabel)}</small></div>
+      <div class="theme-score-head-wrap theme-score-profile"><span>Perfil</span><small>${esc(A.NM_PRFL_FIN||"—")}</small></div>
+      <div>Total</div>
+    </div>
+    ${rows.map(r=>{
+      const winner=maxScore>0 && r.total===maxScore;
+      return `<div class="theme-score-grid theme-score-row ${winner?'winner':''}">
+        <div class="theme-score-theme">
+          <span class="theme-score-icon" style="color:${themeColors[r.classCode]};background:${themeBg[r.classCode]}">${esc(r.icon)}</span>
+          <span>${esc(r.name)}</span>
+        </div>
+        <div class="theme-score-cell">${themeScoreNumber(r.conc)}</div>
+        <div class="theme-score-cell">${themeScoreNumber(r.orc)}</div>
+        <div class="theme-score-cell">${themeScoreNumber(r.profile)}</div>
+        <div class="theme-score-cell"><span class="theme-score-total">${r.total}</span></div>
+      </div>`;
+    }).join("")}`;
+}
+
+
+
+function renderFinalFocus(){
+  const holder=$("#finalFocusGrid");
+  if(!holder)return;
+
+  const maxScore=Math.max(...TOPICS.map(t=>Number(t.score||0)));
+  const winners=TOPICS.filter(t=>maxScore>0 && Number(t.score||0)===maxScore);
+
+  if(!winners.length){
+    holder.innerHTML=`<div class="final-focus-empty">Nenhum tema vencedor neste ciclo.</div>`;
+    return;
+  }
+
+  holder.innerHTML=winners.map(topic=>{
+    const rows=participating.filter(t=>
+      t.TP_FLUXO==="D" && Number(t.CD_CLASS_RADAR)===Number(topic.classCode)
+    );
+    const classTotal=sum(rows);
+
+    const groupMap=new Map();
+    rows.forEach(t=>{
+      const name=t.NM_GRUPO||"Sem grupo";
+      groupMap.set(name,(groupMap.get(name)||0)+Number(t.VL_TRAN||0));
+    });
+
+    const groups=[...groupMap.entries()]
+      .map(([name,value])=>({name,value,pct:classTotal>0?value/classTotal:0}))
+      .sort((a,b)=>b.value-a.value || a.name.localeCompare(b.name,"pt-BR"))
+      .slice(0,3);
+
+    const groupHtml=groups.length ? groups.map(g=>{
+      const groupKey=topic.name+"|||"+g.name;
+      const groupOpen=state.finalFocusExpandedGroup===groupKey;
+      const groupRows=rows.filter(t=>(t.NM_GRUPO||"Sem grupo")===g.name);
+      const groupTotal=sum(groupRows);
+
+      const catMap=new Map();
+      groupRows.forEach(t=>{
+        const name=t.NM_CATEGORIA||"Sem categoria";
+        catMap.set(name,(catMap.get(name)||0)+Number(t.VL_TRAN||0));
+      });
+      const cats=[...catMap.entries()]
+        .map(([name,value])=>({name,value,pct:groupTotal>0?value/groupTotal:0}))
+        .sort((a,b)=>b.value-a.value || a.name.localeCompare(b.name,"pt-BR"));
+
+      const catsHtml=groupOpen ? `<div class="final-focus-categories">${cats.map(c=>{
+        const catKey=topic.name+"|||"+g.name+"|||"+c.name;
+        const catOpen=state.finalFocusExpandedCategory===catKey;
+        const txs=groupRows.filter(t=>(t.NM_CATEGORIA||"Sem categoria")===c.name)
+          .sort((a,b)=>String(b.DT_TRAN).localeCompare(String(a.DT_TRAN))||Number(b.ID_TRANS)-Number(a.ID_TRANS));
+        const txHtml=catOpen ? `<div class="final-focus-transactions">${txs.map(t=>`
+          <div class="final-focus-transaction">
+            <span class="date">${fmtDateISO(t.DT_TRAN)}</span>
+            <span class="desc">${esc(t.TX_DCR_TRAN)}</span>
+            <span class="amount">${fmtBRL(t.VL_TRAN)}</span>
+          </div>`).join("")}</div>` : "";
+        return `<div class="final-focus-category">
+          <button class="final-focus-category-btn" data-final-topic="${esc(topic.name)}" data-final-group="${esc(g.name)}" data-final-category="${esc(c.name)}" aria-expanded="${catOpen?"true":"false"}">
+            <span class="final-focus-category-toggle">${catOpen?"−":"+"}</span>
+            <span class="final-focus-category-name">${esc(c.name)}</span>
+            <span class="final-focus-category-pct">${fmtPct(c.pct)}</span>
+          </button>
+          ${txHtml}
+        </div>`;
+      }).join("")}</div>` : "";
+
+      return `<div class="final-focus-group">
+        <button class="final-focus-group-btn" data-final-topic="${esc(topic.name)}" data-final-group="${esc(g.name)}" aria-expanded="${groupOpen?"true":"false"}">
+          <div class="final-focus-group-main">
+            <span class="final-focus-toggle">${groupOpen?"−":"+"}</span>
+            <span class="final-focus-group-name">${esc(g.name)}</span>
+            <span class="final-focus-group-pct">${fmtPct(g.pct)}</span>
+          </div>
+          <div class="final-focus-track"><div class="final-focus-fill" style="width:${Math.max(0,Math.min(100,g.pct*100)).toFixed(2)}%;background:${CLASS[topic.classCode]?.color||"#64748B"}"></div></div>
+        </button>
+        ${catsHtml}
+      </div>`;
+    }).join("") : `<div class="final-focus-empty">Nenhuma concentração encontrada.</div>`;
+
+    return `<article class="final-focus-card">
+      <div class="final-focus-card-head">
+        <span class="final-focus-card-dot" style="background:${CLASS[topic.classCode]?.color||"#64748B"}"></span>
+        <div class="final-focus-card-title">${esc(topic.name)}</div>
+      </div>
+      <div class="final-focus-groups">${groupHtml}</div>
+    </article>`;
+  }).join("");
+
+  $$('[data-final-group]:not([data-final-category])').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const key=btn.dataset.finalTopic+"|||"+btn.dataset.finalGroup;
+      state.finalFocusExpandedGroup=state.finalFocusExpandedGroup===key?null:key;
+      state.finalFocusExpandedCategory=null;
+      renderFinalFocus();
+    });
+  });
+
+  $$('[data-final-category]').forEach(btn=>{
+    btn.addEventListener('click',e=>{
+      e.stopPropagation();
+      const groupKey=btn.dataset.finalTopic+"|||"+btn.dataset.finalGroup;
+      const catKey=groupKey+"|||"+btn.dataset.finalCategory;
+      state.finalFocusExpandedGroup=groupKey;
+      state.finalFocusExpandedCategory=state.finalFocusExpandedCategory===catKey?null:catKey;
+      renderFinalFocus();
+    });
+  });
+}
+
 function renderDebug(){
   if(new URLSearchParams(location.search).get("debug")!=="1")return;
   $("#debugPanel").textContent=[
@@ -3007,10 +3533,6 @@ function renderDebug(){
 }
 
 function attachEvents(){
-  $("#compositionTab").addEventListener("click",()=>setView("composition"));
-  $("#timelineTab").addEventListener("click",()=>setView("timeline"));
-  $("#futureTop").addEventListener("click",()=>showTransactions({classCode:8,title:"Destinação ao Futuro"}));
-
   $("#clearTransactionContext").addEventListener("click",clearTxContext);
   $("#txSearch").addEventListener("input",renderTransactions);
   $("#txClass").addEventListener("change",renderTransactions);
@@ -3026,8 +3548,9 @@ function init(){
   if(renderGate()){
     renderClosing();
     renderBullets();
-    renderDrill();
     renderWinnerThemes();
+    renderThemeScoreMatrix();
+    renderFinalFocus();
   }
 
   renderDebug();
