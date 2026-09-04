@@ -1,0 +1,481 @@
+# Passo a passo negocial para criar arquivos de conhecimento no RAG
+
+## Objetivo
+
+Este roteiro orienta a área de negócio na preparação dos conteúdos que serão transformados em arquivos de conhecimento do assistente.
+
+A regra principal é:
+
+**Cada arquivo deve representar uma única situação, regra ou unidade de resposta de negócio e deve fazer sentido sozinho.**
+
+Não comece pensando em quantos arquivos serão criados.
+
+Comece pelas dúvidas que o assistente precisa responder.
+
+---
+
+## Passo 1 — Liste as perguntas que o usuário pode fazer
+
+Comece levantando as dúvidas reais que o assistente deverá responder.
+
+Não organize por arquivos ainda.
+
+Registre as perguntas da maneira como as pessoas normalmente fariam.
+
+### Exemplo — Open Finance
+
+Posso cancelar o Open Finance?
+
+Posso escolher com qual banco compartilhar meus dados?
+
+Preciso compartilhar meus dados nos dois sentidos?
+
+Minha senha é compartilhada?
+
+Quais dados podem ser compartilhados?
+
+Open Finance aumenta meu limite?
+
+Open Finance reduz meus juros?
+
+Como faço para trazer os dados de outro banco para o BB?
+
+### Resultado esperado
+
+Ao final deste passo, você terá uma lista de perguntas, ainda sem decidir quais ficarão juntas.
+
+---
+
+## Passo 2 — Escreva a resposta oficial para cada pergunta
+
+Para cada pergunta, procure a resposta na fonte oficial aprovada.
+
+Escreva de forma resumida qual é a resposta de negócio.
+
+Não complete informações que não estejam na fonte.
+
+Se a fonte não responder, registre que a informação não foi encontrada.
+
+### Exemplo
+
+| Pergunta                                | Resposta oficial resumida                                                             |
+| --------------------------------------- | ------------------------------------------------------------------------------------- |
+| Posso cancelar o consentimento?         | O cliente pode cancelar o consentimento.                                              |
+| Posso escolher as instituições?         | O cliente escolhe as instituições envolvidas no compartilhamento.                     |
+| Preciso compartilhar nos dois sentidos? | O compartilhamento não exige reciprocidade automática.                                |
+| Minha senha é compartilhada?            | Senhas e informações de autenticação não são compartilhadas.                          |
+| Open Finance aumenta meu limite?        | O compartilhamento pode contribuir para a análise, mas não garante aumento de limite. |
+
+### Resultado esperado
+
+Ao final deste passo, cada pergunta terá uma resposta sustentada pela fonte.
+
+---
+
+## Passo 3 — Agrupe as perguntas que dependem da mesma resposta de negócio
+
+Este é o passo mais importante.
+
+Não agrupe apenas porque as perguntas falam sobre o mesmo tema.
+
+Pergunte:
+
+**“Para responder corretamente a essas perguntas, eu precisaria usar praticamente o mesmo conjunto de informações?”**
+
+Se sim, elas são candidatas ao mesmo arquivo.
+
+Se a resposta exige outra regra, outro processo, outras condições ou outra situação de negócio, elas devem ser separadas.
+
+### Exemplo de perguntas que podem ficar juntas
+
+Posso cancelar o consentimento?
+
+Posso escolher com quais instituições compartilhar?
+
+Preciso compartilhar nos dois sentidos?
+
+Por quanto tempo posso compartilhar meus dados?
+
+Essas perguntas são diferentes, mas todas fazem parte da mesma situação:
+
+**controle do cliente sobre o consentimento e o compartilhamento.**
+
+Para respondê-las, precisamos explicar praticamente o mesmo conjunto de informações:
+
+o cliente controla o compartilhamento;
+
+o cliente escolhe as instituições;
+
+o consentimento é uma autorização;
+
+o compartilhamento não é automaticamente recíproco;
+
+o consentimento pode ser cancelado.
+
+Portanto, essas perguntas são boas candidatas ao mesmo arquivo.
+
+### Exemplo de perguntas que devem ser separadas
+
+Posso cancelar o consentimento?
+
+Open Finance aumenta meu limite?
+
+As duas perguntas são sobre Open Finance, mas não usam a mesma resposta de negócio.
+
+A primeira exige informações sobre:
+
+**consentimento e controle do compartilhamento.**
+
+A segunda exige informações sobre:
+
+**uso dos dados na análise de crédito e ausência de garantia de resultado.**
+
+Portanto, devem ficar em arquivos diferentes.
+
+### Regra simples
+
+**Mesmo tema não significa mesmo arquivo.**
+
+**Mesma resposta de negócio é que indica o mesmo arquivo.**
+
+### Em caso de dúvida, faça três perguntas
+
+1. Se eu explicar a primeira dúvida, preciso explicar a segunda para a resposta ficar correta ou completa?
+
+2. A mesma regra ou lógica de negócio explica as duas dúvidas?
+
+3. A segunda dúvida poderia ter uma resposta independente, com outra regra, processo ou condição?
+
+Se as duas primeiras respostas forem “sim”, há indicação de juntar.
+
+Se a terceira resposta for “sim”, há indicação de separar.
+
+### Resultado esperado
+
+Ao final deste passo, as perguntas estarão organizadas em grupos que representam possíveis arquivos.
+
+---
+
+## Passo 4 — Complete cada grupo com tudo que precisa ser conhecido junto
+
+Agora olhe para cada grupo e verifique o que precisa acompanhar a resposta principal.
+
+Pergunte:
+
+Qual contexto é necessário?
+
+Existem condições?
+
+Existem exceções?
+
+Existe alguma ressalva importante?
+
+Existe alguma informação que, se omitida, faria a resposta ficar enganosa ou incompleta?
+
+Essas informações devem permanecer junto da regra que explicam ou limitam.
+
+### Exemplo — análise de crédito
+
+Não basta registrar:
+
+“O Open Finance pode contribuir para uma análise de crédito mais completa.”
+
+Se a mesma fonte informa que isso não garante aumento de limite ou redução de taxa, essa ressalva precisa estar na mesma unidade.
+
+A resposta completa precisa preservar as duas ideias:
+
+**benefício possível:** os dados podem ampliar as informações disponíveis para análise.
+
+**limite da afirmação:** isso não garante aumento de limite, redução de juros ou condição melhor.
+
+Separar essas informações poderia fazer o assistente apresentar uma possibilidade como garantia.
+
+### Resultado esperado
+
+Cada grupo passa a conter a resposta principal, o contexto necessário, as condições e as exceções que precisam ser interpretadas juntas.
+
+---
+
+## Passo 5 — Verifique se o arquivo consegue funcionar sozinho
+
+Faça o teste:
+
+**“Se o assistente encontrar somente este arquivo, ele terá informação suficiente para responder corretamente às perguntas desta unidade?”**
+
+Se sim, o conteúdo está caminhando para uma unidade autocontida.
+
+Se não, descubra o que falta.
+
+Pode faltar:
+
+uma condição;
+
+uma exceção;
+
+uma definição;
+
+o contexto necessário;
+
+uma etapa inseparável do processo.
+
+Quando uma informação geral for indispensável para compreender mais de uma unidade, ela pode ser repetida nos arquivos necessários.
+
+O objetivo não é evitar repetição a qualquer custo.
+
+O objetivo é garantir que cada arquivo faça sentido sozinho.
+
+### Exemplo
+
+Um arquivo sobre análise de crédito não deveria dizer:
+
+“Conforme explicado no arquivo de consentimento, os dados podem ser compartilhados...”
+
+Ele deveria conter o contexto necessário para que a própria unidade seja compreendida.
+
+### Resultado esperado
+
+O arquivo não depende de outro arquivo para ser corretamente entendido.
+
+---
+
+## Passo 6 — Retire o que não pertence àquela situação
+
+Agora faça o teste contrário:
+
+**“Existe alguma informação aqui que não é necessária para responder esta situação?”**
+
+Se sim, avalie se ela pertence a outro arquivo.
+
+Outro teste simples é:
+
+**“Consigo explicar em uma frase o que este arquivo representa?”**
+
+Se não conseguir, é possível que existam várias situações misturadas.
+
+### Exemplo ruim
+
+Arquivo chamado:
+
+**Benefícios do Open Finance**
+
+Conteúdo:
+
+Open Finance pode contribuir para análise de crédito.
+
+Open Finance permite visualizar informações financeiras.
+
+Open Finance pode ser utilizado em processos de portabilidade.
+
+Open Finance permite determinadas jornadas de pagamento.
+
+Embora tudo esteja relacionado a Open Finance, existem diferentes situações de negócio dentro do mesmo arquivo.
+
+O arquivo está agrupado pelo tema “benefícios”, e não por uma única resposta.
+
+### Melhor organização
+
+Análise de crédito.
+
+Gestão financeira.
+
+Portabilidade.
+
+Pagamentos.
+
+Cada situação pode ser analisada separadamente para verificar se merece sua própria unidade.
+
+### Resultado esperado
+
+O arquivo contém apenas informações pertencentes àquela unidade de resposta.
+
+---
+
+## Passo 7 — Escolha algumas perguntas representativas
+
+Depois de definir a unidade, selecione as principais formas pelas quais o usuário pode chegar àquela informação.
+
+Não é necessário escrever dezenas de versões da mesma pergunta.
+
+Prefira formulações que representem maneiras realmente diferentes de expressar a necessidade.
+
+### Exemplo
+
+Para a unidade “Consentimento, controle e cancelamento”:
+
+O que é consentimento no Open Finance?
+
+Quem controla meus dados?
+
+Posso escolher as instituições?
+
+Preciso compartilhar nos dois sentidos?
+
+Posso cancelar o consentimento?
+
+Essas perguntas ajudam a representar diferentes formas de chegar à mesma unidade.
+
+### Resultado esperado
+
+O arquivo possui um pequeno conjunto de perguntas representativas da situação.
+
+---
+
+## Passo 8 — Escreva o conteúdo final do arquivo
+
+Com a unidade aprovada, transforme o material em texto corrido.
+
+Uma estrutura simples é:
+
+**Situação ou assunto.**
+
+**Perguntas representativas.**
+
+**Resposta principal.**
+
+**Condições, quando existirem.**
+
+**Exceções e limites, quando existirem.**
+
+**Contexto complementar indispensável, quando necessário.**
+
+Os nomes acima são apenas uma estrutura de trabalho.
+
+No arquivo final, não é necessário escrever rótulos como:
+
+[RESPOSTA PRINCIPAL]
+
+[CONDIÇÕES]
+
+[EXCEÇÕES]
+
+O conteúdo deve ser apresentado de forma natural e autocontida.
+
+### Exemplo
+
+Consentimento, controle e cancelamento no Open Finance.
+
+O que é consentimento no Open Finance?
+Quem controla meus dados no Open Finance?
+Posso escolher com quais instituições compartilhar meus dados?
+O compartilhamento precisa acontecer nos dois sentidos?
+Posso cancelar o consentimento?
+
+No Open Finance, os dados são do cliente. O cliente decide se deseja compartilhar seus dados e com quais instituições.
+
+O consentimento é a autorização dada pelo cliente para o compartilhamento das informações previstas.
+
+Dar consentimento não significa liberar os dados para todas as instituições. O compartilhamento ocorre conforme a autorização concedida pelo cliente.
+
+O compartilhamento não exige reciprocidade automática.
+
+O cliente pode cancelar o consentimento.
+
+### Resultado esperado
+
+Uma unidade de conhecimento pronta para revisão final e transformação em arquivo `.txt`.
+
+---
+
+## Passo 9 — Faça a validação negocial final
+
+Antes de aprovar, responda:
+
+### Sobre a unidade
+
+Consigo explicar em uma frase qual situação este arquivo resolve?
+
+Todas as perguntas pertencem à mesma situação?
+
+### Sobre a fonte
+
+Todas as afirmações estão sustentadas pela fonte oficial?
+
+Incluí alguma informação apenas porque “sei que funciona assim”?
+
+Se a fonte não informa determinado valor, prazo, canal, condição ou exceção, evitei inventá-lo?
+
+### Sobre a completude
+
+A resposta principal está completa?
+
+As condições necessárias estão presentes?
+
+As exceções que limitam a regra estão presentes?
+
+O contexto indispensável está presente?
+
+### Sobre os limites
+
+Existe conteúdo independente que deveria estar em outro arquivo?
+
+O arquivo promete ou afirma mais do que a fonte permite?
+
+### Sobre a autonomia
+
+Se o assistente receber apenas este arquivo, consegue responder corretamente?
+
+Se todas essas verificações forem satisfeitas, a unidade está pronta para publicação.
+
+---
+
+# Resumo do processo
+
+**1. Liste as dúvidas.**
+
+↓
+
+**2. Responda cada dúvida usando a fonte oficial.**
+
+↓
+
+**3. Junte as perguntas que dependem da mesma resposta de negócio.**
+
+↓
+
+**4. Acrescente contexto, condições, exceções e limites.**
+
+↓
+
+**5. Verifique se a unidade funciona sozinha.**
+
+↓
+
+**6. Retire informações que pertencem a outras situações.**
+
+↓
+
+**7. Escolha perguntas representativas.**
+
+↓
+
+**8. Escreva o arquivo final.**
+
+↓
+
+**9. Valide tudo novamente contra a fonte.**
+
+---
+
+# A pergunta principal que o negocial deve guardar
+
+Sempre que houver dúvida sobre juntar ou separar conteúdos, pergunte:
+
+**“Quais informações precisam ser lidas juntas para que o assistente responda corretamente a esta situação?”**
+
+Se precisam ser interpretadas juntas, tendem a formar uma unidade.
+
+Se representam respostas, regras, processos ou situações independentes, tendem a formar unidades diferentes.
+
+---
+
+# Regra de ouro
+
+**Não organize a base apenas pelos temas do material de origem.**
+
+**Organize a base pelas situações que o assistente precisa responder corretamente.**
+
+Um tema amplo pode gerar vários arquivos.
+
+Várias perguntas diferentes podem gerar apenas um arquivo.
+
+O que define a fronteira é a mudança da unidade de resposta de negócio.

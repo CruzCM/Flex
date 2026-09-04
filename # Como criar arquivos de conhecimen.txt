@@ -1,0 +1,150 @@
+# Como criar arquivos de conhecimento para o RAG
+## Passo a passo negocial
+
+---
+
+# 1. Comece pelas perguntas
+
+- Liste as dúvidas reais dos usuários.
+- Ainda não pense em arquivos.
+- Use a linguagem que o usuário realmente usaria.
+
+**Exemplo**
+“Posso cancelar o Open Finance?”
+“Open Finance aumenta meu limite?”
+
+---
+
+# 2. Encontre a resposta oficial
+
+- Responda cada dúvida usando apenas a fonte aprovada.
+- Registre a resposta principal.
+- Se a fonte não responder, não complete por conta própria.
+
+**Objetivo**
+Saber exatamente o que a fonte permite responder.
+
+---
+
+# 3. Agrupe pela mesma resposta de negócio
+
+**Pergunta-chave**
+
+> Para responder essas dúvidas, eu usaria praticamente o mesmo conjunto de informações?
+
+**Juntar**
+“Posso cancelar?”
+“Posso escolher o banco?”
+“Preciso compartilhar nos dois sentidos?”
+
+→ Controle do consentimento.
+
+**Separar**
+“Posso cancelar?”
+“Open Finance aumenta meu limite?”
+
+→ São respostas de negócio diferentes.
+
+---
+
+# 4. Complete a resposta
+
+Inclua o que precisa ser entendido junto:
+
+- contexto;
+- condições;
+- exceções e limites.
+
+**Exemplo**
+
+“Pode melhorar a análise de crédito”
+
+precisa estar junto de:
+
+“Não garante aumento de limite ou redução de taxa.”
+
+---
+
+# 5. Teste se funciona sozinho
+
+Pergunte:
+
+> Se o assistente recuperar somente este arquivo, ele consegue responder corretamente?
+
+**Se não**
+Falta contexto, condição ou exceção.
+
+**Se sim**
+A unidade é autocontida.
+
+---
+
+# 6. Retire o que pertence a outra situação
+
+Pergunte:
+
+> Tudo neste arquivo é necessário para responder a mesma situação?
+
+**Evite**
+Um arquivo chamado “Benefícios do Open Finance” misturando crédito, portabilidade, pagamentos e gestão financeira.
+
+**Prefira**
+Uma situação de negócio por unidade.
+
+---
+
+# 7. Escolha perguntas representativas
+
+- Use algumas formas diferentes de chegar à mesma dúvida.
+- Evite dezenas de paráfrases.
+- Todas devem levar à mesma unidade de resposta.
+
+**Exemplo**
+
+“Posso cancelar?”
+“Quem controla meus dados?”
+“Preciso compartilhar nos dois sentidos?”
+
+---
+
+# 8. Crie o arquivo
+
+Estrutura simples:
+
+**Assunto**
+
+**Perguntas representativas**
+
+**Resposta**
+
+**Condições e exceções necessárias**
+
+O arquivo final deve fazer sentido sozinho.
+
+---
+
+# 9. Valide antes de publicar
+
+Confira:
+
+- Tudo está sustentado pela fonte?
+- O arquivo representa uma única situação?
+- Funciona sozinho?
+- Há alguma promessa ou informação além da fonte?
+
+---
+
+# Regra de ouro
+
+> Não organize a base apenas por temas.
+
+> Organize pelas situações que o assistente precisa responder corretamente.
+
+**Tema amplo**
+Open Finance.
+
+**Unidades de conhecimento**
+Consentimento.
+Dados compartilhados.
+Análise de crédito.
+Portabilidade.

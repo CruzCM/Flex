@@ -1,0 +1,33 @@
+# Vector Store
+
+- Open Search
+
+# Nome do Indice
+
+- idx-meu-indice-01
+
+# Modelo de Embeddings
+
+- Azure Embeddings 3 Large
+- Azure Embeddings API 700 TPM
+
+# Modalidade de Indexação
+
+- Vanilla (Indexa documentos por segmentos)
+- File (Indexa por documentos)
+- Simple Directory Reader
+
+# Para Vanilla precisa definir:
+
+- Tamanho do segmento (em tokens) : Tamanho máximo do segmento 8192
+- Sobreposição entre segmentos (%) : Valor entre 0 e 100 (esse valor será dividido por 100 ao enviar)
+- Método de divisão: Recursive Character Texte Splitter ou Markdown Header Text Splitter
+
+# Para File precisa definir:
+
+- Enviar arquivo no formato .zip
+
+# Para Simple Directory Reader precisa definir:
+
+- Quantidade de tokens por segmento (Tamanho máximo 8192)
+- Quantidade de tokens sobrepostos (Tamanho máximo 100)

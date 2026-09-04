@@ -1,0 +1,123 @@
+Agente Indexado - RAG: esse tipo de agente utiliza a tecnologia RAG (Retrieval-Augmented Generation), que permite a indexação de bases de dados e o uso de modelos de linguagem para gerar respostas para as perguntas dos usuários. Essa tecnologia é especialmente útil para sistemas de atendimento ao cliente, chatbots corporativos, auxílio na tomada de decisões e assistentes virtuais.
+
+Indexação da Base de Conhecimento do Assistente
+Neste momento, é preciso indexar a base de conhecimento do seu agente.
+
+Sempre que precisar atualizar a base de dados (arquivos) do seu agente, este procedimento deve ser executado. Os processos de declaração e publicação, no entanto, ocorrem apenas durante a criação do agente (a publicação será discutida em detalhes posteriormente).
+
+Aqui estão algumas orientações básicas sobre a base de conhecimento:
+
+Para consultar os formatos de arquivos permitidos, por favor, confira os detalhes na seção “Modalidade de indexação”, pois o formato depende da modalidade selecionada;
+O arquivo ".zip" deve ter no máximo 9MB;
+Envie todos os arquivos ".txt" em um único arquivo ".zip", sem subdiretórios.
+Siga estas regras para os arquivos de texto:
+Nomes de arquivos ".txt" devem ter no máximo 130 caracteres;
+Evite caracteres especiais, tabulações, tópicos e linhas em branco nos arquivos de texto;
+Use o padrão UTF-8 para codificação (documentação do Mozilla);
+Encerre as frases com ponto final, sempre que possível;
+Não use bullet points ou caracteres ocultos nos arquivos de texto;
+Mantenha assuntos semânticos agrupados, sem quebras de linha;
+Para indexação utilizando a modalidade "vanilla", recomendamos que cada linha de texto dentro dos seus arquivos ".txt" contenha até 450 tokens (aproximadamente 1.800 caracteres).
+Para a modalidade de indexação "file", cada arquivo ".txt" deverá conter, no máximo, 8.000 tokens (aproximadamente 28.000 caracteres) para o modelo AZURE_EMBEDDINGS_API_700_TPM. Já para os modelos IBM, o limite é de 512 tokens por arquivo (aproximadamente 1.800 caracteres).
+
+Atualmente, esses requisitos já são validados automaticamente pelo pipeline no início da indexação. No entanto, disponibilizamos em nossa wiki um script em Python (notebook) que permite realizar a pré-validação de sua base de conhecimento antes de iniciar a indexação, caso prefira. Você pode acessar o script através do link abaixo:
+
+Para realizar a indexação da base, acesse a guia INDEXAÇÃO DO AGENTE e preencha os campos requeridos, conforme ilustrado na Figura 5.1.
+
+Índice: ao escolher um nome para o índice, opte por uma denominação que facilite sua identificação, como, por exemplo, "idx-gecap10-v1". Isso auxiliará na organização e no gerenciamento dos índices criados.
+
+Atualmente, são oferecidos modelos de embeddings da Azure e IBM. Para selecionar o modelo mais adequado às suas necessidades, considere os seguintes aspectos:
+
+Azure: O modelo de embeddings da Azure consegue processar até 8.192 tokens, permitindo trabalhar com segmentos de texto maiores. Isso favorece a obtenção de contextos mais amplos em frases extensas, reduzindo a fragmentação do sentido semântico. Ao manter mais contexto dentro de um único embedding, há menos vetores a serem armazenados, o que pode melhorar o desempenho nas buscas em bases de dados volumosas.
+
+IBM: Os modelos de embeddings da IBM lidam com até 512 tokens, exigindo, assim, uma divisão mais detalhada dos textos. Essa abordagem pode aumentar a precisão em pesquisas específicas, visto que possibilita uma análise minuciosa de partes menores do texto. Contudo, isso também pode resultar em um maior número de embeddings para armazenar, impactando o desempenho das buscas em bases de dados extensas. Portanto, é crucial ponderar entre a precisão almejada para consultas específicas e a quantidade de embeddings gerados. Tais modelos são particularmente úteis para examinar textos mais curtos ou quando a detecção de informações específicas e detalhadas é fundamental para o propósito do projeto.
+
+Importante: Se você optar por utilizar o modelo de embeddings da IBM para indexar a sua base de conhecimento, é importante observar que o input enviado na requisição da API do agente deve ter no máximo 512 tokens. Isso ocorre porque, internamente, será feito um processo para a geração dos embeddings do texto de entrada, com o objetivo de realizar a busca de contexto por similaridade semântica. O modelo de embeddings da IBM suporta até 512 tokens, e inputs que excedam esse limite podem não ser processados corretamente. Por outro lado, se você optar pelo modelo de embeddings da Azure, o input enviado na requisição da API do agente poderá ter até 8.192 tokens.
+
+Para uma compreensão mais detalhada desses cálculos e seu impacto na aplicação, consulte a seção Funcionamento do RAG .
+
+
+É possível indexar as bases de conhecimento utilizando três modalidades distintas: Vanilla, File e Simple Directory Reader. Na modalidade Vanilla, também é possível indexar as INs (Instruções Normativas) simplesmente fornecendo os respectivos números. Nesse caso, o download dos arquivos para indexação ocorrerá automaticamente.
+
+Modalidade de Indexação:
+
+vanilla: Nessa modalidade, cada índice (embedding) da base vetorizada (indexada) corresponde a um segmento (chunk) do texto presente em cada arquivo ".txt". Essa opção é adequada quando se deseja indexar partes específicas de um texto, permitindo uma análise mais granular e segmentada dos documentos.
+
+file: Neste caso, cada índice (embedding) da base vetorizada (indexada) corresponde a um arquivo completo ".txt". Essa modalidade é ideal quando se busca analisar e indexar documentos inteiros, sem a necessidade de dividir o texto em segmentos menores.
+
+simple directory reader: Essa opção permite indexar arquivos em diversos formatos, incluindo PDF, CSV, DOCX, MD, EPUB, HWP e MBO. É a modalidade recomendada quando se lida com uma ampla variedade de formatos de arquivo, garantindo versatilidade e abrangência na indexação da base de conhecimento.
+
+Tamanho do segmento: Para o modelo da Azure, sugere-se a utilização de 450 tokens, enquanto para os modelos da IBM, recomenda-se um limite de 250 tokens.
+
+Modalidade de separação (preenchimento não obrigatório):
+
+Recursivo: modalidade para indexação de arquivos com formatação padrão.
+
+Markdown: modalidade para indexação de arquivos com formatação ‘Markdown’.
+
+Os campos a seguir são específicos para a modalidade de indexação simple directory reader e servem para configurar o processamento e a divisão dos textos em tokens durante a indexação. Veja abaixo a descrição de cada campo:
+
+Quantidade de overlap de tokens: Este campo define o número de tokens que serão compartilhados entre dois segmentos de texto consecutivos quando o texto for dividido em várias partes. Ao estabelecer um valor para o overlap, você permite que o contexto seja mantido entre os segmentos adjacentes, melhorando a continuidade semântica e facilitando a compreensão do conteúdo durante as buscas. Quantidade de overlaps permitidos: entre 10 e 50.
+
+Quantidade de tokens por segmento: Este campo determina o tamanho máximo de cada segmento de texto em termos de tokens. Ao dividir o texto em segmentos menores, o sistema pode processar e analisar o conteúdo de forma mais eficiente. Definir um valor adequado para a quantidade de chunk de tokens pode ajudar a equilibrar a precisão das buscas e o desempenho do sistema.
+
+Limites de tokens por segmento:
+
+Para modelos Azure: entre 300 e 6.000 tokens
+
+Para modelos IBM: entre 300 e 400 tokens.
+
+Separadores (preenchimento não obrigatório): são marcadores que podem ser incluídos no texto para definir limites entre segmentos (chunks). Dessa forma, sempre que um separador for identificado, o texto será dividido nesse ponto e criará um índice no arquivo de embeddings. Exemplos: ###, FIM, ***, ---, /// .
+
+Cabeçalhos para divisão - disponível somente na modalidade de separação 'Markdown' (preenchimento não obrigatório): permite especificar como os documentos devem ser divididos em segmentos menores, facilitando a organização e a recuperação de informações. Exemplos: #, Header 1.
+
+Origem da indexação: você pode optar por fazer o upload do arquivo ZIP contendo sua base de conhecimento ou selecionar a opção "IN" (Integração com Instruções Normativas). Ao escolher a modalidade “IN”, basta informar o número da IN e pressionar a tecla ',' (vírgula) para validar sua seleção. Após a validação, o download das informações relacionadas à IN selecionada será realizado automaticamente, permitindo que a indexação aconteça sem a necessidade de realizar o upload manual de arquivos, conforme ilustrado na figura 5.2.
+
+Funcionamento do RAG
+
+O tamanho do input de texto quando há implementação de RAG é limitado pela API de embeddings (ada-embeddings-002), essa API possui uma limitação diferente da API do modelo conversacional. Para o modelo conversacional, tem-se um exemplo do modelo GPT4 128k que apresenta uma limitação de 128 mil tokens de janela de contexto.
+
+As soluções de LLM, que são disponibilizadas via GeneraBB, recebem um texto de entrada que é composto dos seguintes componentes:
+
+User_query: entrada do usuário, a partir dessa entrada é feita a vetorização via API de embeddings;
+Prompt: seu template com seus parâmetros, o próprio user query, o knowledge que representa os chunks que foram recuperados pelo mecanismo do RAG, e demais variáveis declaradas no prompt, conforme cadastrados na Engenharia de Prompts, via Plataforma BB.
+
+Figura 8 - Fluxograma conceitual do uso de RAG com LLMs
+
+Exemplos de utilização e casos limites:
+
+Ex. 1 Limite do RAG para geração de embeddings:
+
+Se o user_query ultrapassar o limite de tokens do ada-embeddings-002 de 8.192 tokens:
+
+A rota de embeddings vai dar erro 400, referente a ultrapassagem do limite de tokens (This model's maximum context length is 8192 tokens. Please reduce your prompt; or completion length).
+
+Ex. 2 Limite para consumo do endpoint da API conversacional sem o uso de RAG:
+
+Essa limitação abrange todos os componentes da conversação (user_query + prompt + histórico das mensagens + max_tokens):
+
+Por exemplo, se a soma do user_query, do prompt e do histórico das mensagens totalizar 127.500 tokens, e você definir 800 tokens para o parâmetro max_tokens no modelo GPT-4 de 128k, ocorrerá um erro, pois você terá excedido o limite do modelo em 300 tokens:
+
+128.000 - 127.500 - 800 = - 300 tokens (ultrapassou em 300 tokens)
+
+Outro exemplo: se a soma de user_query, prompt e histórico de mensagens resultar em 127.500 tokens, e você definir 500 tokens para o parâmetro max_tokens no modelo GPT-4 de 128k, você estará exatamente no limite do modelo de 128k:
+
+128.000 - 127.500 - 500 = 0 tokens (ficou dentro do limite de tokens)
+
+Outro exemplo: se a soma do user_query, prompt e histórico de mensagens resultar em 126.000 tokens, e você definir 1.000 tokens para o parâmetro max_tokens no modelo GPT-4 de 128k, você ainda terá uma margem de 1.000 tokens em relação ao limite do modelo de 128k:
+
+128.000 - 126.000 - 1.000 = 1.000 tokens (ainda sobram 1000 tokens no limite de tokens)
+
+Ex. 3 Limite para consumo do endpoint da API conversacional com o uso de RAG:
+
+Essa limitação abrange todos os componentes presentes na conversação (user_query + prompt + knowledge + histórico das mensagens + max_tokens):
+
+Como a entrada já está restringida pelo limite de embeddings, o fator determinante para o limite da conversação em assistentes que utilizam RAG será o tamanho total do seu prompt.
+
+Por exemplo, se forem enviados 126.000 tokens de prompt, mais 1.000 tokens do user_query, 1.000 tokens do histórico de mensagens e 800 tokens para o parâmetro max_tokens no modelo GPT-4 de 128k, ocorrerá um erro, pois você terá excedido o limite do modelo em 800 tokens.
+
+128.000 - 126.000 - 1.000 - 1.000 - 800 = -800 tokens (excedeu em 800 tokens)
+
+Por exemplo, se forem enviados 125.000 tokens de prompt, mais 1.000 tokens do user_query, 1.000 tokens do histórico de mensagens e 800 tokens para o parâmetro max_tokens no modelo GPT-4 de 128k, ainda sobrariam 200 tokens no modelo:
+
+128.000 - 125.000 - 1.000 - 1.000 - 800 = 200 tokens (ainda sobraram 200 tokens no modelo)

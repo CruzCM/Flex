@@ -1,0 +1,172 @@
+Documentação Nova - Criação de índice (somente agentes Indexados/RAG sem índice existente)
+Ao selecionar "Não, preciso criar um novo índice", você é direcionado para a tela Gestão de indexação. O primeiro campo a ser definido é o Vector Store, que determina qual mecanismo de armazenamento vetorial será usado para a indexação:
+
+Opensearch;
+Milvus.
+Select de vector store
+
+⚠️ Esta etapa é obrigatória e bloqueante para agentes Indexados (RAG) sem índice existente. Você só consegue avançar no fluxo após concluir a indexação.
+
+ℹ️ Opensearch e Milvus são dois Vector Stores distintos, cada um com seus próprios campos de configuração — não confunda essa escolha com a Modalidade de indexação, que é um campo específico do fluxo Opensearch (veja a seguir). O Milvus não é uma modalidade do Opensearch nem exige seleção de modalidade: ele é configurado separadamente.
+
+Configurando um índice com Opensearch
+Ao selecionar Opensearch, preencha os seguintes campos:
+
+Campo                         Descrição
+Nome do índice                Até 60 caracteres.
+Modelo de embeddings          Modelo responsável por converter o conteúdo dos arquivos em vetores para busca semântica (Azure ou IBM WatsonX — veja Modelos de embeddings).
+Modalidade de indexação       Define como o Opensearch processa e divide o conteúdo dos arquivos durante a indexação — disponível apenas para o Vector Store Opensearch (veja Modalidades disponíveis).
+Origem da indexação           Arquivo ou IN. Ao marcar Arquivo, é exibido o campo de upload para envio do corpus (.zip) a ser indexado.
+Tamanho do segmento (em tokens) Quantidade de tokens por bloco de texto (veja Modelos disponíveis).
+Sobreposição entre segmentos (%) Valor entre 0 e 50 (dividido por 50 ao ser enviado).
+Método de divisão             Estratégia de segmentação do texto (veja Método de divisão do texto e LangChain).
+Separadores                   Campo opcional — digite o separador desejado e pressione ; para validar.
+Print Opensearch
+
+Atualizando um índice existente (Opensearch)
+ℹ️ No Opensearch, é possível atualizar um índice já existente enviando uma nova base de conhecimento (arquivo .zip) usando o mesmo nome de índice já cadastrado no campo Nome do índice. Nesse caso, o conteúdo anterior é substituído pelo novo corpus indexado, mantendo o vínculo do índice com os agentes que já o utilizam — não é necessário recriar o agente ou reconfigurar o campo Selecione um índice na Etapa 1.1.
+
+Esse comportamento de atualização por reindexação com o mesmo nome está disponível apenas para Opensearch.
+
+Enquanto a indexação ocorre
+O botão Avançar fica desabilitado;
+Um texto exibe o progresso da indexação.
+Ao concluir
+Um ícone verde indica sucesso;
+Uma mensagem confirma a conclusão;
+O botão Avançar é habilitado.
+
+Regras para arquivos de indexação
+Para garantir qualidade e consistência, siga as regras abaixo:
+
+Arquivos .zip (máx. 100 MB) — o formato aceito dentro do .zip varia conforme a modalidade escolhida (veja Modalidades disponíveis);
+Sem subpastas dentro do .zip;
+Nomes de arquivos com até 130 caracteres;
+Codificação UTF-8.
+Evite nos arquivos:
+
+Caracteres especiais;
+Bullets;
+Linhas em branco;
+Tabulações.
+Recomendações:
+
+Use ponto final sempre que possível;
+Agrupe conteúdos relacionados no mesmo arquivo.
+
+Modalidades disponíveis
+O campo Modalidade de indexação, exibido apenas no fluxo Opensearch, define a estratégia usada para transformar o conteúdo dos arquivos em blocos de informação (segmentos) consultáveis pelo agente:
+
+Modalidade                      Descrição                                                                                                 Formatos de arquivo aceitos (dentro do .zip)
+Vanilla (indexa por segmentos)  Cada parte do texto vira um bloco de informação separado para o agente consultar — o documento é dividido em múltiplos segmentos indexáveis.  .txt
+File (indexa por documento)     O arquivo inteiro vira um único bloco de informação, sem divisão em segmentos menores.                     .txt
+Simple Directory Reader         Aceita vários formatos de arquivo em uma mesma indexação. Ideal para bases com tipos variados de conteúdo. .pdf, .csv, .docx, .md, .epub, .hwp, .mbox
+
+ℹ️ Use Vanilla quando quiser que o agente recupere trechos específicos e pontuais do conteúdo (respostas mais granulares). Use File quando o documento inteiro deve ser tratado como uma única unidade de contexto (ex.: políticas curtas, FAQs de página única). Use Simple Directory Reader quando a base de conhecimento reúne arquivos em formatos variados.
+
+Também é possível, na modalidade Vanilla, indexar INs (Instruções Normativas) diretamente pelo número — o download dos arquivos para indexação ocorre automaticamente.
+
+⚠️ Erro comum: se o .zip enviado contiver arquivo(s) com extensão não aceita pela modalidade selecionada (por exemplo, um .png enviado com a modalidade Simple Directory Reader, que não aceita imagens), a indexação falha e a plataforma retorna uma mensagem explicando o motivo e orientando a remover os arquivos com extensão não suportada ou trocar para a modalidade Vanilla ou File caso o conteúdo seja .txt.
+
+Método de divisão do texto e LangChain
+Dentro da modalidade Vanilla, o campo Método de divisão define como o texto é fragmentado em segmentos, com base em text splitters da biblioteca LangChain, amplamente utilizada para preparar documentos antes da geração de embeddings em soluções de RAG:
+
+RecursiveCharacterTextSplitter: divide o texto de forma recursiva, tentando preservar unidades semânticas (parágrafos, frases, palavras) antes de fragmentar por caractere. Segue esta ordem de prioridade: parágrafos (\n\n) → linhas (\n) → palavras → caracteres. É a opção mais genérica e recomendada para documentos sem uma estrutura de marcação bem definida (relatórios, e-mails, artigos, normas), ou como escolha padrão quando não se sabe qual método usar;
+
+MarkdownHeaderTextSplitter: divide o conteúdo com base nos cabeçalhos Markdown (#, ##, ### etc.), preservando a hierarquia lógica do documento — cada seção delimitada por um título vira um segmento independente, e o título é preservado como metadado do segmento. Corresponde ao campo Cabeçalhos Markdown (veja Outras configurações importantes). Indicado para documentos técnicos, wikis ou bases de conhecimento já estruturadas em Markdown.
+
+ℹ️ Use a divisão por cabeçalhos Markdown quando o corpus já estiver estruturado em Markdown (manuais, bases exportadas de wikis etc.) — isso costuma gerar segmentos mais coerentes do que uma divisão puramente por caracteres. Para conteúdos sem essa estrutura (.txt simples), a divisão recursiva por caractere é a mais indicada.
+
+Resumo comparativo:
+
+Método                         Indicado para                                            Respeita estrutura de títulos     Preserva metadado de seção
+RecursiveCharacterTextSplitter Qualquer texto livre; recomendado como padrão para iniciantes Não necessariamente               Não
+MarkdownHeaderTextSplitter     Documentos em formato Markdown                           Sim (foco principal)               Sim
+
+Modelos disponíveis (indexação de texto)
+O Modelo de embeddings escolhido determina o limite de tokens por segmento no Opensearch:
+
+Azure
+
+Até 8.192 tokens por segmento;
+Ideal para textos longos com menos vetores;
+Reduz fragmentação semântica.
+
+IBM
+
+Até 512 tokens por segmento;
+Alta precisão em textos curtos;
+Gera mais vetores e exige mais recursos.
+
+⚠️ Os modelos Azure Embeddings só estão disponíveis para o Vector Store Opensearch. Se o agente precisar usar um modelo Azure, o índice deve ser criado (ou atualizado) nessa opção.
+
+Modelos de embeddings
+Os modelos disponíveis no campo Modelo de embeddings do Opensearch são:
+
+AZURE_EMBEDDINGS_3_LARGE
+AZURE_EMBEDDINGS_API_700_TPM
+IBM_WATSONX_MULTILINGUAL_ES_LARGE_WX_TEXT_EMBEDDING
+IBM_WATSONX_GRANITE_278M_MULTILINGUAL_WX_TEXT_EMBEDDING
+IBM_WATSONX_SLATE_125M_ENGLISH_WX_TEXT_EMBEDDING
+
+Outras configurações importantes
+Overlap de tokens: 10 a 50 (mantém continuidade entre os blocos de texto);
+Tokens por segmento (tamanho de cada bloco de texto):
+Azure: 300 a 6.000;
+IBM: 300 a 400;
+Separadores (opcional): marcações que indicam onde o texto deve ser dividido em blocos — como ###, ***, FIM etc.;
+Cabeçalhos Markdown (caso use esse formato): #, ## etc.
+
+Recomendações de configuração por tamanho de arquivo (Opensearch)
+Os valores de Tokens por segmento e Overlap de tokens impactam diretamente a qualidade da recuperação de contexto pelo agente. Como referência inicial (a ser validada empiricamente conforme o caso de uso):
+
+Porte do arquivo                              Tokens por segmento                         Overlap de tokens   Observação
+Pequeno (poucas páginas / FAQ, políticas curtas) Azure: 300–800 · IBM: 300–350           10–20               Segmentos menores evitam diluir o conteúdo relevante em documentos curtos
+Médio (manuais, procedimentos)                Azure: 1.000–3.000 · IBM: 350–400           20–35               Equilíbrio entre contexto suficiente e granularidade de busca
+Grande (documentos extensos, bases consolidadas) Azure: 4.000–6.000 · IBM: 400 (limite máximo) 35–50            Overlap maior ajuda a preservar contexto entre segmentos consecutivos em textos longos
+
+⚠️ Para arquivos grandes, prefira o modelo Azure (até 8.192 tokens por segmento), que reduz a fragmentação semântica do conteúdo. Para arquivos pequenos ou que exigem alta precisão em trechos curtos, os modelos IBM (até 512 tokens por segmento) tendem a funcionar melhor, ainda que gerem mais vetores.
+
+Configurando um índice com Milvus
+O Milvus é um Vector Store independente do Opensearch — e sua configuração é mais simples e direta, com campos próprios:
+
+Campo                              Descrição
+Nome do índice                     Até 60 caracteres. Deve iniciar com idx_ e conter apenas caracteres alfanuméricos e/ou underscore (ex.: idx_teste_1234).
+Descrição do índice                Até 100 caracteres.
+Modelo de embeddings               Exibe apenas modelos IBM WatsonX — o Milvus não oferece opções Azure: IBM_WATSONX_MULTILINGUAL_ES_LARGE_WX_TEXT_EMBEDDING; IBM_WATSONX_GRANITE_278M_MULTILINGUAL_WX_TEXT_EMBEDDING; IBM_WATSONX_SLATE_125M_ENGLISH_WX_TEXT_EMBEDDING.
+Arquivo                            Área de upload — inclua o .zip contendo os arquivos desejados. Formatos aceitos: .html, .pdf, .txt, .pptx, .docx.
+Quantidade de tokens por segmento  Tamanho máximo de 512 tokens (ex.: 400).
+Quantidade de tokens sobrepostos   Tamanho máximo de 100 tokens (ex.: 50).
+UOR Permitidas                     Digite o número da UOR da equipe e pressione ; para validar (ex.: 530654).
+Tela de gestão de indexação – Milvus preenchida
+
+ℹ️ Como o limite de tokens por segmento no Milvus é fixo em 512 (bem menor que o teto de 8.192 do Opensearch com modelos Azure), não há necessidade de selecionar uma modalidade de divisão: o Milvus aplica seu próprio processo de indexação internamente a partir do arquivo .zip enviado.
+
+⚠️ A regra de nomenclatura do Nome do índice é diferente entre os dois Vector Stores: no Milvus, o nome deve iniciar com idx_ e conter apenas caracteres alfanuméricos e underscore (não aceita hífen); no Opensearch, o campo aceita hífen normalmente (ex.: idx-teste-1234-teste).
+
+Recomendações de configuração por tamanho de arquivo (Milvus)
+
+Porte do arquivo                              Tokens por segmento        Tokens sobrepostos        Observação
+Pequeno (poucas páginas / FAQ, políticas curtas) 200–300                 30–50                     Segmentos menores evitam diluir o conteúdo relevante em documentos curtos
+Médio (manuais, procedimentos)                300–400                   50–70                     Equilíbrio entre contexto suficiente e granularidade de busca dentro do limite do Milvus
+Grande (documentos extensos, bases consolidadas) 400–512 (limite máximo) 80–100 (limite máximo)    Overlap próximo do máximo ajuda a compensar a granularidade menor dos segmentos em textos longos
+
+Modelos de embeddings compatíveis por Vector Store
+
+Vector Store   Modelos de embeddings compatíveis
+Opensearch     AZURE_EMBEDDINGS_3_LARGE; AZURE_EMBEDDINGS_API_700_TPM; IBM_WATSONX_MULTILINGUAL_ES_LARGE_WX_TEXT_EMBEDDING; IBM_WATSONX_GRANITE_278M_MULTILINGUAL_WX_TEXT_EMBEDDING; IBM_WATSONX_SLATE_125M_ENGLISH_WX_TEXT_EMBEDDING
+Milvus         IBM_WATSONX_MULTILINGUAL_ES_LARGE_WX_TEXT_EMBEDDING; IBM_WATSONX_GRANITE_278M_MULTILINGUAL_WX_TEXT_EMBEDDING; IBM_WATSONX_SLATE_125M_ENGLISH_WX_TEXT_EMBEDDING
+
+⚠️ Os modelos Azure Embeddings só estão disponíveis para o Vector Store Opensearch. O Milvus aceita apenas modelos da família IBM WatsonX.
+
+Dicas para melhorar a assertividade das respostas
+Para melhorar a assertividade das respostas, você pode ajustar:
+
+Tamanho do chunk — chunks menores tendem a ser mais precisos; chunks maiores trazem mais contexto;
+Sobreposição (overlap) — aumentar o overlap evita perda de informação nas bordas dos segmentos;
+Método de divisão — teste a modalidade Vanilla para ver se encaixa melhor no seu caso;
+Modelo de Embeddings — prefira modelos com maior janela de tokens se sua base de conhecimento for extensa.
+Outras dicas:
+
+Ajuste o formato dos documentos antes de indexar (uma estrutura clara ajuda muito na similaridade);
+Reforce, no prompt, as instruções para guiar o modelo na recuperação.
