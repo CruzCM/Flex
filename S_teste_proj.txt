@@ -1,0 +1,1032 @@
+Dentro do diretório do projeto, rode primeiro somente este bloco:
+
+echo "=== REPOSITÓRIO ==="
+pwd
+git status --short --branch
+git remote -v
+echo "Branch atual: $(git branch --show-current)"
+echo "Commit atual: $(git rev-parse HEAD)"
+git log -1 --oneline --decorate
+
+echo
+echo "=== DEFAULT BRANCH ==="
+git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null || echo "origin/HEAD não definido"
+
+echo
+echo "=== WORKTREE ==="
+if [[ -z "$(git status --porcelain)" ]]; then
+  echo "OK - working tree limpo"
+else
+  echo "ATENÇÃO - existem alterações locais"
+  git status --short
+fi
+
+O importante é confirmarmos:
+
+remote origin  → GitHub
+working tree   → limpo
+branch atual   → provavelmente main
+commit         → identificado
+origin/HEAD    → identificado
+
+Se estiver limpo, crie sua branch:
+
+git switch -c feature/manuel-local-validation
+
+Escolhi feature/... porque é compatível com o padrão que já vimos nas configurações anteriores do projeto; depois vamos conferir o workflow atual do GitHub clonado antes de assumir qualquer regra definitiva.
+
+Confirme:
+
+git status
+git branch --show-current
+git log -1 --oneline --decorate
+
+Esperado:
+
+On branch feature/manuel-local-validation
+
+--------------------------------------------------------------------------------------------------------------
+
+
+zsh <<'ZSH'
+
+###############################################################################
+# CONSULT FIN
+# VALIDAÇÃO LOCAL COMPLETA — ETAPAS 1 A 16
+#
+# Executar a partir da raiz do repositório GitHub clonado.
+#
+# O script pode:
+#   - criar uma branch LOCAL;
+#   - criar .venv;
+#   - instalar dependências dentro da .venv;
+#   - executar testes;
+#   - carregar .env, se existir e parecer válido;
+#   - iniciar temporariamente o Agent na porta 8080;
+#   - executar health checks;
+#   - validar mTLS;
+#   - tentar POST /chat.
+#
+# O script NÃO:
+#   - faz git push;
+#   - altera código-fonte;
+#   - cria .env;
+#   - copia .env.example;
+#   - imprime AppKey;
+#   - inventa certificados/credenciais.
+###############################################################################
+
+emulate -L zsh
+setopt PIPE_FAIL
+
+###############################################################################
+# CONFIGURAÇÃO LOCAL DA VALIDAÇÃO
+###############################################################################
+
+# Pode sobrescrever antes de executar:
+# export VALIDATION_BRANCH="feature/minha-branch"
+
+BRANCH_NAME="${VALIDATION_BRANCH:-feature/manuel-local-validation}"
+PORT=8080
+BASE_URL="http://127.0.0.1:${PORT}"
+
+TMP_BASE="/tmp/consult-fin-validation-$$"
+mkdir -p "$TMP_BASE"
+
+AGENT_LOG="$TMP_BASE/agent.log"
+UNIT_LOG="$TMP_BASE/unit.log"
+INTEGRATION_LOG="$TMP_BASE/integration.log"
+INSTALL_LOG="$TMP_BASE/install.log"
+CHAT_BODY="$TMP_BASE/chat.json"
+
+typeset -A STATUS
+typeset -A DETAIL
+
+AGENT_PID=""
+AGENT_STARTED=0
+LIVE_OK=0
+READY_OK=0
+CHAT_OK=0
+
+###############################################################################
+# FUNÇÕES AUXILIARES
+###############################################################################
+
+pass() {
+    STATUS[$1]="OK"
+    DETAIL[$1]="$2"
+    echo "[OK] $2"
+}
+
+warn() {
+    STATUS[$1]="AVISO"
+    DETAIL[$1]="$2"
+    echo "[AVISO] $2"
+}
+
+fail() {
+    STATUS[$1]="ERRO"
+    DETAIL[$1]="$2"
+    echo "[ERRO] $2"
+}
+
+section() {
+    echo
+    echo "============================================================================"
+    echo "$1"
+    echo "============================================================================"
+}
+
+cleanup() {
+    if [[ -n "$AGENT_PID" ]]; then
+        if kill -0 "$AGENT_PID" 2>/dev/null; then
+            echo
+            echo "Encerrando Agent temporário PID=$AGENT_PID ..."
+            kill "$AGENT_PID" 2>/dev/null
+            wait "$AGENT_PID" 2>/dev/null
+        fi
+    fi
+}
+
+trap cleanup EXIT INT TERM
+
+
+###############################################################################
+# 1. GIT / GITHUB / BRANCH / COMMIT
+###############################################################################
+
+section "1. GIT / GITHUB / BRANCH / COMMIT"
+
+echo "Diretório:"
+pwd
+
+echo
+echo "Status:"
+git status --short --branch 2>&1
+
+echo
+echo "Remote:"
+git remote -v 2>/dev/null \
+    | sed -E 's#(https?://)[^/@]+@#\1<credenciais-ocultas>@#g'
+
+echo
+echo "Commit atual:"
+git rev-parse HEAD 2>/dev/null
+
+echo
+echo "Último commit:"
+git log -1 --oneline --decorate 2>/dev/null
+
+echo
+echo "Branch atual:"
+CURRENT_BRANCH="$(git branch --show-current 2>/dev/null)"
+echo "${CURRENT_BRANCH:-<nenhuma>}"
+
+echo
+echo "Branch default informada pelo origin:"
+DEFAULT_REF="$(
+    git ls-remote --symref origin HEAD 2>/dev/null \
+        | awk '/^ref:/ {print $2; exit}'
+)"
+
+if [[ -n "$DEFAULT_REF" ]]; then
+    echo "$DEFAULT_REF"
+else
+    echo "<não determinada>"
+fi
+
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    fail 1 "Diretório atual não é um repositório Git."
+else
+    DIRTY="$(git status --porcelain)"
+
+    if [[ "$CURRENT_BRANCH" == "$BRANCH_NAME" ]]; then
+        pass 1 "Já estamos na branch local $BRANCH_NAME."
+
+    elif [[ -n "$DIRTY" ]]; then
+        warn 1 "Há alterações locais; branch não será trocada automaticamente."
+
+    else
+        if git show-ref --verify --quiet "refs/heads/$BRANCH_NAME"; then
+            if git switch "$BRANCH_NAME"; then
+                pass 1 "Branch local existente $BRANCH_NAME ativada."
+            else
+                fail 1 "Não foi possível ativar $BRANCH_NAME."
+            fi
+        else
+            if git switch -c "$BRANCH_NAME"; then
+                pass 1 "Branch local $BRANCH_NAME criada."
+            else
+                fail 1 "Não foi possível criar $BRANCH_NAME."
+            fi
+        fi
+    fi
+fi
+
+echo
+echo "Estado final Git:"
+git status --short --branch 2>/dev/null
+
+
+###############################################################################
+# 2. ESTRUTURA REAL DO REPOSITÓRIO
+###############################################################################
+
+section "2. ESTRUTURA REAL DO REPOSITÓRIO"
+
+echo "Arquivos/diretórios da raiz:"
+ls -la
+
+echo
+echo "Arquivos esperados/relevantes:"
+
+MISSING_CORE=0
+
+for item in \
+    README.md \
+    setup.py \
+    requirements.txt \
+    agent_config.yaml \
+    .env.example \
+    plg_agent_consult_fin
+do
+    if [[ -e "$item" ]]; then
+        echo "[OK]    $item"
+    else
+        echo "[FALTA] $item"
+        MISSING_CORE=$((MISSING_CORE + 1))
+    fi
+done
+
+if (( MISSING_CORE == 0 )); then
+    pass 2 "Estrutura principal esperada está presente."
+else
+    warn 2 "$MISSING_CORE item(ns) esperado(s) não encontrado(s); o GitHub atual pode ter divergido da V0."
+fi
+
+
+###############################################################################
+# 3. README E INSTRUÇÕES ATUAIS
+###############################################################################
+
+section "3. README E INSTRUÇÕES ATUAIS"
+
+if [[ -f README.md ]]; then
+    echo "Trechos relacionados a execução/desenvolvimento:"
+    echo
+
+    grep -nEi \
+        'venv|requirements|pip install|uvicorn|plg_agent_consult_fin|pytest|health/live|health/ready|/chat' \
+        README.md \
+        | head -80
+
+    pass 3 "README atual localizado e inspecionado."
+else
+    fail 3 "README.md não encontrado."
+fi
+
+
+###############################################################################
+# 4. PYTHON EXIGIDO PELO PROJETO
+###############################################################################
+
+section "4. PYTHON"
+
+echo "Referências de versão existentes no repositório:"
+echo
+
+grep -nEH \
+    'python_requires|requires-python|versaoPython|3\.11|3\.12|dev-python' \
+    setup.py \
+    pyproject.toml \
+    aic.json \
+    Dockerfile \
+    2>/dev/null \
+    | head -80
+
+echo
+echo "Pythons disponíveis:"
+
+for p in python3.11 python3.12 python3 python; do
+    if command -v "$p" >/dev/null 2>&1; then
+        echo "$p -> $(command -v "$p") -> $("$p" --version 2>&1)"
+    fi
+done
+
+# Preferimos 3.11 por aderência ao runtime documentado.
+if command -v python3.11 >/dev/null 2>&1; then
+    PYTHON_BIN="$(command -v python3.11)"
+else
+    PYTHON_BIN="$(command -v python3 2>/dev/null)"
+fi
+
+if [[ -z "$PYTHON_BIN" ]]; then
+    fail 4 "Nenhum Python utilizável encontrado."
+else
+    PYVER="$("$PYTHON_BIN" -c 'import sys; print(".".join(map(str, sys.version_info[:3])))')"
+
+    echo
+    echo "Python escolhido para validação: $PYTHON_BIN"
+    echo "Versão: $PYVER"
+
+    if "$PYTHON_BIN" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3,11) else 1)'; then
+        if "$PYTHON_BIN" -c 'import sys; raise SystemExit(0 if sys.version_info[:2] == (3,11) else 1)'; then
+            pass 4 "Python $PYVER compatível e alinhado com 3.11."
+        else
+            warn 4 "Python $PYVER atende >=3.11, mas não é 3.11.x."
+        fi
+    else
+        fail 4 "Python $PYVER é inferior ao mínimo esperado 3.11."
+    fi
+fi
+
+
+###############################################################################
+# 5. PIP / VENV
+###############################################################################
+
+section "5. PIP / VENV"
+
+VENV_DIR="$PWD/.venv"
+
+if [[ -z "$PYTHON_BIN" ]]; then
+    fail 5 "Sem Python para criar ambiente virtual."
+else
+
+    if [[ -x "$VENV_DIR/bin/python" ]]; then
+        echo ".venv já existe."
+    else
+        echo "Criando .venv com:"
+        echo "$PYTHON_BIN"
+
+        if "$PYTHON_BIN" -m venv "$VENV_DIR"; then
+            echo ".venv criada."
+        else
+            fail 5 "Falha ao criar .venv."
+        fi
+    fi
+
+    if [[ -x "$VENV_DIR/bin/python" ]]; then
+        VENV_PY="$VENV_DIR/bin/python"
+
+        echo
+        "$VENV_PY" --version
+
+        if "$VENV_PY" -m pip --version >/dev/null 2>&1; then
+            "$VENV_PY" -m pip --version
+            pass 5 "venv e pip funcionando."
+        else
+            echo "pip ausente; tentando ensurepip..."
+
+            "$VENV_PY" -m ensurepip --upgrade 2>/dev/null
+
+            if "$VENV_PY" -m pip --version >/dev/null 2>&1; then
+                "$VENV_PY" -m pip --version
+                pass 5 "pip recuperado dentro da .venv."
+            else
+                fail 5 "pip não funciona dentro da .venv."
+            fi
+        fi
+    fi
+fi
+
+
+###############################################################################
+# 6. INSTALAÇÃO DAS DEPENDÊNCIAS
+###############################################################################
+
+section "6. DEPENDÊNCIAS"
+
+if [[ ! -x "${VENV_PY:-}" ]]; then
+    fail 6 "Sem Python da .venv."
+else
+
+    # Se o repositório fornecer pip.conf, usamos somente para estes comandos.
+    if [[ -f pip.conf ]]; then
+        echo "Usando pip.conf do próprio repositório."
+        PIP_CONFIG="$PWD/pip.conf"
+    else
+        PIP_CONFIG=""
+        echo "pip.conf não encontrado; usando configuração normal do pip."
+    fi
+
+    : > "$INSTALL_LOG"
+
+    INSTALL_OK=1
+
+    if [[ -f requirements.txt ]]; then
+        echo
+        echo "Instalando requirements.txt..."
+
+        if [[ -n "$PIP_CONFIG" ]]; then
+            env PIP_CONFIG_FILE="$PIP_CONFIG" \
+                "$VENV_PY" -m pip install -r requirements.txt \
+                >>"$INSTALL_LOG" 2>&1
+        else
+            "$VENV_PY" -m pip install -r requirements.txt \
+                >>"$INSTALL_LOG" 2>&1
+        fi
+
+        if (( $? != 0 )); then
+            INSTALL_OK=0
+        fi
+    else
+        echo "requirements.txt ausente."
+        INSTALL_OK=0
+    fi
+
+    echo
+    echo "Instalando pacote em modo editable..."
+
+    if [[ -n "$PIP_CONFIG" ]]; then
+        env PIP_CONFIG_FILE="$PIP_CONFIG" \
+            "$VENV_PY" -m pip install -e . \
+            >>"$INSTALL_LOG" 2>&1
+    else
+        "$VENV_PY" -m pip install -e . \
+            >>"$INSTALL_LOG" 2>&1
+    fi
+
+    if (( $? != 0 )); then
+        INSTALL_OK=0
+    fi
+
+    if (( INSTALL_OK == 1 )); then
+        pass 6 "Dependências principais instaladas."
+    else
+        fail 6 "Uma ou mais instalações falharam."
+        echo
+        echo "Últimas linhas do log:"
+        tail -40 "$INSTALL_LOG"
+    fi
+fi
+
+
+###############################################################################
+# 7. IMPORTAÇÃO DO PACOTE
+###############################################################################
+
+section "7. IMPORTAÇÃO DO PACOTE"
+
+if [[ -x "${VENV_PY:-}" ]]; then
+
+    "$VENV_PY" - <<'PY'
+import sys
+
+print("Python:", sys.version)
+print("Executable:", sys.executable)
+
+import plg_agent_consult_fin
+
+print("Pacote:", plg_agent_consult_fin)
+print("Arquivo:", getattr(plg_agent_consult_fin, "__file__", "<não informado>"))
+PY
+
+    if (( $? == 0 )); then
+        pass 7 "Pacote plg_agent_consult_fin importa corretamente."
+    else
+        fail 7 "Falha ao importar plg_agent_consult_fin."
+    fi
+
+else
+    fail 7 "Python da .venv não disponível."
+fi
+
+
+###############################################################################
+# 8. TESTES UNITÁRIOS
+###############################################################################
+
+section "8. TESTES UNITÁRIOS"
+
+if [[ -x "${VENV_PY:-}" ]]; then
+
+    # O README documenta extras unit/integration.
+    if ! "$VENV_PY" -m pytest --version >/dev/null 2>&1; then
+
+        echo "pytest não instalado. Tentando extras documentados..."
+
+        if [[ -n "${PIP_CONFIG:-}" ]]; then
+            env PIP_CONFIG_FILE="$PIP_CONFIG" \
+                "$VENV_PY" -m pip install -e ".[unit,integration]" \
+                >>"$INSTALL_LOG" 2>&1
+        else
+            "$VENV_PY" -m pip install -e ".[unit,integration]" \
+                >>"$INSTALL_LOG" 2>&1
+        fi
+    fi
+
+    if "$VENV_PY" -m pytest --version >/dev/null 2>&1; then
+
+        echo "Executando tests/unit ..."
+        : > "$UNIT_LOG"
+
+        timeout 180 \
+            "$VENV_PY" -m pytest tests/unit/ -q \
+            >"$UNIT_LOG" 2>&1
+
+        UNIT_RC=$?
+
+        tail -30 "$UNIT_LOG"
+
+        if (( UNIT_RC == 0 )); then
+            pass 8 "Testes unitários passaram."
+        elif (( UNIT_RC == 124 )); then
+            fail 8 "Testes unitários excederam 180 segundos."
+        else
+            fail 8 "Testes unitários falharam (exit=$UNIT_RC)."
+        fi
+
+    else
+        fail 8 "pytest não pôde ser instalado/localizado."
+    fi
+
+else
+    fail 8 "Sem ambiente Python para testes."
+fi
+
+
+###############################################################################
+# 9. TESTES DE INTEGRAÇÃO EXISTENTES
+###############################################################################
+
+section "9. TESTES DE INTEGRAÇÃO"
+
+if [[ -x "${VENV_PY:-}" ]] && "$VENV_PY" -m pytest --version >/dev/null 2>&1; then
+
+    if [[ -d tests/integration ]]; then
+
+        echo "Executando tests/integration ..."
+        : > "$INTEGRATION_LOG"
+
+        timeout 120 \
+            "$VENV_PY" -m pytest tests/integration/ -q \
+            >"$INTEGRATION_LOG" 2>&1
+
+        INTEGRATION_RC=$?
+
+        tail -30 "$INTEGRATION_LOG"
+
+        if (( INTEGRATION_RC == 0 )); then
+            pass 9 "Testes de integração existentes passaram."
+        elif (( INTEGRATION_RC == 124 )); then
+            fail 9 "Testes de integração excederam 120 segundos."
+        else
+            fail 9 "Testes de integração falharam (exit=$INTEGRATION_RC)."
+        fi
+
+    else
+        warn 9 "Diretório tests/integration não existe no GitHub atual."
+    fi
+
+else
+    fail 9 "pytest não disponível."
+fi
+
+
+###############################################################################
+# 10. CONFIGURAÇÃO NECESSÁRIA PARA STARTUP
+###############################################################################
+
+section "10. CONFIGURAÇÃO PARA STARTUP"
+
+echo "Arquivos de configuração:"
+for f in agent_config.yaml .env .env.example; do
+    if [[ -f "$f" ]]; then
+        echo "[OK] $f"
+    else
+        echo "[--] $f"
+    fi
+done
+
+###############################################################################
+# Se houver .env REAL, podemos carregá-lo.
+#
+# Não copiamos .env.example automaticamente.
+# Também recusamos .env que ainda contenha placeholders {{ ... }}.
+###############################################################################
+
+if [[ -f .env ]]; then
+
+    if grep -q '{{' .env; then
+        echo
+        echo "[AVISO] .env contém placeholder {{ ... }}."
+        echo "Ele NÃO será carregado automaticamente."
+
+    elif zsh -n .env >/dev/null 2>&1; then
+
+        echo
+        echo "Carregando variáveis do .env existente..."
+        set -a
+        source ./.env
+        set +a
+
+    else
+        echo
+        echo "[AVISO] .env possui erro de sintaxe e não será carregado."
+    fi
+
+else
+    echo
+    echo ".env ainda não existe. Nenhum arquivo será criado."
+fi
+
+echo
+echo "Variáveis relevantes — somente presença, nunca conteúdo:"
+
+CONFIG_PROBLEM=0
+
+for VAR in \
+    GATEWAY_OUTBOUND_GW_APP_KEY \
+    KEY_STORE_CERT_PATH \
+    KEY_STORE_KEY_PATH \
+    TRUST_STORE_CA_PATH \
+    REQUESTS_CA_BUNDLE
+do
+    VALUE="${(P)VAR}"
+
+    if [[ -z "$VALUE" ]]; then
+        echo "[AUSENTE] $VAR"
+    else
+        if [[ "$VAR" == "GATEWAY_OUTBOUND_GW_APP_KEY" ]]; then
+            echo "[OK]     $VAR=<valor oculto>"
+        else
+            if [[ -f "$VALUE" ]]; then
+                echo "[OK]     $VAR=$VALUE"
+            else
+                echo "[AVISO]  $VAR configurada, mas arquivo não existe: $VALUE"
+                CONFIG_PROBLEM=1
+            fi
+        fi
+    fi
+done
+
+if [[ -n "${GATEWAY_OUTBOUND_GW_APP_KEY:-}" ]]; then
+    if (( CONFIG_PROBLEM == 0 )); then
+        pass 10 "Configuração básica encontrada."
+    else
+        warn 10 "Há caminhos configurados que não existem."
+    fi
+else
+    warn 10 "AppKey ainda não configurada; startup do Gateway pode falhar."
+fi
+
+
+###############################################################################
+# 11. SUBIR FASTAPI / LANGGRAPH TEMPORARIAMENTE
+###############################################################################
+
+section "11. STARTUP DO AGENT"
+
+if [[ ! -x "${VENV_PY:-}" ]]; then
+    fail 11 "Python da .venv indisponível."
+
+elif ss -ltn 2>/dev/null | grep -q ":${PORT} "; then
+    fail 11 "Porta $PORT já está ocupada; não iniciaremos outro processo."
+
+else
+
+    echo "Iniciando:"
+    echo "$VENV_PY -m plg_agent_consult_fin --host 0.0.0.0 --port $PORT"
+
+    : > "$AGENT_LOG"
+
+    "$VENV_PY" -m plg_agent_consult_fin \
+        --host 0.0.0.0 \
+        --port "$PORT" \
+        >"$AGENT_LOG" 2>&1 &
+
+    AGENT_PID=$!
+
+    echo "PID: $AGENT_PID"
+    echo "Log: $AGENT_LOG"
+
+    echo
+    echo "Aguardando startup..."
+
+    for i in {1..30}; do
+
+        if ! kill -0 "$AGENT_PID" 2>/dev/null; then
+            break
+        fi
+
+        HTTP="$(
+            curl -s \
+                -o "$TMP_BASE/startup-live" \
+                -w '%{http_code}' \
+                "$BASE_URL/health/live" \
+                2>/dev/null
+        )"
+
+        if [[ "$HTTP" == "200" ]]; then
+            AGENT_STARTED=1
+            break
+        fi
+
+        sleep 1
+    done
+
+    if (( AGENT_STARTED == 1 )); then
+        pass 11 "Agent iniciou e está respondendo HTTP."
+    else
+        fail 11 "Agent não ficou disponível em até 30 segundos."
+
+        echo
+        echo "Últimas linhas do log de startup:"
+        echo "------------------------------------------------------------"
+
+        tail -50 "$AGENT_LOG" 2>/dev/null \
+            | sed -E \
+                's/(GATEWAY_OUTBOUND_GW_APP_KEY[=: ]+)[^[:space:]]+/\1<OCULTO>/Ig'
+
+        echo "------------------------------------------------------------"
+    fi
+fi
+
+
+###############################################################################
+# 12. /health/live
+###############################################################################
+
+section "12. HEALTH LIVE"
+
+if (( AGENT_STARTED == 1 )); then
+
+    LIVE_HTTP="$(
+        curl -sS \
+            -o "$TMP_BASE/live-body" \
+            -w '%{http_code}' \
+            "$BASE_URL/health/live"
+    )"
+
+    echo "HTTP: $LIVE_HTTP"
+    cat "$TMP_BASE/live-body"
+    echo
+
+    if [[ "$LIVE_HTTP" == "200" ]]; then
+        LIVE_OK=1
+        pass 12 "/health/live retornou HTTP 200."
+    else
+        fail 12 "/health/live retornou HTTP $LIVE_HTTP."
+    fi
+
+else
+    fail 12 "Agent não está ativo; health/live não pode ser validado."
+fi
+
+
+###############################################################################
+# 13. /health/ready
+###############################################################################
+
+section "13. HEALTH READY"
+
+if (( AGENT_STARTED == 1 )); then
+
+    READY_HTTP="$(
+        curl -sS \
+            -o "$TMP_BASE/ready-body" \
+            -w '%{http_code}' \
+            "$BASE_URL/health/ready"
+    )"
+
+    echo "HTTP: $READY_HTTP"
+    cat "$TMP_BASE/ready-body"
+    echo
+
+    if [[ "$READY_HTTP" == "200" ]]; then
+        READY_OK=1
+        pass 13 "/health/ready retornou HTTP 200."
+    else
+        fail 13 "/health/ready retornou HTTP $READY_HTTP."
+    fi
+
+else
+    fail 13 "Agent não está ativo; health/ready não pode ser validado."
+fi
+
+
+###############################################################################
+# 14. GATEWAY OUTBOUND + mTLS
+###############################################################################
+
+section "14. GATEWAY OUTBOUND / mTLS"
+
+###############################################################################
+# Descobre URL HTTPS declarada pelo projeto.
+###############################################################################
+
+GATEWAY_URL="$(
+    grep -Eo 'https://[^ "'\'']+' agent_config.yaml 2>/dev/null \
+        | grep -E 'llm|agentes|outbound|api' \
+        | head -1
+)"
+
+if [[ -z "$GATEWAY_URL" ]]; then
+    echo "URL não extraída automaticamente de agent_config.yaml."
+else
+    echo "Gateway declarado:"
+    echo "$GATEWAY_URL"
+fi
+
+CERT="${KEY_STORE_CERT_PATH:-}"
+KEY="${KEY_STORE_KEY_PATH:-}"
+CA="${TRUST_STORE_CA_PATH:-${REQUESTS_CA_BUNDLE:-}}"
+
+MTLS_READY=1
+
+[[ -f "$CERT" ]] || MTLS_READY=0
+[[ -f "$KEY"  ]] || MTLS_READY=0
+[[ -f "$CA"   ]] || MTLS_READY=0
+
+if [[ -z "$GATEWAY_URL" ]]; then
+
+    warn 14 "Não foi possível identificar automaticamente o Gateway."
+
+elif (( MTLS_READY == 0 )); then
+
+    warn 14 "Certificado, chave e/ou CA de mTLS ainda não estão disponíveis."
+
+else
+
+    echo
+    echo "Testando negociação TLS com certificado cliente."
+    echo "Nenhum segredo será exibido."
+
+    MTLS_RESULT="$(
+        curl \
+            -sS \
+            --connect-timeout 10 \
+            --max-time 20 \
+            --cert "$CERT" \
+            --key "$KEY" \
+            --cacert "$CA" \
+            -o /dev/null \
+            -w 'HTTP=%{http_code} | IP=%{remote_ip} | TLS=%{ssl_verify_result}' \
+            "$GATEWAY_URL" \
+            2>&1
+    )"
+
+    MTLS_RC=$?
+
+    echo "$MTLS_RESULT"
+
+    if (( MTLS_RC == 0 )); then
+        pass 14 "Handshake HTTPS/mTLS concluído. O HTTP pode ser 4xx sem chamada de API válida."
+    else
+        fail 14 "Falha na negociação HTTPS/mTLS com o Gateway."
+    fi
+fi
+
+
+###############################################################################
+# 15. POST /chat
+###############################################################################
+
+section "15. POST /chat"
+
+if (( AGENT_STARTED == 1 )); then
+
+    PAYLOAD='{
+      "message": "Responda somente: Hello World",
+      "session_id": "hello-world-local"
+    }'
+
+    echo "Payload:"
+    echo "$PAYLOAD"
+
+    echo
+    echo "Resposta:"
+
+    CHAT_HTTP="$(
+        curl \
+            -sS \
+            --connect-timeout 10 \
+            --max-time 120 \
+            -o "$CHAT_BODY" \
+            -w '%{http_code}' \
+            -X POST \
+            "$BASE_URL/chat" \
+            -H 'Content-Type: application/json' \
+            -d "$PAYLOAD"
+    )"
+
+    CHAT_CURL_RC=$?
+
+    echo "HTTP: $CHAT_HTTP"
+
+    if [[ -f "$CHAT_BODY" ]]; then
+        cat "$CHAT_BODY"
+        echo
+    fi
+
+    if (( CHAT_CURL_RC == 0 )) && [[ "$CHAT_HTTP" == "200" ]]; then
+        CHAT_OK=1
+        pass 15 "POST /chat retornou HTTP 200."
+    else
+        fail 15 "POST /chat não retornou HTTP 200."
+    fi
+
+else
+    fail 15 "Agent não está ativo; /chat não pode ser testado."
+fi
+
+
+###############################################################################
+# 16. HELLO WORLD E2E
+###############################################################################
+
+section "16. HELLO WORLD END-TO-END"
+
+if (( CHAT_OK == 1 )); then
+
+    if grep -qi 'hello[[:space:]]*world' "$CHAT_BODY" 2>/dev/null; then
+
+        pass 16 "HELLO WORLD E2E CONFIRMADO."
+
+        echo
+        echo "Fluxo comprovado:"
+        echo
+        echo "GitHub clone"
+        echo "    ↓"
+        echo "branch local"
+        echo "    ↓"
+        echo "Python / .venv"
+        echo "    ↓"
+        echo "dependências"
+        echo "    ↓"
+        echo "FastAPI"
+        echo "    ↓"
+        echo "LangGraph"
+        echo "    ↓"
+        echo "Gateway corporativo"
+        echo "    ↓"
+        echo "LLM"
+        echo "    ↓"
+        echo "POST /chat HTTP 200"
+        echo "    ↓"
+        echo "Hello World"
+
+    else
+
+        warn 16 "POST /chat funcionou, mas a resposta não contém literalmente 'Hello World'."
+
+    fi
+
+else
+    fail 16 "Hello World E2E ainda não foi comprovado."
+fi
+
+
+###############################################################################
+# RESUMO FINAL
+###############################################################################
+
+section "RESUMO FINAL DAS 16 ETAPAS"
+
+for N in {1..16}; do
+    printf "%2d. %-7s %s\n" \
+        "$N" \
+        "${STATUS[$N]:-N/A}" \
+        "${DETAIL[$N]:-Sem resultado}"
+done
+
+echo
+echo "----------------------------------------------------------------------------"
+echo "Git:"
+echo "  Branch : $(git branch --show-current 2>/dev/null)"
+echo "  Commit : $(git rev-parse HEAD 2>/dev/null)"
+echo
+echo "Python:"
+if [[ -x "${VENV_PY:-}" ]]; then
+    echo "  $("$VENV_PY" --version 2>&1)"
+    echo "  $VENV_PY"
+else
+    echo "  .venv indisponível"
+fi
+
+echo
+echo "Logs temporários:"
+echo "  Instalação : $INSTALL_LOG"
+echo "  Unitários  : $UNIT_LOG"
+echo "  Integração : $INTEGRATION_LOG"
+echo "  Agent      : $AGENT_LOG"
+
+echo
+echo "----------------------------------------------------------------------------"
+
+if [[ "${STATUS[16]}" == "OK" ]]; then
+    echo
+    echo "RESULTADO: HELLO WORLD DO AGENTE VALIDADO COM SUCESSO."
+else
+    echo
+    echo "RESULTADO: HELLO WORLD AINDA NÃO COMPLETO."
+    echo "Use o resumo acima para identificar exatamente a primeira etapa bloqueante."
+fi
+
+echo
+echo "============================================================================"
+echo "FIM DA VALIDAÇÃO"
+echo "============================================================================"
+
+ZSH

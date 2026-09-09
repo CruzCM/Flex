@@ -1,0 +1,174 @@
+echo
+echo "============================================================"
+echo " VALIDACAO DO AMBIENTE PENGWIN / WSL"
+echo "============================================================"
+
+echo
+echo "1. IDENTIDADE DO AMBIENTE"
+echo "------------------------------------------------------------"
+echo "USER  : $(whoami)"
+echo "HOME  : $HOME"
+echo "PWD   : $PWD"
+echo "SHELL : $SHELL"
+echo "HOST  : $(hostname)"
+
+echo
+echo "2. PENGWIN"
+echo "------------------------------------------------------------"
+versao
+echo
+proxyStatus
+
+echo
+echo "3. SISTEMA OPERACIONAL"
+echo "------------------------------------------------------------"
+cat /etc/os-release
+echo
+uname -a
+echo
+echo "WSL_DISTRO_NAME=${WSL_DISTRO_NAME:-<nao definido>}"
+
+echo
+echo "4. SHELL"
+echo "------------------------------------------------------------"
+zsh --version
+echo "Executavel: $(command -v zsh)"
+echo "Versao ZSH: $ZSH_VERSION"
+
+echo
+echo "5. GIT"
+echo "------------------------------------------------------------"
+git --version
+echo "Executavel: $(command -v git)"
+echo "user.name : $(git config --global user.name 2>/dev/null)"
+echo "user.email: $(git config --global user.email 2>/dev/null)"
+
+echo
+echo "6. PYTHON"
+echo "------------------------------------------------------------"
+python3 --version
+echo "Executavel: $(command -v python3)"
+python3 -c 'import sys, platform; print("sys.executable :", sys.executable); print("platform       :", platform.platform()); print("version_info   :", sys.version_info)'
+
+echo
+echo "7. PIP"
+echo "------------------------------------------------------------"
+python3 -m pip --version 2>&1 || true
+command -v pip 2>/dev/null || echo "pip: nao encontrado"
+command -v pip3 2>/dev/null || echo "pip3: nao encontrado"
+
+echo
+echo "8. VENV"
+echo "------------------------------------------------------------"
+TMP="/tmp/ambiente-venv-$$"
+if python3 -m venv "$TMP"; then
+    echo "venv: OK"
+    "$TMP/bin/python" --version
+    "$TMP/bin/python" -m pip --version 2>&1 || true
+else
+    echo "venv: FALHA"
+fi
+rm -rf "$TMP"
+
+echo
+echo "9. PYENV"
+echo "------------------------------------------------------------"
+command -v pyenv 2>/dev/null || echo "pyenv: nao encontrado"
+pyenv --version 2>/dev/null || true
+pyenv versions 2>/dev/null || true
+
+echo
+echo "10. FERRAMENTAS"
+echo "------------------------------------------------------------"
+for cmd in git python3 pip pip3 curl wget openssl ssh docker podman kubectl oc helm jq yq code; do
+    if command -v "$cmd" >/dev/null 2>&1; then
+        echo "$cmd -> $(command -v "$cmd")"
+    else
+        echo "$cmd -> NAO ENCONTRADO"
+    fi
+done
+
+echo
+echo "11. VERSOES PRINCIPAIS"
+echo "------------------------------------------------------------"
+curl --version 2>/dev/null | head -1
+openssl version 2>/dev/null
+ssh -V 2>&1
+docker --version 2>/dev/null || true
+podman --version 2>/dev/null || true
+kubectl version --client 2>/dev/null || true
+oc version --client 2>/dev/null || true
+helm version 2>/dev/null || true
+
+echo
+echo "12. PROXY"
+echo "------------------------------------------------------------"
+env | grep -iE '^(http|https|no|all)_proxy=' \
+  | sed -E 's#(https?://)[^/@]+@#\1<credenciais-ocultas>@#I' \
+  || echo "Nenhuma variavel de proxy encontrada"
+
+echo
+echo "13. CERTIFICADOS"
+echo "------------------------------------------------------------"
+ls -ld /etc/ssl/certs 2>/dev/null
+echo "Arquivos regulares: $(find /etc/ssl/certs -type f 2>/dev/null | wc -l)"
+echo "Links simbolicos : $(find /etc/ssl/certs -type l 2>/dev/null | wc -l)"
+dpkg-query -W ca-certificates 2>/dev/null || true
+
+echo
+echo "14. REDE"
+echo "------------------------------------------------------------"
+ip -brief addr 2>/dev/null
+echo
+ip route 2>/dev/null
+echo
+cat /etc/resolv.conf
+
+echo
+echo "15. DNS CORPORATIVO"
+echo "------------------------------------------------------------"
+for host in \
+    fontes.intranet.bb.com.br \
+    binarios.intranet.bb.com.br \
+    sso.intranet.bb.com.br \
+    login.intranet.bb.com.br
+do
+    echo
+    echo ">> $host"
+    getent hosts "$host" || echo "NAO RESOLVE"
+done
+
+echo
+echo "16. HTTPS CORPORATIVO"
+echo "------------------------------------------------------------"
+for host in \
+    fontes.intranet.bb.com.br \
+    binarios.intranet.bb.com.br
+do
+    echo
+    echo ">> https://$host"
+    curl \
+        -sS \
+        --connect-timeout 8 \
+        --max-time 15 \
+        -o /dev/null \
+        -w 'HTTP=%{http_code} | IP=%{remote_ip} | TLS=%{ssl_verify_result}\n' \
+        "https://$host" || true
+done
+
+echo
+echo "17. RECURSOS"
+echo "------------------------------------------------------------"
+echo "CPU:"
+nproc
+echo
+echo "Memoria:"
+free -h
+echo
+echo "Disco:"
+df -hT "$HOME"
+
+echo
+echo "============================================================"
+echo " FIM DA VALIDACAO DO AMBIENTE"
+echo "============================================================"
