@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arquitetura PF</title>
+
+<style>
+  * { box-sizing: border-box; }
+
+  :root {
+    --bg: #eef1f5;
+    --paper: #ffffff;
+    --ink: #18212f;
+    --muted: #667085;
+    --line: #d0d5dd;
+    --line-strong: #98a2b3;
+    --blue: #2457a7;
+    --blue-soft: #eef4ff;
+    --indigo: #3448a5;
+    --indigo-soft: #f0f2ff;
+    --label: #f2f4f7;
+    --future: #f8f9fb;
+    --danger: #c62828;
+    --danger-soft: #fff5f5;
+  }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont,
+                 "Segoe UI", Roboto, Arial, sans-serif;
+  }
+
+  .toolbar {
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    min-height: 54px;
+    padding: 10px 18px;
+    background: rgba(255,255,255,.96);
+    border-bottom: 1px solid var(--line);
+    box-shadow: 0 1px 5px rgba(16,24,40,.06);
+  }
+
+  .toolbar button {
+    padding: 9px 16px;
+    border: 1px solid #344054;
+    border-radius: 7px;
+    background: #fff;
+    color: #18212f;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+  }
+
+  .toolbar button:hover {
+    background: #f8fafc;
+  }
+
+  .toolbar button:disabled {
+    opacity: .6;
+    cursor: wait;
+  }
+
+  .viewport {
+    overflow: auto;
+    padding: 24px;
+  }
+
+  #diagram {
+    position: relative;
+    width: 2400px;
+    min-height: 2050px;
+    margin: 0 auto;
+    padding: 42px 58px 56px;
+    background: #f8fafc;
+    border: 1px solid #d9dee7;
+    border-radius: 14px;
+    box-shadow: 0 8px 28px rgba(16,24,40,.08);
+  }
+
+  #connections {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1;
+    pointer-events: none;
+    overflow: visible;
+  }
+
+  #connections > path {
+    fill: none;
+    stroke: #667085;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    vector-effect: non-scaling-stroke;
+  }
+
+  .node {
+    position: relative;
+    z-index: 2;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    box-shadow: 0 4px 14px rgba(16,24,40,.07);
+  }
+
+  .user {
+    position: relative;
+    z-index: 2;
+    width: max-content;
+    min-width: 180px;
+    margin: 0 auto 32px;
+    padding: 10px 18px;
+    text-align: center;
+    font-size: 16px;
+    font-weight: 700;
+    background: #fff;
+    border: 1px solid var(--line-strong);
+    border-radius: 999px;
+    box-shadow: 0 2px 8px rgba(16,24,40,.06);
+  }
+
+  .channel {
+    width: 720px;
+    min-height: 300px;
+    margin: 0 auto;
+    padding: 18px 22px 20px;
+    border-top: 4px solid var(--blue);
+  }
+
+  .orchestrator {
+    width: 900px;
+    min-height: 565px;
+    margin: 54px auto 0;
+    padding: 18px 22px 20px;
+    border-top: 4px solid var(--indigo);
+  }
+
+  .card-title {
+    min-height: 46px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    font-size: 19px;
+    font-weight: 750;
+    line-height: 1.18;
+    letter-spacing: .01em;
+    color: #101828;
+    border-bottom: 1px solid #eaecf0;
+    padding-bottom: 10px;
+    margin-bottom: 10px;
+  }
+
+  .platform {
+    display: table;
+    margin: 0 auto 12px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: var(--blue-soft);
+    color: #234b8f;
+    border: 1px solid #cfe0ff;
+    text-align: center;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: .02em;
+  }
+
+  .orchestrator .platform {
+    background: var(--indigo-soft);
+    color: #3448a5;
+    border-color: #d9ddff;
+  }
+
+  .field {
+    display: grid;
+    grid-template-columns: 245px 1fr;
+    align-items: start;
+    gap: 8px;
+    margin: 6px 0;
+    font-size: 14px;
+    line-height: 1.35;
+  }
+
+  .field b {
+    display: inline-block;
+    min-width: 0;
+    width: max-content;
+    max-width: 240px;
+    padding: 3px 8px;
+    border-radius: 5px;
+    background: var(--label);
+    color: #344054;
+    font-size: 11px;
+    line-height: 1.2;
+    letter-spacing: .035em;
+  }
+
+  .section {
+    border-top: 1px solid #eaecf0;
+    margin-top: 12px;
+    padding-top: 10px;
+  }
+
+  .section-title {
+    display: inline-block;
+    margin-bottom: 6px;
+    padding: 4px 8px;
+    border-radius: 5px;
+    background: var(--label);
+    border: 1px solid #e4e7ec;
+    color: #344054;
+    font-size: 11px;
+    line-height: 1.15;
+    font-weight: 800;
+    letter-spacing: .045em;
+  }
+
+  .status {
+    font-weight: 750;
+  }
+
+  .mono {
+    font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+    font-weight: 700;
+    font-size: .96em;
+  }
+
+  ul {
+    margin: 4px 0 0 19px;
+    padding: 0;
+  }
+
+  li {
+    margin: 4px 0;
+    font-size: 14px;
+    line-height: 1.32;
+    color: #344054;
+    overflow-wrap: anywhere;
+  }
+
+  .field,
+  .integration-card .body,
+  .small-note {
+    overflow-wrap: anywhere;
+  }
+
+  .phase-label,
+  .future-label {
+    position: relative;
+    z-index: 2;
+    display: table;
+    text-align: center;
+    font-size: 13px;
+    line-height: 1;
+    font-weight: 800;
+    letter-spacing: .08em;
+    border: 0;
+    border-radius: 999px;
+    padding: 9px 16px;
+  }
+
+  .phase-label {
+    margin: 76px auto 0;
+    width: auto;
+    background: #eaf2ff;
+    color: #204b8f;
+    box-shadow: inset 0 0 0 1px #c9ddff;
+  }
+
+  .phase1 {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 38px;
+    margin-top: 40px;
+    align-items: stretch;
+  }
+
+  .agent-card {
+    min-height: 565px;
+    height: auto;
+    padding: 16px 18px 20px;
+    border-top: 4px solid #5b77a9;
+    min-width: 0;
+  }
+
+  .agent-card .card-title {
+    min-height: 60px;
+    font-size: 17px;
+  }
+
+  .rag-row {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 38px;
+    margin-top: 46px;
+    align-items: stretch;
+  }
+
+  .integration-card {
+    min-height: 190px;
+    height: auto;
+    padding: 14px 16px 18px;
+    text-align: center;
+    border-top: 4px solid #7286a7;
+    background: #fcfdff;
+    min-width: 0;
+  }
+
+  .integration-card .card-title {
+    min-height: 36px;
+    font-size: 15px;
+  }
+
+  .integration-card .body {
+    font-size: 14px;
+    line-height: 1.38;
+    color: #344054;
+  }
+
+  .future-label {
+    margin: 72px auto 0;
+    width: auto;
+    background: #f2f4f7;
+    color: #475467;
+    box-shadow: inset 0 0 0 1px #d0d5dd;
+  }
+
+  .future-row {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 760px));
+    justify-content: center;
+    gap: 90px;
+    margin-top: 40px;
+    align-items: stretch;
+  }
+
+  .future-card {
+    min-height: 535px;
+    height: auto;
+    padding: 16px 18px 20px;
+    border: 1px dashed #98a2b3;
+    border-top: 4px solid #98a2b3;
+    background: var(--future);
+    box-shadow: 0 3px 10px rgba(16,24,40,.05);
+    min-width: 0;
+  }
+
+  .future-card.out {
+    border-style: dashed;
+  }
+
+  .assistant-red {
+    border-color: var(--danger);
+    border-top-width: 4px;
+    background: var(--danger-soft);
+    box-shadow: 0 4px 14px rgba(198,40,40,.10);
+  }
+
+  .assistant-red .platform {
+    background: #fff0f0;
+    border-color: #ffd0d0;
+    color: #a61b1b;
+  }
+
+  .future-card .card-title {
+    min-height: 60px;
+    font-size: 17px;
+  }
+
+  .future-tools-row {
+    position: relative;
+    z-index: 2;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 760px));
+    justify-content: center;
+    gap: 90px;
+    margin-top: 44px;
+    align-items: stretch;
+  }
+
+  .future-tools {
+    min-height: 180px;
+    height: auto;
+    padding: 14px 16px 18px;
+    text-align: center;
+    background: #fff;
+    border-top: 4px solid #667085;
+    min-width: 0;
+  }
+
+  .future-tools .card-title {
+    min-height: 34px;
+    font-size: 15px;
+  }
+
+  .small-note {
+    font-size: 13px;
+    line-height: 1.4;
+    color: #475467;
+  }
+
+  @media print {
+    .toolbar { display: none; }
+    body { background: #fff; }
+    .viewport { padding: 0; }
+    #diagram { box-shadow: none; }
+  }
+</style>
+</head>
+
+<body>
+
+<div class="toolbar">
+  <button id="exportButton" type="button" onclick="exportJPEG()">Exportar JPEG</button>
+</div>
+
+<div class="viewport">
+  <div id="diagram">
+
+    <svg id="connections" aria-hidden="true">
+      <defs>
+        <marker id="arrow"
+                markerWidth="9"
+                markerHeight="9"
+                refX="8"
+                refY="4.5"
+                orient="auto"
+                markerUnits="strokeWidth">
+          <path d="M0,0 L9,4.5 L0,9 z" fill="#111"></path>
+        </marker>
+      </defs>
+    </svg>
+
+    <div id="user" class="user">Usuário PF</div>
+
+    <div id="ibm" class="node channel">
+      <div class="card-title">IBM</div>
+      <div class="platform">Canal de entrada da jornada PF</div>
+
+      <div class="section">
+        <div class="section-title">RESPONSABILIDADE DO CANAL</div>
+        <ul>
+          <li>Recebe a solicitação do cliente PF</li>
+          <li>Identifica se o assunto pertence ao escopo da jornada</li>
+          <li>Encaminha a solicitação ao Orquestrador PF</li>
+        </ul>
+      </div>
+
+      <div class="section">
+        <div class="section-title">ESCOPO INICIAL</div>
+        <ul>
+          <li>Minhas Finanças</li>
+          <li>Educação Financeira</li>
+          <li>Open Finance</li>
+        </ul>
+      </div>
+
+      <div class="section">
+        <div class="section-title">A VALIDAR</div>
+        <ul>
+          <li>Propagação de identidade / segurança ao Orquestrador (JWT, token, headers, ID cliente)</li>
+          <li>Contrato de contexto conversacional IBM → Orquestrador (session/conversation ID, histórico, correlation ID)</li>
+        </ul>
+      </div>
+    </div>
+
+    <div id="orchestrator" class="node orchestrator">
+      <div class="card-title">ORQUESTRADOR PF</div>
+      <div class="platform">Agent-Ops</div>
+
+      <div class="field"><b>SIGLA:</b> PLG (UAN)</div>
+      <div class="field"><b>FUNCIONALIDADE DO AGENTE:</b> Orquestrador/Planejador</div>
+      <div class="field"><b>NÍVEL DE AUTONOMIA:</b> <span class="status">A VALIDAR</span></div>
+
+      <div class="section">
+        <div class="section-title">IMPLEMENTAÇÃO TÉCNICA</div>
+        <ul>
+          <li>Template Python do Agente de IA</li>
+          <li><span class="mono">LangGraph</span>: definição do fluxo agêntico</li>
+          <li><span class="mono">graph.py</span>: AgentFactory + ValidatingToolNode</li>
+          <li><b>Orquestrador/Planejador:</b> decompõe objetivos, cria planos, chama subagentes e sincroniza fluxos</li>
+          <li>Consolida a resposta do fluxo</li>
+          <li><b>MCP:</b> inicialmente não necessário; utilizar somente se precisar acessar ferramentas/sistemas externos</li>
+        </ul>
+      </div>
+
+      <div class="section">
+        <div class="section-title">TRATA DADOS PESSOAIS OU SENSÍVEIS</div>
+        <ul>
+          <li><span class="status">PROVÁVEL SIM — A VALIDAR</span></li>
+          <li>Pode receber identidade e contexto da jornada PF</li>
+          <li>Pode propagar contexto aos subagentes</li>
+        </ul>
+      </div>
+
+      <div class="section">
+        <div class="section-title">NÚMERO ITDP</div>
+        <ul>
+          <li><span class="status">A VALIDAR COM A UAN</span></li>
+          <li>Necessário caso seja confirmado tratamento de dados pessoais ou sensíveis</li>
+        </ul>
+      </div>
+
+      <div class="section">
+        <div class="section-title">A VALIDAR</div>
+        <ul>
+          <li>Integração de proatividade? <b>Probabilidade baixa</b></li>
+          <li>IBM aceita receber hyperlinks?</li>
+          <li>Inicialmente é pergunta → resposta, sem salvar contexto?</li>
+          <li>É possível manter contexto internamente?</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="phase-label">ESCOPO INICIAL — FASE 1</div>
+
+    <div class="phase1">
+
+      <div id="educador" class="node agent-card">
+        <div class="card-title">ESPECIALISTA<br>EDUCADOR FINANCEIRO</div>
+        <div class="platform">Agent-Ops</div>
+
+        <div class="field"><b>SIGLA:</b> IAA</div>
+        <div class="field"><b>FUNCIONALIDADE DO AGENTE:</b> Agente Especialista</div>
+        <div class="field"><b>NÍVEL DE AUTONOMIA:</b> A0 – Informativo e/ou Recomendador</div>
+
+        <div class="section">
+          <div class="section-title">IMPLEMENTAÇÃO TÉCNICA</div>
+          <ul>
+            <li><span class="mono">LangGraph</span>: definição do fluxo agêntico</li>
+            <li>RAG configurado em <span class="mono">agent_config.yaml</span></li>
+            <li><span class="mono">rag/rag_tool.py</span> — LangChain Tool</li>
+            <li>Gateway Genera BB</li>
+            <li>Base de conhecimento indexada no GeneraBB</li>
+            <li><b>MCP Server:</b> não necessário para o acesso ao RAG</li>
+          </ul>
+        </div>
+
+        <div class="section">
+          <div class="section-title">TRATA DADOS PESSOAIS OU SENSÍVEIS</div>
+          <ul>
+            <li><span class="status">PROVÁVEL NÃO — A VALIDAR</span></li>
+            <li>Conteúdo informacional; não depende de dados pessoais do cliente</li>
+          </ul>
+        </div>
+
+        <div class="section">
+          <div class="section-title">NÚMERO ITDP</div>
+          <ul>
+            <li><span class="status">A DEFINIR APÓS VALIDAÇÃO DO TRATAMENTO</span></li>
+            <li>Reavaliar se identidade/contexto pessoal chegar ao agente</li>
+          </ul>
+        </div>
+      </div>
+
+      <div id="minhas-financas" class="node agent-card">
+        <div class="card-title">ESPECIALISTA<br>MINHAS FINANÇAS</div>
+        <div class="platform">Agent-Ops</div>
+
+        <div class="field"><b>SIGLA:</b> IAA</div>
+        <div class="field"><b>FUNCIONALIDADE DO AGENTE:</b> Agente Especialista</div>
+        <div class="field"><b>NÍVEL DE AUTONOMIA:</b> A0 – Informativo e/ou Recomendador</div>
+
+        <div class="section">
+          <div class="section-title">IMPLEMENTAÇÃO TÉCNICA</div>
+          <ul>
+            <li><span class="mono">LangGraph</span>: definição do fluxo agêntico</li>
+            <li>RAG configurado em <span class="mono">agent_config.yaml</span></li>
+            <li><span class="mono">rag/rag_tool.py</span> — LangChain Tool</li>
+            <li>Gateway Genera BB</li>
+            <li>Base de conhecimento indexada no GeneraBB</li>
+            <li><b>MCP Server:</b> não necessário para o acesso ao RAG</li>
+          </ul>
+        </div>
+
+        <div class="section">
+          <div class="section-title">TRATA DADOS PESSOAIS OU SENSÍVEIS</div>
+          <ul>
+            <li><span class="status">PROVÁVEL NÃO — A VALIDAR</span></li>
+            <li>Conteúdo informacional; não depende de dados pessoais do cliente</li>
+          </ul>
+        </div>
+
+        <div class="section">
+          <div class="section-title">NÚMERO ITDP</div>
+          <ul>
+            <li><span class="status">A DEFINIR APÓS VALIDAÇÃO DO TRATAMENTO</span></li>
+            <li>Reavaliar se identidade/contexto pessoal chegar ao agente</li>
+          </ul>
+        </div>
+      </div>
+
+      <div id="open-finance" class="node agent-card">
+        <div class="card-title">ESPECIALISTA<br>OPEN FINANCE</div>
+        <div class="platform">Agent-Ops</div>
+
+        <div class="field"><b>SIGLA:</b> OPF</div>
+        <div class="field"><b>FUNCIONALIDADE DO AGENTE:</b> Agente Especialista</div>
+        <div class="field"><b>NÍVEL DE AUTONOMIA E PODER DECISÓRIO:</b> A0 – Informativo e/ou Recomendador</div>
+
+        <div class="section">
+          <div class="section-title">IMPLEMENTAÇÃO TÉCNICA</div>
+          <ul>
+            <li><span class="mono">LangGraph</span>: definição do fluxo agêntico</li>
+            <li>RAG configurado em <span class="mono">agent_config.yaml</span></li>
+            <li><span class="mono">rag/rag_tool.py</span> — LangChain Tool</li>
+            <li>Gateway Genera BB</li>
+            <li>Base de conhecimento indexada no GeneraBB</li>
+            <li><b>MCP Server:</b> não necessário para o acesso ao RAG</li>
+          </ul>
+        </div>
+
+        <div class="section">
+          <div class="section-title">TRATA DADOS PESSOAIS OU SENSÍVEIS</div>
+          <ul>
+            <li><span class="status">PROVÁVEL NÃO — A VALIDAR</span></li>
+            <li>Conteúdo informacional; não depende de dados pessoais do cliente</li>
+          </ul>
+        </div>
+
+        <div class="section">
+          <div class="section-title">NÚMERO ITDP</div>
+          <ul>
+            <li><span class="status">A DEFINIR APÓS VALIDAÇÃO DO TRATAMENTO</span></li>
+            <li>Reavaliar se identidade/contexto pessoal chegar ao agente</li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="rag-row">
+      <div id="rag-educador" class="node integration-card">
+        <div class="card-title">RAG — EDUCAÇÃO FINANCEIRA</div>
+        <div class="body">
+          Agent-Ops → <b>rag/rag_tool.py</b><br>
+          LangChain Tool → Gateway GeneraBB<br>
+          Base de conhecimento indexada no GeneraBB<br><br>
+          <b>MCP Server: não necessário para o acesso ao RAG</b>
+        </div>
+      </div>
+
+      <div id="rag-minhas-financas" class="node integration-card">
+        <div class="card-title">RAG — MINHAS FINANÇAS</div>
+        <div class="body">
+          Agent-Ops → <b>rag/rag_tool.py</b><br>
+          LangChain Tool → Gateway GeneraBB<br>
+          Base de conhecimento indexada no GeneraBB<br><br>
+          <b>MCP Server: não necessário para o acesso ao RAG</b>
+        </div>
+      </div>
+
+      <div id="rag-open-finance" class="node integration-card">
+        <div class="card-title">RAG — OPEN FINANCE</div>
+        <div class="body">
+          Agent-Ops → <b>rag/rag_tool.py</b><br>
+          LangChain Tool → Gateway GeneraBB<br>
+          Base de conhecimento indexada no GeneraBB<br><br>
+          <b>MCP Server: não necessário para o acesso ao RAG</b>
+        </div>
+      </div>
+    </div>
+
+    <div class="future-label">EVOLUÇÕES / A VALIDAR</div>
+
+    <div class="future-row">
+
+      <div id="insights" class="node future-card">
+        <div class="card-title">ESPECIALISTA INSIGHTS</div>
+        <div class="platform">Agent-Ops — EM ANÁLISE</div>
+
+        <div class="field"><b>SIGLA:</b> A DEFINIR</div>
+        <div class="field"><b>FUNCIONALIDADE DO AGENTE:</b> Agente Especialista</div>
+        <div class="field"><b>NÍVEL DE AUTONOMIA E PODER DECISÓRIO:</b> A0 – Informativo e/ou Recomendador</div>
+
+        <div class="section">
+          <div class="section-title">IMPLEMENTAÇÃO TÉCNICA</div>
+          <ul>
+            <li>LangGraph: definição do fluxo agêntico</li>
+            <li><b>MCP: necessário</b></li>
+            <li>Integração com MCP Server(s)</li>
+            <li>FastMCP + Ferramentas (tools) / Recursos (resources) / Prompts</li>
+            <li>Consulta a sistemas internos</li>
+          </ul>
+        </div>
+
+        <div class="section">
+          <div class="section-title">PONTOS A VALIDAR</div>
+          <ul>
+              <li>Quando seria chamado pelo Orquestrador?</li>
+            <li>A consulta seria condicional ou em toda interação?</li>
+            <li>Impacto no contexto e na conversa principal</li>
+          </ul>
+        </div>
+      </div>
+
+      <div id="assistente-financeiro" class="node future-card out assistant-red">
+        <div class="card-title">ASSISTENTE FINANCEIRO</div>
+        <div class="platform">Agent-Ops — FORA DO ESCOPO INICIAL</div>
+
+        <div class="field"><b>SIGLA:</b> IAA</div>
+        <div class="field"><b>FUNCIONALIDADE DO AGENTE:</b> Agente Especialista</div>
+        <div class="field"><b>NÍVEL DE AUTONOMIA E PODER DECISÓRIO:</b> A0 – Informativo e/ou Recomendador</div>
+
+        <div class="section">
+          <div class="section-title">IMPLEMENTAÇÃO TÉCNICA</div>
+          <ul>
+            <li>LangGraph: definição do fluxo agêntico</li>
+            <li>Integração com MCP Server(s)</li>
+            <li>FastMCP + Ferramentas (tools) / Recursos (resources) / Prompts</li>
+            <li>Gateway corporativo + sistemas internos</li>
+            <li>Sem execução de operações neste escopo</li>
+          </ul>
+        </div>
+
+        <div class="section">
+          <div class="section-title">TRATA DADOS PESSOAIS OU SENSÍVEIS</div>
+          <ul>
+            <li><b>SIM</b></li>
+            <li>Consulta dados financeiros do cliente para compor a resposta</li>
+          </ul>
+        </div>
+
+        <div class="section">
+          <div class="section-title">NÚMERO ITDP</div>
+          <ul>
+            <li><b>A VALIDAR</b></li>
+            <li>Necessário em razão do tratamento de dados pessoais no fluxo</li>
+          </ul>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="future-tools-row">
+      <div id="mcp-insights" class="node future-tools">
+        <div class="card-title">MCP SERVER</div>
+        <div class="small-note">
+          MCP Server(s) / FastMCP → Ferramentas (tools) / Recursos (resources) / Prompts → gateway corporativo → sistemas internos
+        </div>
+      </div>
+
+      <div id="mcp-assistente" class="node future-tools">
+        <div class="card-title">MCP SERVER</div>
+        <div class="small-note">
+          MCP Server(s) / FastMCP → Ferramentas (tools) / Recursos (resources) / Prompts → gateway corporativo → sistemas internos
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+<script>
+function point(el, side) {
+  const d = document.getElementById("diagram").getBoundingClientRect();
+  const r = el.getBoundingClientRect();
+
+  return {
+    x: r.left - d.left + r.width / 2,
+    y: side === "top" ? r.top - d.top : r.bottom - d.top
+  };
+}
+
+function addPath(d, arrow = true, dashed = false) {
+  const svg = document.getElementById("connections");
+  const ns = "http://www.w3.org/2000/svg";
+  const path = document.createElementNS(ns, "path");
+
+  path.setAttribute("d", d);
+  if (arrow) path.setAttribute("marker-end", "url(#arrow)");
+  if (dashed) path.setAttribute("stroke-dasharray", "12 10");
+
+  svg.appendChild(path);
+}
+
+function clearPaths() {
+  document.querySelectorAll("#connections > path").forEach(p => p.remove());
+}
+
+function drawConnections() {
+  clearPaths();
+
+  const diagram = document.getElementById("diagram");
+  const svg = document.getElementById("connections");
+  svg.setAttribute("viewBox", `0 0 ${diagram.clientWidth} ${diagram.clientHeight}`);
+
+  const user = document.getElementById("user");
+  const ibm = document.getElementById("ibm");
+  const orchestrator = document.getElementById("orchestrator");
+
+  const phaseAgents = [
+    document.getElementById("educador"),
+    document.getElementById("minhas-financas"),
+    document.getElementById("open-finance")
+  ];
+
+  const rags = [
+    document.getElementById("rag-educador"),
+    document.getElementById("rag-minhas-financas"),
+    document.getElementById("rag-open-finance")
+  ];
+
+  let a = point(user, "bottom");
+  let b = point(ibm, "top");
+  addPath(`M ${a.x} ${a.y + 4} L ${b.x} ${b.y - 10}`);
+
+  a = point(ibm, "bottom");
+  b = point(orchestrator, "top");
+  addPath(`M ${a.x} ${a.y} L ${b.x} ${b.y - 10}`);
+
+  // Sem seta entre o Orquestrador e os especialistas da Fase 1.
+  // A separação visual é feita pelo título "ESCOPO INICIAL — FASE 1".
+
+  phaseAgents.forEach((agent, i) => {
+    const p1 = point(agent, "bottom");
+    const p2 = point(rags[i], "top");
+    addPath(`M ${p1.x} ${p1.y} L ${p2.x} ${p2.y - 10}`);
+  });
+
+  // Evoluções: linhas tracejadas para deixar explícito que não fazem parte da Fase 1.
+  const insights = document.getElementById("insights");
+  const assistente = document.getElementById("assistente-financeiro");
+  const mcpInsights = document.getElementById("mcp-insights");
+  const mcpAssistente = document.getElementById("mcp-assistente");
+
+  let p1 = point(insights, "bottom");
+  let p2 = point(mcpInsights, "top");
+  addPath(`M ${p1.x} ${p1.y} L ${p2.x} ${p2.y - 10}`, true, true);
+
+  p1 = point(assistente, "bottom");
+  p2 = point(mcpAssistente, "top");
+  addPath(`M ${p1.x} ${p1.y} L ${p2.x} ${p2.y - 10}`, true, true);
+}
+
+async function exportJPEG() {
+  const button = document.getElementById("exportButton");
+  const oldLabel = button.textContent;
+
+  try {
+    button.disabled = true;
+    button.textContent = "Gerando JPEG...";
+
+    drawConnections();
+
+    if (document.fonts && document.fonts.ready) {
+      await document.fonts.ready;
+    }
+
+    await new Promise(resolve =>
+      requestAnimationFrame(() => requestAnimationFrame(resolve))
+    );
+
+    if (!window.html2canvas) {
+      throw new Error("html2canvas não foi carregado. Verifique a conexão com a internet.");
+    }
+
+    const diagram = document.getElementById("diagram");
+
+    const canvas = await html2canvas(diagram, {
+      backgroundColor: "#ffffff",
+      scale: 1.5,
+      useCORS: true,
+      allowTaint: false,
+      logging: false,
+      width: diagram.scrollWidth,
+      height: diagram.scrollHeight,
+      windowWidth: diagram.scrollWidth,
+      windowHeight: diagram.scrollHeight,
+      scrollX: 0,
+      scrollY: 0
+    });
+
+    const blob = await new Promise((resolve, reject) => {
+      canvas.toBlob(
+        b => b ? resolve(b) : reject(new Error("Falha ao gerar JPEG.")),
+        "image/jpeg",
+        0.96
+      );
+    });
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+
+    link.href = url;
+    link.download = "arquitetura-pf-final-setas-corrigidas.jpg";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+
+  } catch (error) {
+    console.error(error);
+    alert(
+      `Não foi possível exportar o JPEG.
+
+Detalhe: ${error.message}`
+    );
+  } finally {
+    button.disabled = false;
+    button.textContent = oldLabel;
+  }
+}
+
+window.addEventListener("load", () => {
+  drawConnections();
+  setTimeout(drawConnections, 100);
+});
+
+window.addEventListener("resize", drawConnections);
+</script>
+
+</body>
+</html>

@@ -1,0 +1,45 @@
+1. Eu e o Teixeira tínhamos decidido chamar o agente diretamente no **Genera**, principalmente por uma questão de **governança**. Como ainda não havia uma definição clara sobre o caminho a seguir, essa parecia ser a opção mais segura.
+
+2. Depois de concluir a leitura da documentação do **Agent-Ops**, percebemos que não havia nenhuma indicação de que chamar um agente no **Genera** seria o melhor caminho. Pelo contrário: o Agent-Ops já prevê uma **integração direta com o RAG do Genera**, sem a necessidade de criar um agente lá para isso. Ainda precisamos, porém, **confirmar a governança dessa rota**.
+
+3. Com esse entendimento, voltamos para a **arquitetura que já vinha sendo definida desde o início**, mas agora com mais clareza e entendimento sobre o funcionamento da solução.
+
+4. Agora precisamos apenas da **confirmação e validação de todos** para seguir com essa estrutura. (acima)
+
+---
+
+## Roadmap
+
+**0. Validar os RAGs — 11/09**
+- ✅ **Educador Financeiro** — verificar atualização
+- ✅ **Open Finance** — receber versão 1 e validar evolução
+- ⬜ **Minhas Finanças Informacional** — confirmar escopo e prioridade
+
+> O RAG não bloqueia provisionamento/configuração, mas bloqueia a validação final dos agentes.
+
+**1. Provisionar agentes informacionais — 11/09 a 16/09**
+- Solicitar no **Tech.bb**
+- Definições já conhecidas: **IAA / OPF**, **Agente Especialista**, **A0 – Informativo e/ou Recomendador**, **com RAG**, **Cliente Externo** e **sem Número ITDP**, considerando o escopo atual
+
+**2. Configurar projetos — 17/09 a 22/09**
+- Repositórios / GitHub
+- Catálogo de IA
+- Credenciais / gateway
+
+**3. Desenvolver e integrar — 23/09 a 02/10**
+- **Agent-Ops + LangGraph + RAG**
+- Criar **padrão reutilizável para agentes informacionais** [Em desenvolvimento / Testes]
+- Manter RAG e guardrails simples
+- Validação final depende dos RAGs prontos
+
+**4. Validar e fazer deploy — 05/10 a 09/10**
+- Testes
+- Integração via gateway
+- Homologação / Produção
+
+**5. Criar o Orquestrador**
+- Passa pelo **mesmo ciclo completo dos demais agentes**
+- Possui **maior complexidade**
+- **Em sequência:** 13/10 a **06/11**
+- **Em paralelo:** 17/09 a **15/10**
+- ⚠️ Para atender a meta de **15/10**, será necessário trabalhar em paralelo. Isso pode antecipar a entrega, mas também aumenta o risco de **retrabalho e atraso**, principalmente por depender dos aprendizados e das integrações dos agentes especialistas.
