@@ -1,0 +1,2384 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Radar Financeiro — Diagrama Interativo</title>
+<style>
+:root{
+  --bg:#f4f6f9;
+  --surface:#fff;
+  --ink:#182230;
+  --muted:#667085;
+  --line:#d7dee8;
+  --blue:#155c91;
+  --blue2:#0f4770;
+  --blue-soft:#edf5fb;
+  --green:#24724e;
+  --green-soft:#edf8f2;
+  --red:#a43b3b;
+  --red-soft:#fff1f1;
+  --shadow:0 12px 32px rgba(15,23,42,.07);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;
+  background:
+    radial-gradient(circle at 50% -20%, #ffffff 0, #f7f9fb 34%, var(--bg) 70%);
+  color:var(--ink);
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+main{
+  max-width:1500px;
+  margin:auto;
+  padding:34px 40px 70px;
+}
+h1{
+  margin:0 0 26px;
+  font-size:28px;
+  letter-spacing:-.03em;
+}
+
+/* ===== 1. MACROFLUXO ===== */
+.flow-shell{
+  position:relative;
+  padding:16px 0 12px;
+}
+.flow{
+  position:relative;
+  z-index:1;
+  display:grid;
+  grid-template-columns:repeat(6,minmax(0,1fr));
+  gap:20px;
+}
+.stage{
+  border:0;
+  background:transparent;
+  text-align:center;
+  color:var(--muted);
+  font:inherit;
+  min-width:0;
+}
+button.stage{cursor:pointer}
+.stage-dot{
+  width:46px;
+  height:46px;
+  margin:0 auto 9px;
+  border-radius:50%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  border:2px solid var(--line);
+  background:var(--surface);
+  color:#7a8594;
+  font-weight:850;
+  box-shadow:0 4px 12px rgba(15,23,42,.05);
+}
+.stage-name{
+  display:block;
+  font-size:12px;
+  line-height:1.25;
+  font-weight:700;
+}
+.stage.active{color:var(--blue2)}
+.stage.active .stage-dot{
+  background:var(--blue);
+  border-color:var(--blue);
+  color:white;
+  box-shadow:0 8px 20px rgba(21,92,145,.20);
+}
+.stage.active .stage-name{font-weight:850}
+
+/* ===== 2. EXPANSÃO DA ETAPA ===== */
+.stage-map{
+  display:none;
+  margin-top:30px;
+  animation:appear .18s ease;
+}
+.stage-map.open{display:block}
+@keyframes appear{
+  from{opacity:0;transform:translateY(-5px)}
+  to{opacity:1;transform:none}
+}
+.branch{
+  position:relative;
+  padding-top:54px;
+}
+.branch::before{
+  content:"";
+  position:absolute;
+  top:0;
+  left:50%;
+  width:2px;
+  height:30px;
+  background:var(--blue);
+}
+.branch::after{
+  content:"";
+  position:absolute;
+  top:29px;
+  left:10%;
+  right:10%;
+  height:2px;
+  background:var(--line);
+}
+.rules-map{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:16px;
+}
+.rule-node{
+  position:relative;
+  border:1px solid var(--line);
+  border-radius:14px;
+  min-height:104px;
+  padding:16px 14px 13px;
+  background:var(--surface);
+  text-align:left;
+  font:inherit;
+  color:var(--ink);
+  cursor:pointer;
+  box-shadow:0 5px 16px rgba(15,23,42,.045);
+  transition:.16s ease;
+}
+.rule-node::before{
+  content:"";
+  position:absolute;
+  top:-25px;
+  left:50%;
+  width:2px;
+  height:24px;
+  background:var(--line);
+}
+.rule-node:hover{
+  transform:translateY(-2px);
+  border-color:#a9c9df;
+}
+.rule-node.active{
+  border:2px solid var(--blue);
+  background:linear-gradient(180deg,#fff,#f4f9fd);
+  box-shadow:0 10px 26px rgba(21,92,145,.12);
+}
+.rule-kicker{
+  display:block;
+  font-size:10px;
+  font-weight:900;
+  letter-spacing:.08em;
+  text-transform:uppercase;
+  color:var(--blue);
+  margin-bottom:7px;
+}
+.rule-title{
+  display:block;
+  font-size:14px;
+  font-weight:820;
+  line-height:1.22;
+}
+.rule-result{
+  display:block;
+  margin-top:7px;
+  color:var(--muted);
+  font-size:11.5px;
+  line-height:1.25;
+}
+
+/* ===== 3. PAINEL DA REGRA ===== */
+.rule-detail{
+  display:none;
+  margin-top:18px;
+  background:var(--surface);
+  border:1px solid var(--line);
+  border-radius:15px;
+  box-shadow:var(--shadow);
+  overflow:hidden;
+  animation:appear .16s ease;
+}
+.rule-detail.open{display:block}
+.decision{
+  padding:15px 20px;
+  background:#102b44;
+  color:white;
+  font-size:18px;
+  line-height:1.3;
+  font-weight:800;
+}
+.detail-row{
+  display:grid;
+  grid-template-columns:1.05fr .85fr 1.15fr;
+}
+.detail-cell{
+  min-width:0;
+  padding:15px 18px 17px;
+}
+.detail-cell + .detail-cell{border-left:1px solid var(--line)}
+.label{
+  display:block;
+  color:#667085;
+  font-size:9.5px;
+  font-weight:900;
+  letter-spacing:.09em;
+  text-transform:uppercase;
+  margin-bottom:8px;
+}
+.detail-cell p{
+  margin:0;
+  font-size:12.5px;
+  line-height:1.45;
+  color:#344054;
+}
+.code{
+  display:inline-block;
+  font:11.5px/1.45 "SFMono-Regular",Consolas,monospace;
+  background:#eef2f6;
+  color:#26374a;
+  padding:3px 6px;
+  border-radius:5px;
+  margin:1px;
+}
+.cut{
+  display:block;
+  background:#eef4f8;
+  color:#123f62;
+  border-radius:8px;
+  padding:9px 10px;
+  font:12px/1.5 "SFMono-Regular",Consolas,monospace;
+}
+.pos{color:#206844;font-weight:800}
+.neg{color:#9b3636;font-weight:800}
+
+/* Regra 3: mini timeline, somente quando necessário */
+.timeline{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  border-bottom:1px solid var(--line);
+  background:#f9fbfc;
+}
+.t-step{
+  position:relative;
+  padding:12px 15px;
+  min-height:68px;
+}
+.t-step + .t-step{border-left:1px solid var(--line)}
+.t-step b{
+  display:block;
+  color:var(--blue2);
+  font-size:11px;
+  margin-bottom:4px;
+}
+.t-step span{
+  color:#536173;
+  font-size:11.5px;
+  line-height:1.3;
+}
+
+@media(max-width:1050px){
+  main{padding:26px 18px 50px}
+  .flow{grid-template-columns:repeat(6,150px);padding-bottom:10px}
+.rules-map{grid-template-columns:repeat(5,220px);overflow-x:auto;padding:26px 3px 5px}
+  .branch::after,.branch::before,.rule-node::before{display:none}
+  .branch{padding-top:0}
+  .detail-row,.timeline{grid-template-columns:1fr}
+  .detail-cell + .detail-cell,.t-step + .t-step{border-left:0;border-top:1px solid var(--line)}
+}
+
+.rule-context{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:0;
+  border-top:1px solid var(--line);
+  background:#fafbfd;
+}
+.rule-context > div{
+  padding:12px 18px;
+}
+.rule-context > div + div{
+  border-left:1px solid var(--line);
+}
+.rule-context .label{
+  margin-bottom:6px;
+}
+.rule-context p{
+  margin:0;
+  font-size:12.5px;
+  line-height:1.45;
+  color:#344054;
+}
+@media(max-width:1050px){
+  .rule-context{grid-template-columns:1fr}
+  .rule-context > div + div{border-left:0;border-top:1px solid var(--line)}
+}
+
+
+.period-flow{
+  display:grid;
+  grid-template-columns:1fr auto 1fr auto 1fr;
+  align-items:center;
+  gap:10px;
+  padding:14px 18px;
+  border-bottom:1px solid var(--line);
+  background:#f9fbfc;
+}
+.period-node{
+  min-height:72px;
+  padding:11px 12px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#fff;
+}
+.period-node b{
+  display:block;
+  margin-bottom:5px;
+  color:var(--blue2);
+  font-size:11px;
+}
+.period-node span{
+  display:block;
+  color:#4b596b;
+  font-size:11.5px;
+  line-height:1.35;
+}
+.period-arrow{
+  color:#94a0ae;
+  font-size:20px;
+  font-weight:800;
+}
+.period-cases{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:10px;
+  padding:14px 18px 16px;
+  border-bottom:1px solid var(--line);
+}
+.period-case{
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:11px 12px;
+  background:#fff;
+}
+.period-case b{
+  display:block;
+  margin-bottom:6px;
+  color:var(--blue2);
+  font-size:12px;
+}
+.period-case p{
+  margin:0;
+  color:#465466;
+  font-size:11.5px;
+  line-height:1.4;
+}
+.period-case .window{
+  display:block;
+  margin-top:7px;
+  color:var(--green);
+  font-weight:850;
+}
+@media(max-width:1050px){
+  .period-flow{grid-template-columns:1fr}
+  .period-arrow{transform:rotate(90deg);text-align:center}
+  .period-cases{grid-template-columns:1fr}
+}
+
+
+.human-intro{
+  padding:16px 18px 14px;
+  border-bottom:1px solid var(--line);
+  background:#fbfcfd;
+}
+.human-intro p{
+  margin:0;
+  font-size:13px;
+  line-height:1.55;
+  color:#344054;
+}
+.human-intro strong{color:var(--blue2)}
+.human-logic{
+  display:grid;
+  grid-template-columns:1fr auto 1fr auto 1fr;
+  gap:10px;
+  align-items:center;
+  padding:14px 18px;
+  border-bottom:1px solid var(--line);
+}
+.human-box{
+  padding:12px 13px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:white;
+  min-height:78px;
+}
+.human-box b{
+  display:block;
+  margin-bottom:5px;
+  color:var(--blue2);
+  font-size:11px;
+}
+.human-box span{
+  display:block;
+  font-size:12px;
+  line-height:1.4;
+  color:#465466;
+}
+.human-arrow{
+  color:#98a3b1;
+  font-size:20px;
+  font-weight:800;
+}
+.human-cases{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:10px;
+  padding:14px 18px;
+  border-bottom:1px solid var(--line);
+}
+.human-case{
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#fff;
+  padding:12px 13px;
+}
+.human-case b{
+  display:block;
+  color:var(--blue2);
+  margin-bottom:7px;
+  font-size:12px;
+}
+.human-case p{
+  margin:0;
+  font-size:11.8px;
+  line-height:1.45;
+  color:#465466;
+}
+.human-case .result{
+  display:block;
+  margin-top:7px;
+  color:var(--green);
+  font-weight:850;
+}
+.human-why{
+  padding:13px 18px 15px;
+  background:#f7fafc;
+}
+.human-why .label{margin-bottom:5px}
+.human-why p{
+  margin:0;
+  font-size:12.5px;
+  line-height:1.5;
+  color:#344054;
+}
+@media(max-width:1050px){
+  .human-logic,.human-cases{grid-template-columns:1fr}
+  .human-arrow{transform:rotate(90deg);text-align:center}
+}
+
+
+.sync-role{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  padding:14px 18px;
+  border-bottom:1px solid var(--line);
+  background:#fbfcfd;
+}
+.sync-role > div{
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:12px 13px;
+  background:#fff;
+}
+.sync-role b{
+  display:block;
+  margin-bottom:5px;
+  color:var(--blue2);
+  font-size:11px;
+}
+.sync-role p{
+  margin:0;
+  color:#465466;
+  font-size:12px;
+  line-height:1.45;
+}
+.sync-question{
+  padding:13px 18px;
+  border-bottom:1px solid var(--line);
+  background:#f7fafc;
+  text-align:center;
+}
+.sync-question strong{
+  color:var(--blue2);
+  font-size:13px;
+}
+.sync-cases{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  padding:14px 18px 16px;
+  border-bottom:1px solid var(--line);
+}
+.sync-case{
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:12px 13px;
+  background:#fff;
+}
+.sync-case b{
+  display:block;
+  margin-bottom:7px;
+  color:var(--blue2);
+  font-size:12px;
+}
+.sync-case p{
+  margin:0;
+  color:#465466;
+  font-size:11.8px;
+  line-height:1.45;
+}
+.sync-case .result{
+  display:block;
+  margin-top:8px;
+  color:var(--green);
+  font-weight:850;
+}
+@media(max-width:1050px){
+  .sync-role,.sync-cases{grid-template-columns:1fr}
+}
+
+
+.rule2-hero{
+  padding:16px 18px;
+  border-bottom:1px solid var(--line);
+  background:#fbfcfd;
+}
+.rule2-hero p{
+  margin:0;
+  font-size:13px;
+  line-height:1.5;
+  color:#344054;
+}
+.rule2-hero strong{color:var(--blue2)}
+
+.rule2-run{
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  padding:11px 18px;
+  border-bottom:1px solid var(--line);
+  background:#f5f9fc;
+  color:#445164;
+  font-size:12px;
+}
+.rule2-run .date{
+  font-weight:850;
+  color:var(--blue2);
+}
+
+.rule2-examples{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:14px;
+  padding:16px 18px;
+  border-bottom:1px solid var(--line);
+}
+.rule2-example{
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:#fff;
+  overflow:hidden;
+}
+.rule2-example-head{
+  padding:11px 13px;
+  background:#f7f9fb;
+  border-bottom:1px solid var(--line);
+}
+.rule2-example-head b{
+  display:block;
+  font-size:12.5px;
+  color:var(--blue2);
+}
+.rule2-example-head span{
+  display:block;
+  margin-top:3px;
+  color:#667085;
+  font-size:11px;
+}
+.rule2-chain{
+  padding:12px 13px 13px;
+}
+.rule2-line{
+  display:grid;
+  grid-template-columns:108px 1fr;
+  gap:10px;
+  align-items:start;
+  padding:7px 0;
+}
+.rule2-line + .rule2-line{
+  border-top:1px dashed #e3e8ee;
+}
+.rule2-line .k{
+  color:#7a8594;
+  font-size:10px;
+  font-weight:850;
+  text-transform:uppercase;
+  letter-spacing:.05em;
+}
+.rule2-line .v{
+  color:#344054;
+  font-size:12px;
+  line-height:1.4;
+}
+.rule2-window{
+  margin-top:10px;
+  padding:9px 10px;
+  border-radius:8px;
+  background:var(--green-soft);
+  color:#235f43;
+  font-size:12px;
+  font-weight:850;
+}
+.rule2-takeaway{
+  display:grid;
+  grid-template-columns:1.2fr .8fr;
+  gap:0;
+  background:#fff;
+}
+.rule2-takeaway > div{
+  padding:13px 18px;
+}
+.rule2-takeaway > div + div{
+  border-left:1px solid var(--line);
+}
+.rule2-takeaway .label{
+  margin-bottom:5px;
+}
+.rule2-takeaway p{
+  margin:0;
+  font-size:12.5px;
+  line-height:1.45;
+  color:#344054;
+}
+@media(max-width:1050px){
+  .rule2-examples,.rule2-takeaway{grid-template-columns:1fr}
+  .rule2-takeaway > div + div{border-left:0;border-top:1px solid var(--line)}
+}
+
+
+.move-scope{
+  display:grid;
+  grid-template-columns:1fr auto 1fr;
+  align-items:center;
+  gap:12px;
+  padding:14px 18px;
+  border-bottom:1px solid var(--line);
+  background:#fbfcfd;
+}
+.move-scope-box{
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:12px 13px;
+  background:#fff;
+}
+.move-scope-box b{
+  display:block;
+  margin-bottom:5px;
+  color:var(--blue2);
+  font-size:11px;
+}
+.move-scope-box p{
+  margin:0;
+  color:#465466;
+  font-size:12px;
+  line-height:1.45;
+}
+.move-arrow{
+  color:#98a3b1;
+  font-size:20px;
+  font-weight:800;
+}
+
+.transfer-visual{
+  display:grid;
+  grid-template-columns:1fr auto 1fr;
+  align-items:center;
+  gap:14px;
+  padding:18px;
+  border-bottom:1px solid var(--line);
+  background:#fbfcfd;
+}
+.account-box{
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:14px;
+  background:#fff;
+  text-align:center;
+}
+.account-box b{
+  display:block;
+  margin-bottom:6px;
+  color:var(--blue2);
+  font-size:12px;
+}
+.account-box .amount{
+  display:block;
+  font-size:20px;
+  font-weight:850;
+  color:var(--ink);
+}
+.transfer-center{
+  min-width:190px;
+  text-align:center;
+}
+.transfer-center .flow-arrow{
+  display:block;
+  font-size:28px;
+  color:var(--blue);
+  line-height:1;
+}
+.transfer-center small{
+  display:block;
+  margin-top:7px;
+  color:#667085;
+  font-size:11px;
+  line-height:1.35;
+}
+.match-grid{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:8px;
+  padding:13px 18px;
+  border-bottom:1px solid var(--line);
+}
+.match-item{
+  padding:9px 10px;
+  border:1px solid var(--line);
+  border-radius:9px;
+  background:#fff;
+  text-align:center;
+  font-size:11px;
+  color:#465466;
+}
+.match-item strong{
+  display:block;
+  margin-bottom:3px;
+  color:var(--blue2);
+  font-size:10px;
+  text-transform:uppercase;
+  letter-spacing:.05em;
+}
+.pair-types{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  padding:14px 18px;
+  border-bottom:1px solid var(--line);
+}
+.pair-box{
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:12px 13px;
+  background:#fff;
+}
+.pair-box b{
+  display:block;
+  margin-bottom:5px;
+  color:var(--blue2);
+  font-size:12px;
+}
+.pair-box p{
+  margin:0;
+  font-size:11.8px;
+  line-height:1.4;
+  color:#465466;
+}
+.transfer-result{
+  padding:13px 18px;
+  background:var(--green-soft);
+  color:#245f43;
+  font-size:13px;
+  font-weight:800;
+  text-align:center;
+}
+@media(max-width:1050px){
+  .move-scope,.transfer-visual,.pair-types{grid-template-columns:1fr}
+  .move-arrow{transform:rotate(90deg);text-align:center}
+  .match-grid{grid-template-columns:1fr 1fr}
+  .transfer-center{min-width:0}
+}
+
+
+.edge-example{
+  display:grid;
+  grid-template-columns:1fr auto 1fr;
+  gap:12px;
+  align-items:center;
+  padding:14px 18px;
+  border-bottom:1px solid var(--line);
+  background:#fbfcfd;
+}
+.edge-leg{
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:12px 13px;
+  background:#fff;
+}
+.edge-leg.outside{
+  background:#f7f8fa;
+}
+.edge-leg.inside{
+  background:#f4faf7;
+  border-color:#bfdccb;
+}
+.edge-leg b{
+  display:block;
+  margin-bottom:5px;
+  font-size:11px;
+  color:var(--blue2);
+}
+.edge-leg p{
+  margin:0;
+  font-size:12px;
+  line-height:1.45;
+  color:#465466;
+}
+.edge-mid{
+  text-align:center;
+  color:#667085;
+  font-size:11px;
+  min-width:150px;
+}
+.edge-mid strong{
+  display:block;
+  color:var(--blue2);
+  font-size:12px;
+  margin-bottom:4px;
+}
+.edge-note{
+  padding:11px 18px 13px;
+  border-bottom:1px solid var(--line);
+  background:#fff;
+  font-size:12px;
+  color:#475467;
+  line-height:1.45;
+}
+.edge-note strong{color:var(--blue2)}
+@media(max-width:1050px){
+  .edge-example{grid-template-columns:1fr}
+  .edge-mid{min-width:0}
+}
+
+
+.finance-split{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:14px;
+  padding:16px 18px;
+  border-bottom:1px solid var(--line);
+  background:#fbfcfd;
+}
+.finance-column{
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:#fff;
+  overflow:hidden;
+}
+.finance-column-head{
+  padding:11px 13px;
+  border-bottom:1px solid var(--line);
+  background:#f7f9fb;
+}
+.finance-column-head b{
+  display:block;
+  color:var(--blue2);
+  font-size:12.5px;
+}
+.finance-column-head span{
+  display:block;
+  margin-top:3px;
+  color:#667085;
+  font-size:11px;
+}
+.finance-items{
+  display:grid;
+  gap:8px;
+  padding:12px 13px 13px;
+}
+.finance-item{
+  padding:9px 10px;
+  border:1px solid var(--line);
+  border-radius:8px;
+  background:#fff;
+  color:#344054;
+  font-size:11.8px;
+  line-height:1.35;
+}
+.finance-item strong{
+  color:var(--blue2);
+}
+.finance-map{
+  display:grid;
+  grid-template-columns:1fr auto 1fr;
+  gap:12px;
+  align-items:center;
+  padding:14px 18px;
+  border-bottom:1px solid var(--line);
+}
+.finance-map-box{
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:12px 13px;
+  background:#fff;
+}
+.finance-map-box b{
+  display:block;
+  margin-bottom:5px;
+  color:var(--blue2);
+  font-size:11px;
+}
+.finance-map-box p{
+  margin:0;
+  font-size:12px;
+  line-height:1.45;
+  color:#465466;
+}
+.finance-arrow{
+  color:#98a3b1;
+  font-size:20px;
+  font-weight:800;
+}
+.unmapped-box{
+  margin:14px 18px 0;
+  padding:12px 13px;
+  border:1px dashed #c8d0da;
+  border-radius:10px;
+  background:#fafbfc;
+}
+.unmapped-box b{
+  display:block;
+  margin-bottom:4px;
+  color:var(--blue2);
+  font-size:11px;
+}
+.unmapped-box p{
+  margin:0;
+  font-size:12px;
+  line-height:1.45;
+  color:#465466;
+}
+@media(max-width:1050px){
+  .finance-split,.finance-map{grid-template-columns:1fr}
+  .finance-arrow{transform:rotate(90deg);text-align:center}
+}
+
+
+.outflow-intro{
+  padding:15px 18px;
+  border-bottom:1px solid var(--line);
+  background:#fbfcfd;
+}
+.outflow-intro p{
+  margin:0;
+  color:#344054;
+  font-size:13px;
+  line-height:1.5;
+}
+.outflow-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+  padding:16px 18px;
+  border-bottom:1px solid var(--line);
+}
+.outflow-card{
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:#fff;
+  padding:13px 14px;
+}
+.outflow-card b{
+  display:block;
+  margin-bottom:5px;
+  color:var(--blue2);
+  font-size:12.5px;
+}
+.outflow-card p{
+  margin:0;
+  color:#465466;
+  font-size:11.8px;
+  line-height:1.45;
+}
+.prudence-box{
+  margin:14px 18px 0;
+  padding:13px 14px;
+  border:1px solid #cfd8e3;
+  border-radius:10px;
+  background:#f7f9fb;
+}
+.prudence-box b{
+  display:block;
+  margin-bottom:5px;
+  color:var(--blue2);
+  font-size:11.5px;
+}
+.prudence-box p{
+  margin:0;
+  color:#465466;
+  font-size:12px;
+  line-height:1.45;
+}
+@media(max-width:1050px){
+  .outflow-grid{grid-template-columns:1fr}
+}
+
+
+.cash-intro{
+  padding:15px 18px;
+  border-bottom:1px solid var(--line);
+  background:#fbfcfd;
+}
+.cash-intro p{
+  margin:0;
+  color:#344054;
+  font-size:13px;
+  line-height:1.5;
+}
+.cash-formula{
+  display:grid;
+  grid-template-columns:1fr auto 1fr;
+  gap:12px;
+  align-items:center;
+  padding:14px 18px;
+  border-bottom:1px solid var(--line);
+}
+.cash-formula-box{
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:12px 13px;
+  background:#fff;
+  text-align:center;
+}
+.cash-formula-box b{
+  display:block;
+  color:var(--blue2);
+  font-size:11px;
+  margin-bottom:5px;
+}
+.cash-formula-box span{
+  display:block;
+  color:#344054;
+  font-size:13px;
+  font-weight:800;
+}
+.cash-op{
+  color:#98a3b1;
+  font-size:20px;
+  font-weight:850;
+}
+.budget-scale{
+  display:grid;
+  grid-template-columns:repeat(5,1fr);
+  gap:8px;
+  padding:15px 18px;
+  border-bottom:1px solid var(--line);
+}
+.budget-band{
+  border:1px solid var(--line);
+  border-radius:10px;
+  padding:11px 10px;
+  background:#fff;
+  text-align:center;
+}
+.budget-band b{
+  display:block;
+  margin-bottom:4px;
+  color:var(--blue2);
+  font-size:11.5px;
+}
+.budget-band span{
+  display:block;
+  color:#5d6978;
+  font-size:10.8px;
+  line-height:1.35;
+}
+.pressure-intro{
+  padding:15px 18px;
+  border-bottom:1px solid var(--line);
+  background:#fbfcfd;
+}
+.pressure-intro p{
+  margin:0;
+  color:#344054;
+  font-size:13px;
+  line-height:1.5;
+}
+.pressure-grid{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+  padding:16px 18px;
+  border-bottom:1px solid var(--line);
+}
+.pressure-card{
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:#fff;
+  padding:13px 14px;
+}
+.pressure-card b{
+  display:block;
+  color:var(--blue2);
+  margin-bottom:6px;
+  font-size:12.5px;
+}
+.pressure-card p{
+  margin:0 0 9px 0;
+  color:#465466;
+  font-size:11.8px;
+  line-height:1.4;
+}
+.pressure-ruler{
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:5px;
+}
+.pressure-ruler span{
+  padding:7px 5px;
+  border:1px solid var(--line);
+  border-radius:7px;
+  text-align:center;
+  color:#596579;
+  font-size:10px;
+  line-height:1.25;
+  background:#fafbfc;
+}
+.pressure-ruler span strong{
+  display:block;
+  color:#344054;
+  font-size:10.5px;
+}
+.diagnosis-bridge{
+  padding:13px 18px;
+  background:#f7fafc;
+}
+.diagnosis-bridge p{
+  margin:0;
+  color:#344054;
+  font-size:12.5px;
+  line-height:1.45;
+}
+@media(max-width:1050px){
+  .cash-formula,.pressure-grid{grid-template-columns:1fr}
+  .cash-op{transform:rotate(90deg);text-align:center}
+  .budget-scale{grid-template-columns:1fr}
+}
+
+
+.budget-shield{
+  margin:14px 18px 0;
+  padding:14px;
+  border:1px solid var(--line);
+  border-radius:11px;
+  background:#f8fafc;
+}
+.budget-shield b{
+  display:block;
+  margin-bottom:8px;
+  color:var(--blue2);
+  font-size:12px;
+}
+.budget-shield p{
+  margin:0 0 10px 0;
+  color:#465466;
+  font-size:12px;
+  line-height:1.45;
+}
+.shield-grid{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+}
+.shield-item{
+  border:1px solid var(--line);
+  border-radius:9px;
+  padding:10px 11px;
+  background:#fff;
+}
+.shield-item strong{
+  display:block;
+  margin-bottom:4px;
+  color:#344054;
+  font-size:11.5px;
+}
+.shield-item span{
+  display:block;
+  color:#5d6978;
+  font-size:11px;
+  line-height:1.4;
+}
+@media(max-width:1050px){
+  .shield-grid{grid-template-columns:1fr}
+}
+
+
+.priority-flow{
+  padding:16px 18px;
+  border-bottom:1px solid var(--line);
+}
+.priority-pillars{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:10px;
+}
+.priority-pillar{
+  border:1px solid var(--line);
+  border-radius:11px;
+  background:#fff;
+  padding:12px 13px;
+  text-align:center;
+}
+.priority-pillar b{
+  display:block;
+  color:var(--blue2);
+  font-size:12px;
+  margin-bottom:5px;
+}
+.priority-pillar span{
+  display:block;
+  color:#5d6978;
+  font-size:11px;
+  line-height:1.4;
+}
+.priority-engine{
+  margin:12px auto 0;
+  max-width:620px;
+  border:1px solid #ccd6e3;
+  border-radius:12px;
+  background:#f7f9fb;
+  padding:12px 14px;
+  text-align:center;
+}
+.priority-engine b{
+  display:block;
+  color:var(--blue2);
+  font-size:12px;
+  margin-bottom:4px;
+}
+.priority-engine p{
+  margin:0;
+  color:#465466;
+  font-size:11.5px;
+  line-height:1.45;
+}
+.priority-arrow{
+  text-align:center;
+  color:#8b98a8;
+  font-size:22px;
+  line-height:1;
+  padding:8px 0 2px;
+  font-weight:850;
+}
+.theme-grid{
+  display:grid;
+  grid-template-columns:repeat(5,minmax(0,1fr));
+  gap:8px;
+  padding:12px 18px 16px;
+  border-bottom:1px solid var(--line);
+}
+.theme-card{
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#fff;
+  padding:11px 10px;
+  text-align:center;
+}
+.theme-card .theme-no{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:24px;
+  height:24px;
+  border-radius:50%;
+  background:#eef3f8;
+  color:var(--blue2);
+  font-size:10px;
+  font-weight:850;
+  margin-bottom:6px;
+}
+.theme-card b{
+  display:block;
+  color:#344054;
+  font-size:11.2px;
+  margin-bottom:5px;
+  line-height:1.25;
+}
+.theme-card span{
+  display:block;
+  color:#667085;
+  font-size:10.4px;
+  line-height:1.35;
+}
+.priority-governance{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:10px;
+  padding:14px 18px;
+  border-bottom:1px solid var(--line);
+  background:#fbfcfd;
+}
+.governance-card{
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#fff;
+  padding:12px 13px;
+}
+.governance-card b{
+  display:block;
+  color:var(--blue2);
+  font-size:11.5px;
+  margin-bottom:5px;
+}
+.governance-card p{
+  margin:0;
+  color:#465466;
+  font-size:11px;
+  line-height:1.45;
+}
+.final-output{
+  margin:14px 18px 0;
+  padding:13px 14px;
+  border:1px solid #cfd8e3;
+  border-radius:10px;
+  background:#f7f9fb;
+  text-align:center;
+}
+.final-output b{
+  display:block;
+  color:var(--blue2);
+  margin-bottom:5px;
+  font-size:11.5px;
+}
+.final-output p{
+  margin:0;
+  color:#465466;
+  font-size:12px;
+  line-height:1.45;
+}
+@media(max-width:1050px){
+  .priority-pillars,.priority-governance{grid-template-columns:1fr}
+  .theme-grid{grid-template-columns:1fr}
+}
+
+
+.macro-phases{
+  display:grid;
+  grid-template-columns:repeat(6,minmax(0,1fr));
+  gap:20px;
+  margin:0 0 12px 0;
+}
+.macro-phase{
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:#f8fafc;
+  padding:9px 12px 10px;
+  min-height:54px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+}
+.macro-phase.phase1{grid-column:span 3}
+.macro-phase.phase2{grid-column:span 1}
+.macro-phase.phase3{grid-column:span 2}
+.macro-phase b{
+  display:block;
+  color:var(--blue2);
+  font-size:10.8px;
+  letter-spacing:.04em;
+  text-transform:uppercase;
+  margin-bottom:3px;
+}
+.macro-phase span{
+  color:#667085;
+  font-size:10.5px;
+  line-height:1.35;
+}
+.stage-question{
+  display:block;
+  margin-top:4px;
+  color:#7a8695;
+  font-size:10.5px;
+  line-height:1.3;
+  font-weight:600;
+}
+@media(max-width:1050px){
+  .macro-phases{grid-template-columns:repeat(6,150px);}
+}
+
+
+.flow-scroll-wrapper{
+  width:100%;
+}
+@media(max-width:1050px){
+  .flow-scroll-wrapper{
+    overflow-x:auto;
+    padding-bottom:8px;
+  }
+  .macro-phases,
+  .flow{
+    width:1000px;
+    min-width:1000px;
+    overflow:visible;
+  }
+  .macro-phases{
+    grid-template-columns:repeat(6,150px);
+  }
+  .flow{
+    grid-template-columns:repeat(6,150px);
+    padding-bottom:0;
+  }
+}
+
+</style>
+</head>
+<body>
+<main>
+  <h1>Radar Financeiro</h1>
+
+  <section class="flow-shell" aria-label="Macrofluxo do Radar">
+<div class="flow-scroll-wrapper">
+<div class="macro-phases">
+      <div class="macro-phase phase1">
+        <b>Fase 1 · Qualificação e Contexto</b>
+        <span>Define quem analisar e em qual período</span>
+      </div>
+
+      <div class="macro-phase phase2">
+        <b>Fase 2 · Higienização</b>
+        <span>Separa movimentação real de ruído operacional</span>
+      </div>
+
+      <div class="macro-phase phase3">
+        <b>Fase 3 · Inteligência e Ação</b>
+        <span>Transforma movimentos em diagnóstico e prioridade</span>
+      </div>
+    </div>
+
+
+    
+<div class="flow">
+<button class="stage active" id="stage1" type="button">
+        <span class="stage-dot">1</span>
+        <span class="stage-name">Elegibilidade</span><span class="stage-question">Quem entra no Radar?</span>
+      </button>
+      <button class="stage" id="stage2" type="button">
+        <span class="stage-dot">2</span>
+        <span class="stage-name">Identificação e Contexto</span><span class="stage-question">Quem é esse cliente?</span>
+      </button>
+      <button class="stage" id="stage3" type="button">
+        <span class="stage-dot">3</span>
+        <span class="stage-name">Período de Análise</span><span class="stage-question">Qual período representa sua realidade?</span>
+      </button>
+      <button class="stage" id="stage4" type="button">
+        <span class="stage-dot">4</span>
+        <span class="stage-name">Movimentações Efetivas</span><span class="stage-question">O que realmente conta no caixa?</span>
+      </button>
+      <button class="stage" id="stage5" type="button">
+        <span class="stage-dot">5</span>
+        <span class="stage-name">Organização e Diagnóstico</span><span class="stage-question">Como está a vida financeira?</span>
+      </button>
+      <button class="stage" id="stage6" type="button">
+        <span class="stage-dot">6</span>
+        <span class="stage-name">Priorização</span><span class="stage-question">Qual tema deve ser priorizado?</span>
+      </button>
+    </div>
+</div>
+  </section>
+
+  <section class="stage-map open" id="stageMap">
+    <div class="branch">
+      <div class="rules-map">
+
+        <button class="rule-node active" data-rule="r1" type="button">
+          <span class="rule-kicker">Regra 1</span>
+          <span class="rule-title">Pessoa Física</span>
+          <span class="rule-result">Somente PF segue</span>
+        </button>
+
+        <button class="rule-node" data-rule="r2" type="button">
+          <span class="rule-kicker">Regra 2</span>
+          <span class="rule-title">Transações Ativas</span>
+          <span class="rule-result">Somente registros válidos</span>
+        </button>
+
+        <button class="rule-node" data-rule="r3" type="button">
+          <span class="rule-kicker">Regra 3</span>
+          <span class="rule-title">Uso Recente do App</span>
+          <span class="rule-result">1 mês relativo à execução</span>
+        </button>
+
+        <button class="rule-node" data-rule="r4" type="button">
+          <span class="rule-kicker">Regra 4</span>
+          <span class="rule-title">Moeda Nacional</span>
+          <span class="rule-result">100% BRL</span>
+        </button>
+
+        <button class="rule-node" data-rule="r5" type="button">
+          <span class="rule-kicker">Regra 5</span>
+          <span class="rule-title">Exclusão Agro</span>
+          <span class="rule-result">Sem movimentação Agro</span>
+        </button>
+
+      </div>
+    </div>
+
+    <!-- REGRA 1 -->
+    <article class="rule-detail open" id="r1">
+      <div class="decision">Exclusivo para Pessoa Física.</div>
+      <div class="detail-row">
+        <div class="detail-cell">
+          <span class="label">Banco</span>
+          <p><span class="code">DB2GFP.TRAN_RLZD_INST_PCT</span><br><span class="code">CD_TIP_PSS</span></p>
+        </div>
+        <div class="detail-cell">
+          <span class="label">Corte</span>
+          <span class="cut">CD_TIP_PSS = 1</span>
+        </div>
+        <div class="detail-cell">
+          <span class="label">Impacto</span>
+          <p><span class="pos">PF → segue</span><br><span class="neg">PJ → sai</span></p>
+        </div>
+      </div>
+    </article>
+
+    <!-- REGRA 2 -->
+    <article class="rule-detail" id="r2">
+      <div class="decision">Somente transações ativas e confirmadas entram na análise.</div>
+      <div class="detail-row">
+        <div class="detail-cell">
+          <span class="label">Banco</span>
+          <p><span class="code">DB2GFP.TRAN_RLZD_INST_PCT</span><br><span class="code">CD_EST_TRAN_INST</span></p>
+        </div>
+        <div class="detail-cell">
+          <span class="label">Corte</span>
+          <span class="cut">CD_EST_TRAN_INST = 0</span>
+        </div>
+        <div class="detail-cell">
+          <span class="label">Impacto</span>
+          <p>Confirmada → considera.<br>Cancelada/recusada → ignora.</p>
+        </div>
+      </div>
+    </article>
+
+    <!-- REGRA 3 -->
+    <article class="rule-detail" id="r3">
+      <div class="decision">Uso recente é relativo à Data de Execução do Radar.</div>
+      <div class="timeline">
+        <div class="t-step"><b>1 · Âncora</b><span>DT_EXEA<br>15/09/2026</span></div>
+        <div class="t-step"><b>2 · Retrovisor</b><span>DT_EXEA - 1 mês<br>15/08/2026</span></div>
+        <div class="t-step"><b>3 · Evidência</b><span>TS_INCL_TRAN<br>no intervalo</span></div>
+        <div class="t-step"><b>4 · Decisão</b><span>Dentro → segue<br>Fora → sai</span></div>
+      </div>
+      <div class="detail-row">
+        <div class="detail-cell">
+          <span class="label">Banco</span>
+          <p><span class="code">TS_INCL_TRAN</span> <span class="code">DT_EXEA</span><br><span class="code">DT_PUBLICO_INI</span></p>
+        </div>
+        <div class="detail-cell">
+          <span class="label">Corte</span>
+          <span class="cut">DT_EXEA - 1 mês ≤ TS_INCL_TRAN &lt; DT_EXEA</span>
+        </div>
+        <div class="detail-cell">
+          <span class="label">Impacto</span>
+          <p>Execução 15/09:<br><span class="pos">02/09 → entra</span> · <span class="neg">10/05 → sai</span></p>
+        </div>
+      </div>
+    </article>
+
+    <!-- REGRA 4 -->
+    <article class="rule-detail" id="r4">
+      <div class="decision">Qualquer moeda diferente de BRL desqualifica o cliente inteiro.</div>
+      <div class="detail-row">
+        <div class="detail-cell">
+          <span class="label">Banco</span>
+          <p><span class="code">CD_TIP_MOE_CRR</span> → <span class="code">FL_SOMENTE_BRL</span></p>
+        </div>
+        <div class="detail-cell">
+          <span class="label">Corte</span>
+          <span class="cut">moeda ≠ 'BRL'
+→ FL_SOMENTE_BRL = 'N'</span>
+        </div>
+        <div class="detail-cell">
+          <span class="label">Impacto</span>
+          <p>Cliente 10101:<br>25 compras em BRL + US$ 12 → <span class="neg">excluído</span>.</p>
+        </div>
+      </div>
+    </article>
+
+    <!-- REGRA 5 -->
+    <article class="rule-detail" id="r5">
+      <div class="decision">Presença de movimentação Agro exclui o cliente da régua mensal.</div>
+      <div class="detail-row">
+        <div class="detail-cell">
+          <span class="label">Banco</span>
+          <p><span class="code">CD_CTGR_TRAN_OGNL</span> → <span class="code">FL_TEM_MOV_AGRO</span></p>
+        </div>
+        <div class="detail-cell">
+          <span class="label">Corte</span>
+          <span class="cut">movimento Agro
+→ FL_TEM_MOV_AGRO = 'S'</span>
+        </div>
+        <div class="detail-cell">
+          <span class="label">Impacto</span>
+          <p>Cliente 20202:<br>R$ 800 em insumos agrícolas → <span class="neg">excluído</span>.</p>
+        </div>
+      </div>
+    </article>
+
+  </section>
+
+  <section class="stage-map" id="stageMap2">
+    <div class="branch">
+      <div class="rules-map" style="grid-template-columns:repeat(4,minmax(0,1fr));">
+
+        <button class="rule-node" data-rule="s2r1" data-stage="2" type="button">
+          <span class="rule-kicker">Regra 1</span>
+          <span class="rule-title">Conta BB Única</span>
+          <span class="rule-result">1 conta elegível</span>
+        </button>
+
+        <button class="rule-node" data-rule="s2r2" data-stage="2" type="button">
+          <span class="rule-kicker">Regra 2</span>
+          <span class="rule-title">CPF Único</span>
+          <span class="rule-result">1 CPF válido</span>
+        </button>
+
+        <button class="rule-node" data-rule="s2r3" data-stage="2" type="button">
+          <span class="rule-kicker">Regra 3</span>
+          <span class="rule-title">Renda Presumida</span>
+          <span class="rule-result">Obrigatória</span>
+        </button>
+
+        <button class="rule-node" data-rule="s2r4" data-stage="2" type="button">
+          <span class="rule-kicker">Regra 4</span>
+          <span class="rule-title">Perfil Financeiro</span>
+          <span class="rule-result">Obrigatório</span>
+        </button>
+
+      </div>
+    </div>
+<article class="rule-detail" id="s2r1">
+      <div class="decision">O cliente precisa ter exatamente uma conta corrente BB elegível.</div>
+
+      <div class="detail-row">
+        <div class="detail-cell">
+          <span class="label">Banco</span>
+          <p>
+            <span class="code">DB2GFP.TRAN_RLZD_INST_PCT</span><br>
+            <span class="code">NR_MCA_PCT_OPB</span>
+            <span class="code">CD_PRD</span>
+            <span class="code">NR_AG_TITR</span>
+            <span class="code">CD_CT_TITR</span>
+          </p>
+        </div>
+
+        <div class="detail-cell">
+          <span class="label">Corte</span>
+          <span class="cut">NR_MCA_PCT_OPB = 999999999
+AND CD_PRD = 6
+AND QT_CONTAS_ELEGIVEIS = 1</span>
+        </div>
+
+        <div class="detail-cell">
+          <span class="label">Impacto</span>
+          <p>
+            <span class="pos">1 conta → segue</span><br>
+            <span class="neg">0 ou múltiplas contas → não processa</span>
+          </p>
+        </div>
+      </div>
+
+      <div class="rule-context">
+        <div>
+          <span class="label">Por que existe</span>
+          <p>Uma única conta evita conflito entre ciclos financeiros diferentes.</p>
+        </div>
+        <div>
+          <span class="label">Como é usado</span>
+          <p><span class="code">NR_AG_TITR</span> + <span class="code">CD_CT_TITR</span> são usados para buscar em <span class="code">DB2GFP.CT_GRDR_FNCO</span> o dia de corte que define o período financeiro do cliente.</p>
+        </div>
+      </div>
+    </article>
+<article class="rule-detail" id="s2r2">
+      <div class="decision">O cliente precisa ter exatamente um CPF válido e único.</div>
+
+      <div class="detail-row">
+        <div class="detail-cell">
+          <span class="label">Banco</span>
+          <p>
+            <span class="code">DB2GFP.TRAN_RLZD_INST_PCT</span><br>
+            <span class="code">NR_CPF_CNPJ_TITR</span>
+          </p>
+        </div>
+
+        <div class="detail-cell">
+          <span class="label">Corte</span>
+          <span class="cut">COUNT(DISTINCT CPF_VALIDO) = 1</span>
+        </div>
+
+        <div class="detail-cell">
+          <span class="label">Impacto</span>
+          <p>
+            <span class="pos">1 CPF → segue</span><br>
+            <span class="neg">CPF ausente ou múltiplo → não processa</span>
+          </p>
+        </div>
+      </div>
+
+      <div class="rule-context">
+        <div>
+          <span class="label">Por que existe</span>
+          <p>Garante a identidade fiscal única do titular. Com mais de um CPF vinculado ao mesmo cliente, o Radar não consegue determinar qual pessoa está por trás das movimentações.</p>
+        </div>
+
+        <div>
+          <span class="label">Como é usado</span>
+          <p>O CPF é a chave para buscar em <span class="code">DB2DFE.REN_AVLD_PF</span>, pelo campo <span class="code">NR_CPF_BASE_SRF</span>, a Renda Presumida usada no diagnóstico. Essa tabela não possui <span class="code">CD_CLI</span>.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="rule-detail" id="s2r3">
+      <div class="decision">Sem renda presumida, o cliente não continua no Radar.</div>
+      <div class="detail-row">
+        <div class="detail-cell">
+          <span class="label">Banco</span>
+          <p>
+            <span class="code">DB2DFE.REN_AVLD_PF</span><br>
+            <span class="code">NR_CPF_BASE_SRF</span>
+            <span class="code">DT_INCL_REN_AVLD</span>
+            <span class="code">VL_REN</span>
+          </p>
+        </div>
+        <div class="detail-cell">
+          <span class="label">Corte</span>
+          <span class="cut">CPF localizado
+→ registro mais recente
+→ VL_REN disponível</span>
+        </div>
+        <div class="detail-cell">
+          <span class="label">Impacto</span>
+          <p>
+            Cliente 30303:<br>
+            CPF válido, mas sem renda encontrada → <span class="neg">excluído</span>.
+          </p>
+        </div>
+      </div>
+    </article>
+<article class="rule-detail" id="s2r4">
+      <div class="decision">O cliente precisa ter um macroperfil financeiro válido.</div>
+
+      <div class="detail-row" style="grid-template-columns:1fr 1fr;">
+        <div class="detail-cell">
+          <span class="label">Banco</span>
+          <p>
+            <span class="code">DB2D1D.DVS_GRDR_FNCO_PF</span><br>
+            <span class="code">CD_CLI</span>
+            <span class="code">DT_REF</span>
+            <span class="code">CD_MAC_PRFL_CLI</span>
+          </p>
+        </div>
+
+        <div class="detail-cell">
+          <span class="label">Impacto</span>
+          <p>Sem macroperfil financeiro válido → <span class="neg">excluído</span>.</p>
+        </div>
+      </div>
+
+      <div class="rule-context">
+        <div>
+          <span class="label">Como é usado</span>
+          <p>Pelo <span class="code">CD_CLI</span>, o Radar busca o perfil mais recente até <span class="code">DT_EXEA</span> e recupera <span class="code">CD_MAC_PRFL_CLI</span>: 1 = Endividado, 2 = Equilibrista, 3 = Investidor.</p>
+        </div>
+
+        <div>
+          <span class="label">Por que é obrigatório</span>
+          <p>O macroperfil representa o comportamento financeiro histórico do cliente e orienta se a recomendação deve priorizar crédito ou investimentos. Sem esse dado, o cliente não segue no Radar.</p>
+        </div>
+      </div>
+    </article>
+
+  </section>
+
+
+  <section class="stage-map" id="stageMap3">
+    <div class="branch">
+      <div class="rules-map" style="grid-template-columns:repeat(2,minmax(0,1fr)); max-width:760px; margin:0 auto;">
+
+        <button class="rule-node" data-rule="s3r1" data-stage="3" type="button">
+          <span class="rule-kicker">Regra 1</span>
+          <span class="rule-title">Dia do Ciclo</span>
+          <span class="rule-result">Ciclo do cliente ou fallback dia 01</span>
+        </button>
+
+        <button class="rule-node" data-rule="s3r2" data-stage="3" type="button">
+          <span class="rule-kicker">Regra 2</span>
+          <span class="rule-title">Período Fechado</span>
+          <span class="rule-result">Somente ciclo completamente encerrado</span>
+        </button>
+
+      </div>
+    </div>
+
+    <article class="rule-detail" id="s3r1">
+      <div class="decision">O Radar usa o dia de ciclo da conta; se ele não existir, adota o dia 01.</div>
+
+      <div class="detail-row">
+        <div class="detail-cell">
+          <span class="label">Banco</span>
+          <p>
+            <span class="code">DB2GFP.CT_GRDR_FNCO</span><br>
+            <span class="code">CD_UOR_CC</span>
+            <span class="code">NR_CC</span>
+            <span class="code">DD_INC_MM_CLC_BLC</span>
+            <span class="code">TS_ULT_EXEA_PSQ</span>
+          </p>
+        </div>
+
+        <div class="detail-cell">
+          <span class="label">Corte</span>
+          <span class="cut">ciclo encontrado → usa DD_INC_MM_CLC_BLC
+sem ciclo → DD_INC_MM_CLC_BLC_FALLBACK = 1</span>
+        </div>
+
+        <div class="detail-cell">
+          <span class="label">Impacto</span>
+          <p>
+            <span class="pos">Ciclo encontrado → usa o dia do cliente</span><br>
+            <span class="pos">Ciclo ausente → usa dia 01 e segue</span>
+          </p>
+        </div>
+      </div>
+
+      <div class="rule-context">
+        <div>
+          <span class="label">Como é usado</span>
+          <p>Agência e conta localizam o ciclo em <span class="code">CT_GRDR_FNCO</span>. Havendo histórico, o Radar usa o registro mais recente por <span class="code">TS_ULT_EXEA_PSQ</span>.</p>
+        </div>
+
+        <div>
+          <span class="label">Por que existe</span>
+          <p>O dia do ciclo define onde começa e termina o mês financeiro. A ausência desse cadastro não exclui o cliente: o fallback no dia 01 mantém o processamento.</p>
+        </div>
+      </div>
+    </article>
+<article class="rule-detail" id="s3r2">
+      <div class="decision">O Radar analisa o último período que já estava totalmente fechado quando os dados do cliente foram sincronizados.</div>
+
+      <div class="rule2-hero">
+        <p><strong>A ideia é simples:</strong> o Radar pode rodar hoje, mas os dados de cada cliente podem estar atualizados até dias diferentes. Por isso, a janela é definida pela última sincronização daquele cliente — e não apenas pela data do job.</p>
+      </div>
+
+      <div class="rule2-run">
+        Radar executando em <span class="date">01/10</span> · ambos os clientes têm ciclo no <span class="date">dia 20</span>
+      </div>
+
+      <div class="rule2-examples">
+
+        <div class="rule2-example">
+          <div class="rule2-example-head">
+            <b>Cliente A · sincronizou em 28/09</b>
+            <span>Os dados estão atualizados até depois da virada do dia 20.</span>
+          </div>
+          <div class="rule2-chain">
+            <div class="rule2-line">
+              <span class="k">Sincronização</span>
+              <span class="v">28/09</span>
+            </div>
+            <div class="rule2-line">
+              <span class="k">Ciclo aberto</span>
+              <span class="v">20/09 a 19/10</span>
+            </div>
+            <div class="rule2-line">
+              <span class="k">O Radar faz</span>
+              <span class="v">Descarta esse ciclo, porque ainda não terminou.</span>
+            </div>
+            <div class="rule2-window">Analisa 20/08 a 19/09</div>
+          </div>
+        </div>
+
+        <div class="rule2-example">
+          <div class="rule2-example-head">
+            <b>Cliente B · sincronizou em 15/09</b>
+            <span>Os dados foram atualizados antes da virada do dia 20.</span>
+          </div>
+          <div class="rule2-chain">
+            <div class="rule2-line">
+              <span class="k">Sincronização</span>
+              <span class="v">15/09</span>
+            </div>
+            <div class="rule2-line">
+              <span class="k">Ciclo aberto</span>
+              <span class="v">20/08 a 19/09</span>
+            </div>
+            <div class="rule2-line">
+              <span class="k">O Radar faz</span>
+              <span class="v">Descarta esse ciclo, porque ainda estava aberto em 15/09.</span>
+            </div>
+            <div class="rule2-window">Analisa 20/07 a 19/08</div>
+          </div>
+        </div>
+
+      </div>
+
+      <div class="rule2-takeaway">
+        <div>
+          <span class="label">O ponto principal</span>
+          <p>Dois clientes processados no mesmo dia podem ter janelas diferentes, porque cada um pode ter sincronizado seus dados em momentos diferentes.</p>
+        </div>
+
+        <div>
+          <span class="label">Por que existe</span>
+          <p>Para nunca calcular o diagnóstico sobre um período que ainda estava incompleto na última atualização real daquele cliente.</p>
+        </div>
+      </div>
+    </article>
+
+  </section>
+<section class="stage-map" id="stageMap4">
+    <div class="branch">
+      <div class="rules-map" style="grid-template-columns:1fr; max-width:420px; margin:0 auto;">
+
+        <button class="rule-node" data-rule="s4r1" data-stage="4" type="button">
+          <span class="rule-kicker">Regra 1</span>
+          <span class="rule-title">Transferências entre Contas Próprias</span>
+          <span class="rule-result">Não são renda nem gasto</span>
+        </button>
+
+      </div>
+    </div>
+<article class="rule-detail" id="s4r1">
+      <div class="decision">Transferência entre contas próprias não é renda nem gasto.</div>
+
+      <div class="transfer-visual">
+        <div class="account-box">
+          <b>Conta BB</b>
+          <span class="amount">− R$ 1.500</span>
+        </div>
+
+        <div class="transfer-center">
+          <span class="flow-arrow">→</span>
+          <small>Mesmo dinheiro mudando de conta</small>
+        </div>
+
+        <div class="account-box">
+          <b>Outra conta do cliente</b>
+          <span class="amount">+ R$ 1.500</span>
+        </div>
+      </div>
+
+      <div class="match-grid">
+        <div class="match-item"><strong>Cliente</strong>Mesmo titular</div>
+        <div class="match-item"><strong>Valor</strong>Mesmo valor</div>
+        <div class="match-item"><strong>Moeda</strong>Mesma moeda</div>
+        <div class="match-item"><strong>Natureza</strong>Débito ↔ Crédito</div>
+        <div class="match-item"><strong>Instituição</strong>Bancos diferentes</div>
+      </div>
+
+      <div class="pair-types">
+        <div class="pair-box">
+          <b>Par Exato · mesma data</b>
+          <p>As duas movimentações estão dentro do ciclo e acontecem no mesmo dia.</p>
+          <p style="margin-top:7px"><strong>Ação:</strong> anula as duas pontas.</p>
+        </div>
+
+        <div class="pair-box">
+          <b>Par de Borda · diferença de 1 a 5 dias</b>
+          <p>Uma movimentação está dentro da janela oficial e a contraparte está fora, mas a até 5 dias de distância.</p>
+          <p style="margin-top:7px"><strong>Ação:</strong> a ponta de dentro é neutralizada; a de fora serve apenas como contraprova.</p>
+        </div>
+      </div>
+
+      <div class="edge-example">
+        <div class="edge-leg outside">
+          <b>18/08 · fora da janela</b>
+          <p>Débito de R$ 2.000 no BB.</p>
+        </div>
+
+        <div class="edge-mid">
+          <strong>Diferença: 3 dias</strong>
+          dentro da tolerância de ±5 dias
+        </div>
+
+        <div class="edge-leg inside">
+          <b>21/08 · dentro da janela</b>
+          <p>Crédito de R$ 2.000 no Inter.</p>
+        </div>
+      </div>
+
+      <div class="edge-note">
+        <strong>Janela oficial:</strong> 20/08 a 19/09 ·
+        <strong>margem inferior pesquisada:</strong> até 15/08.
+        O crédito de 21/08 é neutralizado porque o débito correspondente apareceu em 18/08.
+      </div>
+
+      <div class="transfer-result">
+        A margem de ±5 dias existe apenas para reconciliar transferências que cruzam a borda do ciclo.
+      </div>
+
+      <div class="rule-context">
+        <div>
+          <span class="label">Por que existe</span>
+          <p>Fins de semana, feriados e tempos diferentes de compensação podem registrar as duas pontas em dias distintos.</p>
+        </div>
+        <div>
+          <span class="label">Resultado</span>
+          <p>O Radar evita transformar transferência própria em falsa renda ou falso gasto.</p>
+        </div>
+      </div>
+    </article>
+
+  </section>
+
+  <section class="stage-map" id="stageMap5">
+    <div class="branch">
+      <div class="rules-map" style="grid-template-columns:repeat(3,minmax(0,1fr)); max-width:980px; margin:0 auto;">
+
+        <button class="rule-node" data-rule="s5r1" data-stage="5" type="button">
+          <span class="rule-kicker">Regra 1</span>
+          <span class="rule-title">Balança de Caixa</span>
+          <span class="rule-result">Quanto saiu em relação ao que entrou</span>
+        </button>
+
+        <button class="rule-node" data-rule="s5r2" data-stage="5" type="button">
+          <span class="rule-kicker">Regra 2</span>
+          <span class="rule-title">Classificação das Movimentações</span>
+          <span class="rule-result">Entradas e saídas organizadas por finalidade</span>
+        </button>
+
+        <button class="rule-node" data-rule="s5r3" data-stage="5" type="button">
+          <span class="rule-kicker">Regra 3</span>
+          <span class="rule-title">Pressão Financeira</span>
+          <span class="rule-result">Onde o orçamento está sendo pressionado</span>
+        </button>
+
+      </div>
+    </div>
+
+    <article class="rule-detail" id="s5r1">
+      <div class="decision">O Radar mede se o cliente gastou aproximadamente o que recebeu, gastou mais ou conseguiu gerar sobra.</div>
+
+      <div class="cash-intro">
+        <p>As entradas funcionam como a régua do período. O Radar compara o total de saídas com o total de entradas e transforma essa relação em uma leitura direta da saúde financeira.</p>
+      </div>
+
+      <div class="cash-formula">
+        <div class="cash-formula-box">
+          <b>Saídas do período</b>
+          <span>VL_SAI_TOTAL</span>
+        </div>
+
+        <div class="cash-op">÷</div>
+
+        <div class="cash-formula-box">
+          <b>Entradas do período</b>
+          <span>VL_ENT_TOTAL</span>
+        </div>
+      </div>
+
+      <div class="budget-scale">
+        <div class="budget-band">
+          <b>Superávit Acentuado</b>
+          <span>Saídas abaixo de 75%</span>
+        </div>
+        <div class="budget-band">
+          <b>Superávit Moderado</b>
+          <span>75% a 95%</span>
+        </div>
+        <div class="budget-band">
+          <b>Equilíbrio</b>
+          <span>95% a 105%</span>
+        </div>
+        <div class="budget-band">
+          <b>Déficit Moderado</b>
+          <span>105% a 125%</span>
+        </div>
+        <div class="budget-band">
+          <b>Déficit Acentuado</b>
+          <span>Acima de 125%</span>
+        </div>
+      </div>
+
+      <div class="rule-context" style="grid-template-columns:1fr;">
+        <div>
+          <span class="label">Como é usado</span>
+          <p><span class="code">PC_SAI_ENT = VL_SAI_TOTAL / VL_ENT_TOTAL</span> posiciona o cliente em uma das cinco faixas orçamentárias.</p>
+        </div>
+      </div>
+
+      <div class="budget-shield" style="margin:14px 18px 0;">
+        <b>Blindagem Orçamentária</b>
+        <p>A decisão é tomada por categoria para garantir a precisão do cálculo.</p>
+
+        <div class="shield-grid">
+          <div class="shield-item">
+            <strong>Não entram em VL_ENT_TOTAL</strong>
+            <span><b>Resgates de Investimentos</b> · patrimônio existente, não renda nova.<br><b>Transferências próprias</b> · já chegam neutralizadas da etapa anterior.</span>
+          </div>
+
+          <div class="shield-item">
+            <strong>Não entram em VL_SAI_TOTAL</strong>
+            <span><b>Aplicações e Poupança</b> · guardar dinheiro não é despesa de consumo.<br><b>Pagamento de Fatura</b> · não duplica compras já capturadas individualmente.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="rule-context" style="grid-template-columns:1fr;">
+        <div>
+          <span class="label">Por que existe</span>
+          <p>O valor absoluto não basta. Gastar R$ 5 mil pode representar sobra para quem recebeu R$ 10 mil e déficit para quem recebeu R$ 4 mil. A relação com as entradas coloca o resultado em contexto real.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="rule-detail" id="s5r2">
+      <div class="decision">Depois da limpeza, o Radar organiza cada movimentação pelo papel que ela representa na vida financeira do cliente.</div>
+
+      <div class="finance-split">
+        <div class="finance-column">
+          <div class="finance-column-head">
+            <b>Entradas</b>
+            <span>Dinheiro que chega ao cliente</span>
+          </div>
+          <div class="finance-items">
+            <div class="finance-item"><strong>Renda</strong></div>
+            <div class="finance-item"><strong>Estorno</strong></div>
+            <div class="finance-item"><strong>Resgate</strong></div>
+            <div class="finance-item"><strong>Crédito</strong></div>
+            <div class="finance-item"><strong>Outras</strong></div>
+          </div>
+        </div>
+
+        <div class="finance-column">
+          <div class="finance-column-head">
+            <b>Saídas</b>
+            <span>Destino do dinheiro</span>
+          </div>
+          <div class="finance-items">
+            <div class="finance-item"><strong>Essenciais</strong> · mercado, moradia, água, luz e farmácia</div>
+            <div class="finance-item"><strong>Não Essenciais</strong> · lazer, restaurantes, compras e streaming</div>
+            <div class="finance-item"><strong>Futuro</strong> · investimentos, poupança e previdência</div>
+            <div class="finance-item"><strong>Obrigações</strong> · parcelas de empréstimos, financiamentos e faturas</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rule-context" style="grid-template-columns:1fr;">
+        <div>
+          <span class="label">Por que existe</span>
+          <p>Separar entradas e saídas por finalidade permite entender de onde vem o dinheiro e, principalmente, para onde ele está indo — base necessária para o diagnóstico financeiro.</p>
+        </div>
+      </div>
+    </article>
+
+    <article class="rule-detail" id="s5r3">
+      <div class="decision">Depois de saber se há sobra ou déficit, o Radar identifica onde está a maior pressão sobre a renda.</div>
+
+      <div class="pressure-intro">
+        <p>Cada balde de gastos é comparado com a renda presumida. O objetivo ainda não é escolher uma recomendação, mas produzir sinais objetivos sobre o comportamento financeiro do cliente.</p>
+      </div>
+
+      <div class="pressure-grid">
+        <div class="pressure-card">
+          <b>Essenciais</b>
+          <p>Mostra quanto da renda está comprometido com necessidades básicas e custos fixos.</p>
+          <div class="pressure-ruler">
+            <span><strong>&lt; 50%</strong>Controlado</span>
+            <span><strong>50%–75%</strong>Atenção</span>
+            <span><strong>≥ 75%</strong>Alta pressão</span>
+          </div>
+        </div>
+
+        <div class="pressure-card">
+          <b>Não Essenciais</b>
+          <p>Mostra o peso do consumo flexível e das escolhas discricionárias.</p>
+          <div class="pressure-ruler">
+            <span><strong>&lt; 30%</strong>Controlado</span>
+            <span><strong>30%–45%</strong>Atenção</span>
+            <span><strong>≥ 45%</strong>Alta pressão</span>
+          </div>
+        </div>
+
+        <div class="pressure-card">
+          <b>Obrigações</b>
+          <p>Mostra quanto da renda está comprometido com crédito, parcelas, empréstimos e faturas.</p>
+          <div class="pressure-ruler">
+            <span><strong>&lt; 30%</strong>Controlado</span>
+            <span><strong>30%–45%</strong>Atenção</span>
+            <span><strong>≥ 45%</strong>Alta pressão</span>
+          </div>
+        </div>
+
+        <div class="pressure-card">
+          <b>Futuro</b>
+          <p>A lógica é invertida: guardar pouco sinaliza maior necessidade de estímulo à formação de reserva.</p>
+          <div class="pressure-ruler">
+            <span><strong>&gt; 30%</strong>Boa formação</span>
+            <span><strong>20%–30%</strong>Atenção</span>
+            <span><strong>&lt; 20%</strong>Baixa reserva</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="diagnosis-bridge">
+        <p><strong>Saída da etapa:</strong> o Radar agora conhece a situação geral do caixa e os pontos de pressão do orçamento. Na Etapa 6 (Priorização), esses sinais serão combinados com o perfil financeiro para definir qual tema deve ser priorizado.</p>
+      </div>
+    </article>
+  </section>
+
+
+  <section class="stage-map" id="stageMap6">
+    <div class="branch">
+      <div class="rules-map" style="grid-template-columns:1fr; max-width:360px; margin:0 auto;">
+        <button class="rule-node" data-rule="s6r1" data-stage="6" type="button">
+          <span class="rule-kicker">Regra Final</span>
+          <span class="rule-title">Motor de Priorização</span>
+          <span class="rule-result">3 sinais → 5 temas → 1 prioridade</span>
+        </button>
+      </div>
+    </div>
+
+    <article class="rule-detail" id="s6r1">
+      <div class="decision">O Radar combina os sinais financeiros do cliente e identifica qual tema merece prioridade naquele momento.</div>
+
+      <div class="priority-flow">
+        <div class="priority-pillars">
+          <div class="priority-pillar">
+            <b>1 · Concentração dos Gastos</b>
+            <span>Onde o dinheiro está mais concentrado: essenciais, não essenciais, futuro ou obrigações.</span>
+          </div>
+
+          <div class="priority-pillar">
+            <b>2 · Situação do Orçamento</b>
+            <span>Se o período terminou com sobra, equilíbrio ou déficit.</span>
+          </div>
+
+          <div class="priority-pillar">
+            <b>3 · Perfil Financeiro</b>
+            <span>O histórico do cliente: Endividado, Equilibrista ou Investidor.</span>
+          </div>
+        </div>
+
+        <div class="priority-engine">
+          <b>Como o motor decide</b>
+          <p>Cada tema recebe pontos a partir dessas três frentes. A maior pontuação se torna a prioridade do cliente.</p>
+        </div>
+
+        <div class="priority-arrow">↓</div>
+      </div>
+
+      <div class="theme-grid">
+        <div class="theme-card">
+          <span class="theme-no">1</span>
+          <b>Categorização dos Gastos</b>
+          <span>Primeiro entender para onde o dinheiro está indo.</span>
+        </div>
+
+        <div class="theme-card">
+          <span class="theme-no">2</span>
+          <b>Gestão de Orçamento</b>
+          <span>Pressão em gastos essenciais e necessidade de reequilíbrio.</span>
+        </div>
+
+        <div class="theme-card">
+          <span class="theme-no">3</span>
+          <b>Consumo Planejado</b>
+          <span>Peso elevado de gastos não essenciais.</span>
+        </div>
+
+        <div class="theme-card">
+          <span class="theme-no">4</span>
+          <b>Formação de Reserva</b>
+          <span>Existe capacidade de poupar, mas pouco vai para o futuro.</span>
+        </div>
+
+        <div class="theme-card">
+          <span class="theme-no">5</span>
+          <b>Uso Consciente do Crédito</b>
+          <span>Obrigações e dívidas pressionam a renda.</span>
+        </div>
+      </div>
+
+      <div class="priority-governance">
+        <div class="governance-card">
+          <b>Trava de Categorização</b>
+          <p>Se mais de 75% das despesas estiverem sem classificação, o Radar não tenta recomendar poupança, consumo ou crédito. <strong>Categorização dos Gastos</strong> recebe prioridade automática.</p>
+        </div>
+
+        <div class="governance-card">
+          <b>Empate Técnico</b>
+          <p>Se dois ou mais temas terminarem com a mesma pontuação máxima, o Radar não escolhe no palpite. Registra <span class="code">CD_TEMA_VENCEDOR = 9</span> para tratamento posterior.</p>
+        </div>
+      </div>
+
+      <div class="final-output">
+        <b>Resultado Final</b>
+        <p><span class="code">NR_PONT_MAX</span> registra a maior pontuação e <span class="code">CD_TEMA_VENCEDOR</span> identifica o tema que será levado ao cliente.</p>
+      </div>
+
+      <div class="rule-context" style="grid-template-columns:1fr;">
+        <div>
+          <span class="label">Por que existe</span>
+          <p>O Radar não entrega apenas um retrato financeiro. Ele transforma o diagnóstico em uma prioridade objetiva para orientar a conversa mais relevante com o cliente.</p>
+        </div>
+      </div>
+    </article>
+  </section>
+
+</main>
+
+<script>
+const stages = {
+  stage1: document.getElementById('stageMap'),
+  stage2: document.getElementById('stageMap2'),
+  stage3: document.getElementById('stageMap3'),
+  stage4: document.getElementById('stageMap4'),
+  stage5: document.getElementById('stageMap5'),
+  stage6: document.getElementById('stageMap6')
+};
+
+function closeAllStageMaps(exceptId=null){
+  Object.entries(stages).forEach(([id,map])=>{
+    if(id !== exceptId){
+      map.classList.remove('open');
+      document.getElementById(id).classList.remove('active');
+    }
+  });
+}
+
+Object.entries(stages).forEach(([id,map])=>{
+  const stage = document.getElementById(id);
+  stage.addEventListener('click',()=>{
+    const willOpen = !map.classList.contains('open');
+    closeAllStageMaps(willOpen ? id : null);
+    map.classList.toggle('open', willOpen);
+    stage.classList.toggle('active', willOpen);
+  });
+});
+
+document.querySelectorAll('.rule-node').forEach(node=>{
+  node.addEventListener('click',()=>{
+    const map = node.closest('.stage-map');
+    const id = node.dataset.rule;
+    const already = node.classList.contains('active');
+
+    map.querySelectorAll('.rule-node').forEach(n=>n.classList.remove('active'));
+    map.querySelectorAll('.rule-detail').forEach(d=>d.classList.remove('open'));
+
+    if(!already){
+      node.classList.add('active');
+      document.getElementById(id).classList.add('open');
+    }
+  });
+});
+</script>
+</body>
+</html>
