@@ -1,0 +1,887 @@
+Prepare a apresentação no PowerPoint para criação dos próximos slides.
+
+Configure o documento em formato widescreen padrão, com proporção 16:9.
+
+Use as dimensões:
+33,867 cm de largura
+19,05 cm de altura
+
+A apresentação será usada para slides com diagramas horizontais, então mantenha a área útil pensada para leitura da esquerda para a direita.
+
+Deixe o ambiente pronto para criar slides editáveis dentro desse tamanho de tela.
+
+-----------------------------------
+
+
+Crie um slide em PowerPoint widescreen 16:9, totalmente editável, com um diagrama horizontal de arquitetura e governança.
+
+Priorize a estrutura visual, o esqueleto e as conexões do diagrama.
+
+Organize o slide em 3 faixas horizontais:
+
+1. faixa principal superior com o fluxo de 4 etapas
+2. faixa inferior com a contingência unificada
+3. margens laterais para entrada e saída do fluxo
+
+A composição principal deve ser lida da esquerda para a direita.
+
+========================================
+ESTRUTURA GERAL DO FLUXO
+========================================
+
+Na área principal, crie 4 colunas grandes, lado a lado, com a mesma largura e a mesma altura.
+
+Cada coluna deve ser um contêiner retangular com:
+- cabeçalho horizontal no topo
+- corpo interno abaixo do cabeçalho
+- área de decisão no lado direito da coluna
+
+As 4 colunas devem ser:
+
+01 · OBTENÇÃO DOS DADOS
+(via MCP)
+
+02 · ENTRADA NO AGENTE
+
+03 · PROCESSAMENTO
+(LLM + Tools)
+
+04 · SAÍDA & FECHAMENTO
+
+À esquerda das 4 colunas, fora delas, coloque um bloco de entrada vertical:
+
+Usuário
+Canal Autenticado
+(App BB / ABB)
+
+À direita das 4 colunas, fora delas, coloque um bloco de saída vertical:
+
+Entrega ao Usuário
+(HTTP 200)
+
+Conecte:
+Usuário → coluna 01
+coluna 04 → Entrega ao Usuário
+
+========================================
+FORMATO DAS 4 COLUNAS
+========================================
+
+Cada coluna deve seguir a mesma lógica estrutural:
+
+A. cabeçalho superior com o número e o nome da etapa
+B. card superior interno com ícone + nome do componente principal
+C. bloco central interno com lista de guardrails
+D. bloco inferior interno com sinais operacionais ou métricas
+E. losango de decisão no lado direito da coluna
+F. seta horizontal “Sim” para a próxima coluna
+G. seta vertical “Não” descendo para a contingência
+
+As 4 colunas devem ter alinhamento uniforme e mesma altura.
+
+========================================
+COLUNA 01
+========================================
+
+Título da coluna:
+01 · OBTENÇÃO DOS DADOS
+(via MCP)
+
+Dentro da coluna, organize 3 blocos empilhados verticalmente:
+
+1. card superior:
+MCP
+Sistema do Banco
+(retorna DataFrame)
+
+2. card central:
+Guardrails
+com lista em bullets
+
+3. card inferior:
+Sinais Operacionais
+com lista em bullets
+
+No lado direito da coluna, posicione um losango de decisão alinhado verticalmente ao centro da coluna com o texto:
+
+DataFrame válido?
+
+Conexões:
+- seta preta da entrada do usuário até o centro da coluna
+- seta preta da coluna até o losango
+- seta horizontal para a coluna 02 com rótulo “Sim”
+- seta vertical vermelha para baixo com rótulo “Não”, indo para a faixa de contingência
+
+========================================
+COLUNA 02
+========================================
+
+Título da coluna:
+02 · ENTRADA NO AGENTE
+
+Dentro da coluna, organize 3 blocos empilhados verticalmente:
+
+1. card superior:
+Solicitação do Usuário
++
+DataFrame validado
+
+2. card central:
+Guardrails
+com lista em bullets
+
+3. card inferior:
+Sinal Operacional
+com lista curta
+
+No lado direito da coluna, posicione um losango de decisão com o texto:
+
+Solicitação válida?
+
+Conexões:
+- seta horizontal vinda da coluna 01
+- seta da coluna para o losango
+- seta horizontal “Sim” para a coluna 03
+- seta vertical vermelha “Não” para a contingência
+
+========================================
+COLUNA 03
+========================================
+
+Título da coluna:
+03 · PROCESSAMENTO
+(LLM + Tools)
+
+Dentro da coluna, organize 3 blocos empilhados verticalmente:
+
+1. card superior:
+LLM + Tools Autorizadas
+com uma lista curta de tools
+
+2. card central:
+Guardrails
+com lista em bullets
+
+3. card inferior:
+Métricas
+com lista em bullets
+
+No lado direito da coluna, posicione um losango de decisão com o texto:
+
+Execução válida?
+
+Conexões:
+- seta horizontal vinda da coluna 02
+- seta da coluna para o losango
+- seta horizontal “Sim” para a coluna 04
+- seta vertical vermelha “Não” para a contingência
+
+========================================
+COLUNA 04
+========================================
+
+Título da coluna:
+04 · SAÍDA & FECHAMENTO
+
+Dentro da coluna, organize 3 blocos empilhados verticalmente:
+
+1. card superior:
+Composição da Resposta
+
+2. card central:
+Guardrails
+com lista em bullets
+
+3. card inferior:
+Métricas
+com lista em bullets
+
+No lado direito da coluna, posicione um losango de decisão com o texto:
+
+Resposta liberada?
+
+Conexões:
+- seta horizontal vinda da coluna 03
+- seta da coluna para o losango
+- seta horizontal “Sim” para Entrega ao Usuário
+- seta vertical vermelha “Não” para a contingência
+
+========================================
+FAIXA DE CONTINGÊNCIA
+========================================
+
+Na parte inferior do slide, ocupando praticamente toda a largura, crie uma grande faixa horizontal retangular com contorno destacado.
+
+Essa faixa representa um fluxo alternativo único e deve receber todas as setas vermelhas “Não” das 4 colunas.
+
+No canto esquerdo da faixa de contingência, coloque:
+- um ícone de alerta
+- o título:
+CONTINGÊNCIA UNIFICADA
+(Respostas Padrão Seguras)
+
+Abaixo do título, coloque uma frase curta descritiva em texto menor.
+
+Dentro da faixa de contingência, organize um fluxo horizontal da esquerda para a direita com 5 elementos:
+
+1. bloco:
+Mensagem Padrão Segura
+(Resposta pré-redigida e homologada)
+
+2. bloco:
+Dossiê Estruturado
+(Solicitação + MCP + Tools + Resultados + Resposta)
+
+3. bloco:
+MongoDB
+Registro de Evidências
+
+4. losango:
+Resposta confirmada?
+
+5. bloco final à direita:
+Contingência Preventiva
+(Resposta Retida)
+
+Conexões dentro da contingência:
+- as setas vermelhas vindas das colunas entram na faixa e convergem para o bloco “Mensagem Padrão Segura”
+- seta horizontal do bloco 1 para o bloco 2
+- seta horizontal do bloco 2 para o bloco 3
+- seta horizontal do bloco 3 para o losango “Resposta confirmada?”
+- do losango, seta horizontal ou diagonal com rótulo “Sim” subindo até o bloco “Entrega ao Usuário”
+- do losango, seta curta com rótulo “Não” indo para “Contingência Preventiva”
+
+========================================
+REGRAS DE LIGAÇÃO
+========================================
+
+Use esta lógica de conectores:
+
+- fluxo principal: sempre horizontal da esquerda para a direita
+- decisões aprovadas: seguem horizontalmente para a próxima etapa
+- falhas: descem verticalmente até a faixa de contingência
+- contingência: segue horizontalmente até confirmação
+- confirmação positiva: sobe até a entrega ao usuário
+
+========================================
+HIERARQUIA VISUAL DO ESQUELETO
+========================================
+
+A hierarquia estrutural deve ficar assim:
+
+1. entrada do usuário
+2. 4 grandes colunas de processamento
+3. losango ao fim de cada coluna
+4. faixa inferior única de contingência
+5. entrega ao usuário como saída final
+
+O diagrama deve parecer modular, corporativo, simétrico e fácil de escanear visualmente.
+
+Todos os blocos, setas, conectores, losangos e textos devem permanecer editáveis no PowerPoint.
+
+---------------------------------------------------------------
+
+
+Crie um slide em PowerPoint widescreen 16:9, totalmente editável, com um diagrama horizontal de arquitetura e governança.
+
+Priorize o esqueleto visual do slide, a geometria dos blocos e a lógica das conexões.
+
+A composição deve ser organizada em 3 faixas:
+
+1. faixa principal com o fluxo superior de 4 etapas
+2. faixa inferior de contingência unificada
+3. área lateral esquerda para entrada e lateral direita para entrega
+
+A leitura principal do diagrama deve ser da esquerda para a direita.
+
+========================================
+ESTRUTURA PRINCIPAL
+========================================
+
+Crie 4 grandes colunas verticais lado a lado, com mesma largura e mesma altura.
+
+Cada coluna deve conter:
+- cabeçalho superior
+- card superior do componente principal
+- card central de guardrails
+- card inferior de métrica ou sinal
+- losango de decisão no lado direito
+- seta horizontal “Sim” para a próxima etapa
+- seta vertical “Não” para a contingência
+
+As 4 colunas devem ser:
+
+01 · ENTRADA
+02 · ACESSO À BASE OFICIAL
+03 · PROCESSAMENTO
+04 · SAÍDA & FECHAMENTO
+
+À esquerda das colunas, fora delas, coloque um bloco vertical de entrada:
+
+Usuário / Canal
+(ABB / App BB)
+
+À direita das colunas, fora delas, coloque um bloco vertical de saída:
+
+Entrega ao Usuário
+
+Conecte:
+Usuário → coluna 01
+coluna 04 → Entrega ao Usuário
+
+========================================
+COLUNA 01
+========================================
+
+Título:
+01 · ENTRADA
+
+Estrutura interna da coluna:
+1. card superior:
+Guardrails de Entrada
+
+2. card central:
+Guardrails de Entrada
+com bullets
+
+3. card inferior:
+Métrica / Sinal
+com bullets
+
+No lado direito da coluna, um losango com o texto:
+
+Solicitação válida?
+
+Conexões:
+- seta preta da entrada do usuário até a coluna
+- seta preta da coluna até o losango
+- do losango, seta horizontal “Sim” para a coluna 02
+- do losango, seta vertical vermelha “Não” para a contingência
+
+========================================
+COLUNA 02
+========================================
+
+Título:
+02 · ACESSO À BASE OFICIAL
+
+Estrutura interna da coluna:
+1. card superior:
+Busca no GeneraBB
+
+2. card central:
+Guardrails
+com bullets
+
+3. card inferior:
+Métrica
+com bullets
+
+No lado direito da coluna, um losango com o texto:
+
+Base oficial suficiente?
+
+Conexões:
+- seta horizontal vinda da coluna 01
+- seta da coluna até o losango
+- do losango, seta horizontal “Sim” para a coluna 03
+- do losango, seta vertical vermelha “Não” para a contingência
+
+========================================
+COLUNA 03
+========================================
+
+Título:
+03 · PROCESSAMENTO
+
+Estrutura interna da coluna:
+1. card superior:
+Geração via Gateway LLM
+
+2. card central:
+Guardrails
+com bullets
+
+3. card inferior:
+Métrica
+com bullets
+
+No lado direito da coluna, um losango com o texto:
+
+Execução válida?
+
+Conexões:
+- seta horizontal vinda da coluna 02
+- seta da coluna até o losango
+- do losango, seta horizontal “Sim” para a coluna 04
+- do losango, seta vertical vermelha “Não” para a contingência
+
+========================================
+COLUNA 04
+========================================
+
+Título:
+04 · SAÍDA & FECHAMENTO
+
+Estrutura interna da coluna:
+1. card superior:
+Composição da Resposta
+
+2. card central:
+Guardrails
+com bullets
+
+3. card inferior:
+Métricas
+com bullets
+
+No lado direito da coluna, um losango com o texto:
+
+Resposta liberada?
+
+Conexões:
+- seta horizontal vinda da coluna 03
+- seta da coluna até o losango
+- do losango, seta horizontal “Sim” para Entrega ao Usuário
+- do losango, seta vertical vermelha “Não” para a contingência
+
+========================================
+FAIXA DE CONTINGÊNCIA
+========================================
+
+Na parte inferior do slide, crie uma faixa horizontal grande, ocupando quase toda a largura, separada do fluxo principal.
+
+No lado esquerdo da faixa, coloque:
+- um ícone de alerta
+- o título:
+CONTINGÊNCIA UNIFICADA
+(Respostas Padrão Seguras)
+
+Abaixo do título, uma frase curta explicativa.
+
+Dentro dessa faixa, organize um fluxo horizontal com 5 elementos:
+
+1. bloco:
+Mensagem Padrão Segura
+(Resposta pré-redigida e homologada)
+
+2. bloco:
+Registro de Evidências
+Solicitação + Trechos + Gates + Resposta
+
+3. bloco:
+MongoDB
+Registro de Evidências
+
+4. losango:
+Registro confirmado?
+
+5. bloco final:
+Contingência Preventiva
+(Resposta Retida)
+
+Conexões:
+- todas as setas vermelhas “Não” vindas das 4 colunas descem e entram nessa faixa
+- essas falhas convergem para o bloco “Mensagem Padrão Segura”
+- seta horizontal do bloco 1 para o bloco 2
+- seta horizontal do bloco 2 para o bloco 3
+- seta horizontal do bloco 3 para o losango “Registro confirmado?”
+- do losango, seta “Sim” subindo até “Entrega ao Usuário”
+- do losango, seta “Não” indo para “Contingência Preventiva”
+
+========================================
+COMPORTAMENTO DOS CONECTORES
+========================================
+
+Use sempre esta convenção estrutural:
+
+- fluxo principal: horizontal
+- sucesso: seta horizontal para a próxima etapa
+- falha: seta vertical para baixo
+- contingência: fluxo horizontal
+- confirmação positiva na contingência: seta subindo para a entrega final
+
+========================================
+PROPORÇÃO E ALINHAMENTO
+========================================
+
+Mantenha:
+- 4 colunas principais com dimensões iguais
+- losangos alinhados verticalmente ao centro de cada coluna
+- faixa de contingência alinhada abaixo de todas as colunas
+- entrada e saída alinhadas horizontalmente ao centro do fluxo principal
+
+A composição deve transmitir claramente:
+entrada → validações por etapa → saída
+e, em paralelo,
+falha em qualquer etapa → contingência unificada
+
+Todos os elementos devem ficar editáveis no PowerPoint.
+
+
+
+
+-------------------------------
+
+Recrie este slide como um diagrama totalmente editável no PowerPoint.
+
+Organize o fluxo principal da esquerda para a direita em 4 etapas:
+
+01 · ENTRADA
+02 · ACESSO À BASE OFICIAL
+03 · PROCESSAMENTO
+04 · SAÍDA & FECHAMENTO
+
+Antes da etapa 01, coloque:
+
+Usuário / Canal
+(ABB / App BB)
+
+Conecte o usuário à etapa 01.
+
+ETAPA 01 — ENTRADA
+
+Bloco principal:
+Guardrails de Entrada
+
+Conteúdo:
+• Validação de escopo
+• PII de entrada
+• Anti-Injection / Jailbreak
+• Limites de requisição
+
+Métrica / Sinal:
+• Detect Jailbreak
+
+Depois desse bloco, adicione a decisão:
+
+Solicitação válida?
+
+Caminho “Sim” segue para a etapa 02.
+Caminho “Não” segue para a contingência na parte inferior.
+
+
+ETAPA 02 — ACESSO À BASE OFICIAL
+
+Bloco principal:
+Busca no GeneraBB
+
+Guardrails:
+• Consulta obrigatória à base homologada
+• Limite de trechos recuperados
+• Timeout / tratamento de erro
+• Proibição de resposta sem base oficial
+
+Métrica:
+• Context Precision
+
+Depois desse bloco, adicione a decisão:
+
+Base oficial suficiente?
+
+Caminho “Sim” segue para a etapa 03.
+Caminho “Não” segue para a contingência.
+
+
+ETAPA 03 — PROCESSAMENTO
+
+Bloco principal:
+Geração via Gateway LLM
+
+Guardrails:
+• Resposta ancorada apenas nos trechos recuperados
+• NonAdvice (sem aconselhamento financeiro)
+• Toxicidade
+• Tool Correctness
+
+Métrica:
+• Faithfulness
+
+Depois desse bloco, adicione a decisão:
+
+Execução válida?
+
+Caminho “Sim” segue para a etapa 04.
+Caminho “Não” segue para a contingência.
+
+
+ETAPA 04 — SAÍDA & FECHAMENTO
+
+Bloco principal:
+Composição da Resposta
+
+Guardrails:
+• Blocklist corporativa
+• PII / dados sensíveis
+• Conteúdo permitido
+
+Métricas:
+• Answer Relevance
+• PII Leakage
+• Task Completion
+
+Depois desse bloco, adicione a decisão:
+
+Resposta liberada?
+
+Caminho “Sim” segue para:
+
+Entrega ao Usuário
+
+Caminho “Não” segue para a contingência.
+
+
+Na parte inferior do slide, crie uma área horizontal chamada:
+
+CONTINGÊNCIA UNIFICADA
+(Respostas Padrão Seguras)
+
+Texto de apoio:
+
+Acionada em caso de solicitação inválida, ausência de base oficial, falha na geração, violação de segurança ou resultado inconsistente.
+
+Faça os caminhos “Não” das validações convergirem para esse fluxo de contingência.
+
+Dentro da contingência, organize da esquerda para a direita:
+
+Mensagem Padrão Segura
+(Resposta pré-redigida e homologada)
+
+→
+
+Registro de Evidências
+Solicitação + Trechos + Gates + Resposta
+
+→
+
+MongoDB
+Registro de Evidências
+
+→
+
+decisão:
+Registro confirmado?
+
+Se “Sim”:
+seguir para Entrega ao Usuário.
+
+Se “Não”:
+seguir para:
+
+Contingência Preventiva
+(Resposta Retida)
+
+A leitura principal do slide deve ser:
+
+Usuário
+→ Entrada
+→ Acesso à Base Oficial
+→ Processamento
+→ Saída & Fechamento
+→ Entrega ao Usuário
+
+E todas as falhas de validação devem convergir visualmente para o fluxo unificado de contingência na parte inferior.
+
+Todos os blocos, textos, decisões, setas e conectores devem permanecer editáveis no PowerPoint.
+
+
+--------------------------------------------------
+
+Recrie este slide como um diagrama totalmente editável no PowerPoint.
+
+O diagrama representa um fluxo de agente com obtenção de dados via MCP, processamento com LLM + Tools, validações e contingência.
+
+Organize o fluxo principal da esquerda para a direita em 4 etapas:
+
+01 · OBTENÇÃO DOS DADOS
+(via MCP)
+
+02 · ENTRADA NO AGENTE
+
+03 · PROCESSAMENTO
+(LLM + Tools)
+
+04 · SAÍDA & FECHAMENTO
+
+
+ENTRADA
+
+Antes da etapa 01, coloque:
+
+Usuário /
+Canal Autenticado
+(App BB / ABB)
+
+Conecte o usuário à etapa 01.
+
+
+01 · OBTENÇÃO DOS DADOS
+(via MCP)
+
+Bloco principal:
+
+MCP
+Sistema do Banco
+(retorna DataFrame)
+
+Guardrails:
+• Origem autorizada
+• Timeout e tratamento de erro
+• Validação do retorno
+• Schema e tipos esperados
+
+Sinais Operacionais:
+• Disponibilidade dos dados
+• Integridade do DataFrame
+• Latência / timeout
+
+Ao final da etapa, coloque a decisão:
+
+DataFrame válido?
+
+Se “Sim”, seguir para a etapa 02.
+Se “Não”, seguir para a contingência unificada.
+
+
+02 · ENTRADA NO AGENTE
+
+Bloco principal:
+
+Solicitação do Usuário
++
+DataFrame validado
+
+Guardrails:
+• Escopo permitido
+• Anti-Injection / Jailbreak
+• Limites da solicitação
+• Dados disponíveis para análise
+
+Sinal Operacional:
+• Detect Jailbreak
+
+Ao final da etapa, coloque a decisão:
+
+Solicitação válida?
+
+Se “Sim”, seguir para a etapa 03.
+Se “Não”, seguir para a contingência unificada.
+
+
+03 · PROCESSAMENTO
+(LLM + Tools)
+
+Bloco principal:
+
+LLM + Tools Autorizadas
+
+Tools:
+• resumo_financeiro
+• datas
+• filtros
+• cálculos
+• outras tools homologadas
+
+Guardrails:
+• Apenas tools autorizadas
+• Validação de parâmetros
+• Cálculos executados pelas tools
+• Tratamento controlado de erros
+
+Métricas:
+• Tool Correctness
+• Correctness
+
+Ao final da etapa, coloque a decisão:
+
+Execução válida?
+
+Se “Sim”, seguir para a etapa 04.
+Se “Não”, seguir para a contingência unificada.
+
+
+04 · SAÍDA & FECHAMENTO
+
+Bloco principal:
+
+Composição da Resposta
+
+Guardrails:
+• Consistência com outputs das tools
+• PII / dados sensíveis
+• Conteúdo permitido
+
+Métricas:
+• Tool Output Utilization
+• PII Leakage
+• Task Completion
+
+Ao final da etapa, coloque a decisão:
+
+Resposta liberada?
+
+Se “Sim”, seguir para:
+
+Entrega ao Usuário
+(HTTP 200)
+
+Se “Não”, seguir para a contingência unificada.
+
+
+CONTINGÊNCIA
+
+Na parte inferior do slide, crie uma área horizontal chamada:
+
+CONTINGÊNCIA UNIFICADA
+(Respostas Padrão Seguras)
+
+Texto:
+
+Acionada em caso de dados inválidos, solicitação inválida, falha de tool, timeout, resultado inconsistente ou violação de segurança.
+
+Faça todos os caminhos “Não” das quatro validações convergirem para essa área.
+
+Dentro da contingência, organize o fluxo:
+
+Mensagem Padrão Segura
+(Resposta pré-redigida e homologada)
+
+→
+
+Dossiê Estruturado
+(Solicitação + MCP + Tools + Resultados + Resposta)
+
+→
+
+MongoDB
+Registro de Evidências
+
+→
+
+decisão:
+
+Resposta confirmada?
+
+Se “Sim”:
+seguir para Entrega ao Usuário (HTTP 200).
+
+Se “Não”:
+seguir para:
+
+Contingência Preventiva
+(Resposta Retida)
+
+
+A leitura principal do diagrama deve ser:
+
+Usuário
+→ obtenção dos dados via MCP
+→ validação do DataFrame
+→ entrada no agente
+→ processamento com LLM + Tools
+→ composição da resposta
+→ entrega ao usuário.
+
+As falhas de validação devem convergir para o mesmo fluxo de contingência na parte inferior.
+
+Todos os blocos, decisões, textos, setas e conectores devem permanecer editáveis no PowerPoint.
