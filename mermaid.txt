@@ -1,0 +1,87 @@
+flowchart TD
+
+    subgraph E1["01 · ENTRADA"]
+        A["Usuário / Canal"] --> B["Guardrails de Entrada<br/>• Validação de escopo<br/>• PII de entrada<br/>• Anti-Injection / Jailbreak<br/>• Limites de requisição<br/><br/>Métrica / Sinal<br/>• Detect Jailbreak"]
+        B --> G1{"Solicitação válida?"}
+    end
+
+    subgraph E2["02 · ACESSO À BASE OFICIAL"]
+        G1 -- "✔ Sim" --> C["Busca no GeneraBB<br/><br/>Guardrails<br/>• Consulta obrigatória à base homologada<br/>• Limite de trechos recuperados<br/>• Timeout / tratamento de erro<br/>• Proibição de resposta sem base oficial<br/><br/>Métrica<br/>• Context Precision"]
+        C --> G2{"Base oficial suficiente?"}
+    end
+
+    subgraph E3["03 · PROCESSAMENTO"]
+        G2 -- "✔ Sim" --> D["Geração via Gateway LLM<br/><br/>Guardrails<br/>• Resposta ancorada apenas nos trechos recuperados<br/>• NonAdvice (sem aconselhamento financeiro)<br/>• Toxicidade<br/>• Tool Correctness<br/><br/>Métrica<br/>• Faithfulness"]
+        D --> G3{"Execução válida?"}
+    end
+
+    subgraph E4["04 · SAÍDA & FECHAMENTO"]
+        G3 -- "✔ Sim" --> E["Composição da Resposta<br/><br/>Guardrails<br/>• Blocklist corporativa<br/>• PII / dados sensíveis<br/>• Conteúdo permitido<br/><br/>Métricas<br/>• Answer Relevance<br/>• PII Leakage<br/>• Task Completion"]
+
+        E --> G4{"Resposta liberada?"}
+        G4 -- "✔ Sim" --> F["Registro de Evidências<br/>Solicitação + Trechos + Gates + Resposta"]
+        F --> H["Entrega ao Usuário"]
+    end
+
+    subgraph CONT["CONTINGÊNCIA UNIFICADA"]
+        G1 -- "✖ Não" --> S["Mensagem Padrão Segura"]
+        G2 -- "✖ Não" --> S
+        G3 -- "✖ Não" --> S
+        G4 -- "✖ Não" --> S
+        S --> F
+    end
+
+    ---------------------------
+
+
+    flowchart TD
+
+    A["Usuário / Canal"] --> O["Backend / Orquestrador"]
+
+    subgraph E1["01 · OBTENÇÃO DOS DADOS"]
+        O --> B["MCP · Sistema do Banco<br/><br/>Guardrails<br/>• Origem autorizada<br/>• Timeout / tratamento de erro<br/>• Validação do retorno<br/>• Schema e tipos esperados<br/><br/>Sinais<br/>• Disponibilidade dos dados<br/>• Integridade do DataFrame"]
+        B --> G1{"DataFrame válido?"}
+    end
+
+    subgraph E2["02 · ENTRADA NO AGENTE"]
+        G1 -- "✔ Sim" --> C["Solicitação + DataFrame<br/><br/>Guardrails<br/>• Escopo permitido<br/>• Anti-Injection / Jailbreak<br/>• Limites da solicitação<br/><br/>Métrica / Sinal<br/>• Detect Jailbreak"]
+        C --> G2{"Solicitação válida?"}
+    end
+
+    subgraph E3["03 · PROCESSAMENTO"]
+        G2 -- "✔ Sim" --> D["LLM + Tools Autorizadas<br/>resumo_financeiro · datas · filtros · cálculos<br/><br/>Guardrails<br/>• Apenas tools autorizadas<br/>• Validação de parâmetros<br/>• Cálculos executados pelas tools<br/>• Tratamento controlado de erros<br/><br/>Métricas<br/>• Tool Correctness<br/>• Correctness"]
+        D --> G3{"Execução válida?"}
+    end
+
+    subgraph E4["04 · SAÍDA & FECHAMENTO"]
+        G3 -- "✔ Sim" --> E["Composição da Resposta<br/><br/>Guardrails<br/>• Consistência com outputs das tools<br/>• PII / dados sensíveis<br/>• Conteúdo permitido<br/><br/>Métricas<br/>• Tool Output Utilization<br/>• PII Leakage<br/>• Task Completion"]
+
+        E --> G4{"Resposta liberada?"}
+
+        G4 -- "✔ Sim" --> J["Dossiê Estruturado<br/>Solicitação + MCP + Tools + Resultados + Resposta"]
+
+        J --> K{"Registro confirmado?"}
+
+        K -- "✔ Sim" --> L["Entrega ao Usuário"]
+    end
+
+    subgraph CONT["CONTINGÊNCIA UNIFICADA"]
+        G1 -- "✖ Não" --> S["Mensagem Padrão Segura"]
+        G2 -- "✖ Não" --> S
+        G3 -- "✖ Não" --> S
+        G4 -- "✖ Não" --> S
+
+        S --> J
+
+        K -- "✖ Falha" --> N["Contingência Preventiva<br/>Resposta Retida"]
+    end
+
+    J -. "Pós-processamento" .-> Q["Avaliação de Governança<br/>• Tool Correctness<br/>• Correctness<br/>• Tool Output Utilization<br/>• PII Leakage<br/>• Task Completion"]
+
+    Q -. "Desvio" .-> R["Curadoria Sob Demanda"]
+
+    style E1 fill:#f0f7ff,stroke:#2563eb,stroke-width:1.5px
+    style E2 fill:#f5f3ff,stroke:#7c3aed,stroke-width:1.5px
+    style E3 fill:#fdf4ff,stroke:#c026d3,stroke-width:1.5px
+    style E4 fill:#f0fdf4,stroke:#15803d,stroke-width:1.5px
+    style CONT fill:#fff7ed,stroke:#ea580c,stroke-width:1.5px,stroke-dasharray: 4 4
