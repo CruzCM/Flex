@@ -1,0 +1,64 @@
+Slide 7 — Especialização
+Alterações
+Especialista em Cartões e Fatura
+Especialista em Gestão Financeira
+Especialista em Seguros
+Especialista em Renegociação de Dívidas
+Fala
+
+“Como o Juscelino mostrou, a gente pode evoluir um agente dando a ele fluxo, conhecimento e capacidades, tudo isso de forma padronizada.
+
+A partir daí, surge uma questão importante: até que ponto faz sentido concentrar tudo em um único agente?
+
+Aqui existe um cuidado para não aumentar demais a complexidade, dificultando inclusive a manutenção e a evolução.
+
+Então, uma forma de lidar com isso é separar responsabilidades. Podemos criar agentes especialistas, cada um com uma função bem definida.”
+
+Slide 8 — Orquestração
+Fala
+
+“Quando a gente separa as responsabilidades e passa a ter vários agentes especialistas, surge uma nova questão: quem coordena tudo isso?
+
+É aí que entra o orquestrador. O orquestrador recebe a solicitação, entende o que está sendo pedido e direciona para o especialista mais adequado.
+
+E, quando necessário, ele pode coordenar mais de um especialista e, no final, consolidar tudo em uma única resposta para o usuário.
+
+Então, o papel do orquestrador não é fazer tudo sozinho. É direcionar, coordenar e consolidar.”
+
+Slide 9 — Diretrizes
+Fala
+
+“Mas, quando a gente leva isso para uma arquitetura corporativa, não basta só conectar os agentes. Então foi proposta uma arquitetura para que esse ecossistema consiga crescer de forma organizada.
+
+Então temos algumas diretrizes que tratam de:
+
+1. Padrões comuns de integração: usar formas padronizadas de acesso às ferramentas e capacidades, como o MCP.
+
+2. Comunicação entre agentes: definir uma forma organizada e padronizada para a troca de contexto e resultados entre os especialistas, como o A2A.
+
+3. Reutilização de capacidades: aproveitar agentes e capacidades já existentes em diferentes jornadas.
+
+4. Baixo acoplamento: evitar que um agente fique dependente demais de uma integração ou de outro componente.
+
+5. Governança e evolução: pensar desde o início em segurança, observabilidade, qualidade e evolução da solução.
+
+A ideia é justamente evitar que cada novo agente vire uma solução isolada.”
+
+Slide 10 — Arquitetura Multiagentes (temos que refazer) veja o slide alvo
+
+Fala
+“Agora a gente consegue enxergar como essas diretrizes aparecem na arquitetura do banco.
+O fluxo começa pelos canais e consumidores, passa pelos controles de acesso e segurança e chega à camada de integração e orquestração, que coordena os acionamentos.
+A partir daí entram os agentes especializados e suborquestradores.
+E sustentando toda essa estrutura temos duas camadas transversais: persistência, para manter informações como contexto e estado, e observabilidade e qualidade, para acompanhar o funcionamento do ecossistema.
+Então, mais importante do que olhar cada caixa isoladamente é entender essa separação de responsabilidades, que permite organizar e governar a arquitetura.”
+
+
+Slide 11 — Fechamento
+Manuel
+
+“E, a partir daí, a gente entra na especialização, na orquestração e, por fim, em um ecossistema de agentes.
+
+Então ficam três ideias principais: reutilizar antes de construir do zero, padronizar antes de criar integrações específicas e pensar em governança desde o início.
+
+No fim, o objetivo é esse: não ter vários agentes isolados, mas um ecossistema que consiga evoluir de forma organizada, segura e reutilizável.”

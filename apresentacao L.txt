@@ -1,0 +1,46 @@
+Foi apresentada a visão do orquestrador e como ele funciona. Agora, o objetivo é mostrar como esses agentes estão sendo construídos e como, futuramente, vão se conectar de forma padronizada a esse orquestrador central.
+
+Esses agentes já estão sendo pensados com uma base comum de governança. A ideia é que cada etapa tenha algum mecanismo, métrica ou tratamento associado.
+
+Como a proposta é trabalhar com agentes especialistas, cada um tem uma função bem delimitada. Hoje, estamos desenvolvendo dois tipos principais: agentes que usam somente base de conhecimento e agentes que usam ferramentas e acesso a dados corporativos.
+
+Nos agentes que usam base de conhecimento, o foco é garantir que a resposta venha de uma base homologada, que o contexto recuperado seja relevante e que a resposta esteja aderente a esse contexto. Para isso, usamos métricas como Precisão do Contexto (Context Precision), Fidelidade ao Contexto (Faithfulness) e Relevância da Resposta (Answer Relevance), além de mecanismos de escopo, jailbreak e conteúdo.
+
+Nos agentes com MCP, a preocupação muda um pouco. Além da qualidade da resposta, precisamos garantir o uso correto dos dados e das Tools. Aí entram validação de parâmetros, uso de Tools autorizadas e métricas como Correção no Uso das Tools (Tool Correctness) e Sucesso das Chamadas de Tools (Tool Call Success), além de sinais como latência, erros e volume de dados.
+
+Como cada agente pode usar dados e bases com diferentes níveis de criticidade, essas práticas de governança também podem variar. Inicialmente, os agentes que estamos desenvolvendo têm uma estrutura mais simples.
+
+Na observabilidade, vamos usar o OpenTelemetry para coletar e acompanhar as métricas, e o Oracle para registrar o histórico das interações e permitir auditorias sob demanda.
+
+Olhando para os agentes que temos hoje, essas duas arquiteturas atendem bem tanto às necessidades de desenvolvimento quanto às de governança, inclusive pensando na aprovação do relatório.
+
+A proposta é usar essas duas arquiteturas como base e ajustar os mecanismos e as métricas conforme a necessidade de cada agente.
+
+
+----------------------------------------------------------------------
+
+
+| Tipo                  | Item                                             | OpenTelemetry                                                         |
+| --------------------- | ------------------------------------------------ | --------------------------------------------------------------------- |
+| **Guardrail**         | Aderência ao escopo                              | Pode gerar evento/trace                                               |
+| **Guardrail**         | Proteção contra jailbreak                        | Pode registrar detecção                                               |
+| **Guardrail**         | Uso de base homologada                           | Pode registrar a execução                                             |
+| **Guardrail**         | Resposta baseada no contexto                     | Pode registrar resultado da validação                                 |
+| **Guardrail**         | Tools autorizadas                                | Pode registrar chamadas                                               |
+| **Guardrail**         | Validação de parâmetros e schema                 | Pode registrar falhas                                                 |
+| **Guardrail**         | Consistência com dados/contexto                  | Pode registrar resultado                                              |
+| **Guardrail**         | Controle de toxicidade                           | Pode registrar bloqueios/detecções                                    |
+| **Guardrail**         | Restrição a recomendações não permitidas         | Pode registrar violações                                              |
+| **Métrica**           | Detecção de Jailbreak (**Detect Jailbreak**)     | Pode ser enviada como métrica                                         |
+| **Métrica**           | Precisão do Contexto (**Context Precision**)     | **Sim — confirmado no template**                                      |
+| **Métrica**           | Fidelidade ao Contexto (**Faithfulness**)        | Pode ser enviada como métrica                                         |
+| **Métrica**           | Relevância da Resposta (**Answer Relevance**)    | Pode ser enviada como métrica                                         |
+| **Métrica**           | Correção no Uso das Tools (**Tool Correctness**) | Validador existe; envio via OTel não está explicitamente confirmado   |
+| **Métrica**           | Sucesso das Chamadas (**Tool Call Success**)     | Pode ser instrumentada                                                |
+| **Métrica**           | Toxicidade (**Toxicity**)                        | Validação existe; emissão via OTel não está explicitamente confirmada |
+| **Métrica**           | Não Recomendação (**NonAdvice**)                 | Pode ser instrumentada                                                |
+| **Sinal operacional** | Latência                                         | Sim                                                                   |
+| **Sinal operacional** | Erros                                            | Sim                                                                   |
+| **Sinal operacional** | Timeout                                          | Sim                                                                   |
+| **Sinal operacional** | Quantidade de chamadas                           | Sim                                                                   |
+| **Sinal operacional** | Volume de dados retornados                       | Sim                                                                   |
