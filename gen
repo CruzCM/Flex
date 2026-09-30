@@ -1,0 +1,84 @@
+ Com base na análise do código deste projeto, encontrei as configurações e formatos exatos de payload para realizar
+  chamadas ao GeneraBB.
+
+  │ BLOQUEADO POR AMBIENTE: Não posso executar esses comandos a partir deste ambiente (workspace local/sandbox), pois
+  │ não temos conexão autorizada, credenciais ou acesso real aos serviços corporativos. Toda a estrutura abaixo foi
+  │ validada localmente apenas pela leitura do código-fonte e das configurações (agent_config.yaml). Você precisará
+  │ rodar estes comandos no seu ambiente corporativo (onde o curl alcança os domínios *.bb.com.br).
+
+  Neste repositório, há dois componentes que se comunicam com o Genera. Como você mencionou testar "o genere" e ver o
+  JSON, vou deixar o curl para os dois cenários: Genera Safe (Guardrail) e Genera RAG (Recuperação de contexto).
+
+  ### 1. Testar o Genera Safe (Guardrails / Curador)
+
+  Baseado no arquivo test_genera_safe_guardrails.py e em utils/genera_safe_guardrails.py, o Guardrail avalia se uma
+  mensagem é segura.
+
+    curl -X POST "https://generabb-acs.gbb.servicos.bb.com.br/gateway/agent" \
+      -H "accept: application/json" \
+      -H "Content-Type: application/json" \
+      -H "X-Client-Id: SEU_GUARDRAIL_EXTERNAL_CLIENT_ID" \
+      -H "UOR: SUA_UOR" \
+      -H "userIdentification: SEU_USER_ID" \
+      -d '{
+        "action": "conversar",
+        "body": {
+          "data": {
+            "input": "Sua mensagem de teste aqui",
+            "context": {
+              "messages": []
+            }
+          }
+        },
+        "agent_id": "agente-curador-iagen"
+      }'
+
+  JSON Esperado (Retorno):
+  O código espera que a resposta contenha uma chave allowed (booleano) e, se bloqueado, uma chave reason ou um status
+  (como blocked, rejected, violation).
+  ──────
+  ### 2. Testar o Genera RAG (Recuperação de Contexto do Índice)
+
+  Baseado no arquivo utils/rag_tool.py, este é o endpoint que faz a busca (retrieval) na sua base de dados do MF
+  Educador Financeiro.
+
+    curl -X POST "https://generabb-acs.gbb.servicos.bb.com.br/gateway/core" \
+      -H "accept: application/json" \
+      -H "Content-Type: application/json" \
+      -H "X-Client-Id: SEU_RAG_CLIENT_ID" \
+      -H "UOR: SUA_UOR" \
+      -H "userIdentification: SEU_USER_ID" \
+      -d '{
+        "action": "recuperar-contexto-indice",
+        "body": {
+          "data": {
+            "input": "O que é educação financeira?",
+            "context": {
+              "query_type": "hybrid",
+              "total_context": 5
+            },
+            "index_id": "idx-mf-edu-fin"
+          }
+        }
+      }'
+
+  JSON Esperado (Retorno):
+  O código do RAG navega no JSON buscando o caminho exato data.retrieved_contexts[*].passage_text. Portanto, a
+  estrutura retornada pelo Genera para que o código do projeto funcione precisa ser algo parecido com:
+
+    {
+      "data": {
+        "retrieved_contexts": [
+          {
+            "passage_text": "Texto recuperado 1..."
+          },
+          {
+            "passage_text": "Texto recuperado 2..."
+          }
+        ]
+      }
+    }
+
+  Lembre-se de substituir os valores de cabeçalho (SEU_..._CLIENT_ID, SUA_UOR e SEU_USER_ID) pelos valores e tokens
+  reais que você utiliza em ambiente corporativo, já que na configuração local (mock/HML) as variáveis de uor e
+  user_id costumam estar em branco ("").
