@@ -1,0 +1,183 @@
+%%spark
+
+jvm = spark._jvm
+conf = spark.sparkContext._jsc.hadoopConfiguration()
+fs = jvm.org.apache.hadoop.fs.FileSystem.get(conf)
+
+home = fs.getHomeDirectory()
+
+usuario = jvm.org.apache.hadoop.security.UserGroupInformation.getCurrentUser()
+
+print("Usuario:", usuario.getShortUserName())
+print("HDFS:", fs.getUri())
+print("Home:", home)
+print("Diretorio existe:", fs.exists(home))
+
+print("\nCAMINHO PARA COPIAR:")
+print(fs.makeQualified(home))
+
+
+
+
+
+%%spark
+
+# PREENCHER COM O CAMINHO ENCONTRADO
+diretorio_hdfs = "COLE_O_CAMINHO_AQUI"
+
+jvm = spark._jvm
+conf = spark.sparkContext._jsc.hadoopConfiguration()
+
+pasta = jvm.org.apache.hadoop.fs.Path(diretorio_hdfs)
+fs = pasta.getFileSystem(conf)
+
+if not fs.exists(pasta):
+    raise ValueError("Diretorio nao encontrado.")
+
+caminho = jvm.org.apache.hadoop.fs.Path(
+    pasta, "teste_hdfs.txt"
+)
+
+conteudo = """TESTE HDFS
+ID;DESCRICAO;VALOR
+1;Registro A;100.00
+2;Registro B;200.00
+3;Registro C;300.00
+"""
+
+# Salvar arquivo sem sobrescrever um existente
+arquivo = fs.create(caminho, False)
+
+escritor = jvm.java.io.OutputStreamWriter(arquivo, "UTF-8")
+
+try:
+    escritor.write(conteudo)
+finally:
+    escritor.close()
+
+print("Arquivo salvo:", fs.makeQualified(caminho))
+print("Arquivo existe:", fs.exists(caminho))
+print("Tamanho em bytes:", fs.getFileStatus(caminho).getLen())
+
+# Conferir o conteudo gravado
+spark.read.text(str(caminho)).show(truncate=False)
+
+
+
+
+-----
+
+
+%%spark
+
+conector = criar_conector_db2_spark()
+
+jvm = spark._jvm
+
+# Configuracao JDBC
+propriedades = jvm.java.util.Properties()
+propriedades.setProperty("user", conector.usuario)
+propriedades.setProperty("password", conector.senha)
+propriedades.setProperty("readOnly", "true")
+
+# Carregar driver
+try:
+    classe = jvm.java.lang.Class.forName(conector.driver)
+except Exception:
+    carregador = jvm.java.lang.Thread.currentThread().getContextClassLoader()
+    classe = jvm.java.lang.Class.forName(
+        conector.driver, True, carregador
+    )
+
+# Abrir conexao
+conexao = classe.newInstance().connect(
+    conector.url, propriedades
+)
+
+consultas = {
+    "01 - SELECT SIMPLES": """
+        SELECT 1 AS TESTE
+        FROM SYSIBM.SYSDUMMY1
+    """,
+
+    "02 - CTE SIMPLES": """
+        WITH P AS (
+            SELECT 1 AS TESTE
+            FROM SYSIBM.SYSDUMMY1
+        )
+        SELECT TESTE FROM P
+    """,
+
+    "03 - CTE COM DATAS": """
+        WITH P AS (
+            SELECT
+                DATE('2026-10-26') AS DT_INI,
+                DATE('2026-11-25') AS DT_FIM_EXCL
+            FROM SYSIBM.SYSDUMMY1
+        )
+        SELECT DT_INI, DT_FIM_EXCL FROM P
+    """,
+
+    "04 - MULTIPLAS CTES": """
+        WITH A AS (
+            SELECT 1 AS VALOR
+            FROM SYSIBM.SYSDUMMY1
+        ),
+        B AS (
+            SELECT VALOR + 1 AS VALOR
+            FROM A
+        )
+        SELECT VALOR FROM B
+    """
+}
+
+try:
+    if not conexao.isReadOnly():
+        raise RuntimeError("Conexao nao esta em somente leitura.")
+
+    conexao.setAutoCommit(True)
+
+    conexao.setTransactionIsolation(
+        jvm.java.sql.Connection.TRANSACTION_READ_COMMITTED
+    )
+
+    print("Conexao DB2: OK")
+    print("Somente leitura:", conexao.isReadOnly())
+    print("=" * 70)
+
+    for nome, sql in consultas.items():
+
+        comando = None
+        resultado = None
+
+        try:
+            comando = conexao.createStatement()
+            comando.setQueryTimeout(60)
+
+            resultado = comando.executeQuery(sql)
+
+            colunas = resultado.getMetaData().getColumnCount()
+
+            while resultado.next():
+                valores = [
+                    resultado.getString(i)
+                    for i in range(1, colunas + 1)
+                ]
+
+                print(nome, "| OK |", valores)
+
+        except Exception as erro:
+            print(nome, "| ERRO |", str(erro))
+
+        finally:
+            if resultado is not None:
+                resultado.close()
+
+            if comando is not None:
+                comando.close()
+
+finally:
+    conexao.close()
+
+print("=" * 70)
+print("TESTE FINALIZADO")
