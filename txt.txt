@@ -46,3 +46,17 @@ retomar_execucao = None
 baixar_zip_jupyterlab = True
 cluster_bbmagic = "CDP"
 destino_hdfs = None
+
+
+--------
+
+
+Solicito uma avaliação técnica, quantitativa e independente dos resultados do estudo dos seis indicadores GFP.
+
+Utilize a documentação Guia_Avaliacao_Resultados_Estudo_GFP_Radar.md como orientação metodológica e o pacote ZIP da execução corporativa como fonte primária dos resultados.
+
+Nosso objetivo é compreender profundamente o comportamento dos seis indicadores e determinar quais devem ser utilizados como filtros no Radar Financeiro, quais não devem ser utilizados e quais exigem tratamento condicionado.
+
+Execute todos os controles previstos na documentação, analise as consultas individualmente e de forma cruzada, quantifique os impactos e produza uma matriz conclusiva de decisão.
+
+Não altere o código do Radar nesta etapa. Não presuma que os filtros atualmente utilizados estão corretos. Toda recomendação deverá ser sustentada pelas evidências disponíveis, distinguindo fatos documentados, comportamentos observados, inferências e questões pendentes.
