@@ -49,7 +49,6 @@ retomar_execucao = None
 baixar_zip_jupyterlab = True
 cluster_bbmagic = "CDP"
 destino_hdfs = None
-
 --------
 
 
