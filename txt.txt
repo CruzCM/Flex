@@ -2,10 +2,12 @@
 # PARAMETROS DO ESTUDO
 # ============================================================
 
+revisao_notebook = "gfp-jdbc-integrado-2"
+
 modo = "CENSITARIO"
 
-data_inicial = "2026-11-08"
-data_final_exclusiva = "2026-11-15"
+data_inicial = "2026-11-20"
+data_final_exclusiva = "2026-11-27"
 
 consultas_selecionadas = (
     "Q00",
@@ -16,6 +18,7 @@ consultas_selecionadas = (
     "Q04",
     "Q05",
     "Q06",
+    "Q07",
     "Q08",
     "Q09",
     "Q10",
@@ -30,14 +33,14 @@ semente = 42
 tamanho_lote = 10
 
 # Particionamento
-particoes = [78]
+particoes = []
 experimentar_formula_particao = False
 autorizar_censo = True
 
 # Controle de execucao
-timeout_transacoes_segundos = 120
-timeout_cadastros_segundos = 30
-orcamento_global_segundos = 300
+timeout_transacoes_segundos = 900
+timeout_cadastros_segundos = 120
+orcamento_global_segundos = 21600
 
 # Retomada
 retomar_execucao = None
@@ -46,7 +49,6 @@ retomar_execucao = None
 baixar_zip_jupyterlab = True
 cluster_bbmagic = "CDP"
 destino_hdfs = None
-
 
 --------
 
